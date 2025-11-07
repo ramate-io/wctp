@@ -8,6 +8,8 @@ mod geography;
 mod terrain;
 mod ui;
 
+pub use geography::FeatureRegistry;
+
 pub use camera::CameraController;
 pub use chunk::{ChunkConfig, ChunkCoord, LoadedChunks};
 pub use terrain::TerrainConfig;
@@ -18,9 +20,14 @@ pub struct TerrainPlugin {
 
 impl Plugin for TerrainPlugin {
 	fn build(&self, app: &mut App) {
+		// Set up geographic features
+		let mut feature_registry = geography::FeatureRegistry::new();
+		feature_registry.add_feature(Box::new(geography::canyons::CanyonFeature::new(self.seed, 1000)));
+
 		app.insert_resource(TerrainConfig::new(self.seed))
 			.insert_resource(ChunkConfig::default())
 			.insert_resource(LoadedChunks::default())
+			.insert_resource(feature_registry)
 			.add_systems(Startup, (camera::setup_camera, setup_lighting, ui::setup_debug_ui))
 			.add_systems(
 				Update,

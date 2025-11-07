@@ -1,4 +1,5 @@
 use crate::chunk::{ChunkCoord, TerrainChunk};
+use crate::geography::FeatureRegistry;
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
 
@@ -45,6 +46,7 @@ pub fn generate_chunk_mesh(
 	resolution: usize,
 	config: &TerrainConfig,
 	perlin: &Perlin,
+	feature_registry: Option<&FeatureRegistry>,
 ) -> Mesh {
 	let mut vertices = Vec::new();
 	let mut indices = Vec::new();
@@ -82,6 +84,11 @@ pub fn generate_chunk_mesh(
 			}
 
 			height = (height / max_value) * config.height_scale;
+
+			// Apply geographic features (canyons, etc.)
+			if let Some(registry) = feature_registry {
+				height = registry.apply_features(world_x, world_z, height, config);
+			}
 
 			// Local position relative to chunk origin
 			let local_x = xf * step;
@@ -156,9 +163,10 @@ pub fn spawn_chunk(
 	resolution: usize,
 	config: &TerrainConfig,
 	perlin: &Perlin,
+	feature_registry: Option<&FeatureRegistry>,
 ) -> Entity {
 	// Use unwrapped coordinate for mesh generation to ensure seamless terrain
-	let mesh = generate_chunk_mesh(&unwrapped_coord, chunk_size, resolution, config, perlin);
+	let mesh = generate_chunk_mesh(&unwrapped_coord, chunk_size, resolution, config, perlin, feature_registry);
 	let mesh_handle = meshes.add(mesh);
 
 	// Make the origin chunk (0, 0) reddish for easy verification
