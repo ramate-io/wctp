@@ -9,8 +9,8 @@ pub struct TerrainPlugin {
 impl Plugin for TerrainPlugin {
 	fn build(&self, app: &mut App) {
 		app.insert_resource(TerrainSeed(self.seed))
-			.add_systems(Startup, (setup_camera, setup_terrain, setup_lighting))
-			.add_systems(Update, camera_controller);
+			.add_systems(Startup, (setup_camera, setup_terrain, setup_lighting, setup_debug_ui))
+			.add_systems(Update, (camera_controller, update_coordinate_display));
 	}
 }
 
@@ -25,16 +25,24 @@ pub struct CameraController {
 	pub pitch: f32,
 }
 
+#[derive(Component)]
+struct CoordinateDisplay;
+
 fn setup_camera(mut commands: Commands) {
+	let camera_pos = Vec3::new(0.0, 20.0, 30.0);
+	let look_at = Vec3::new(0.0, 0.0, 0.0);
+
+	log::info!("Setting up camera at position: {:?}, looking at: {:?}", camera_pos, look_at);
+
 	commands.spawn((
 		Camera3d::default(),
-		Transform::from_xyz(0.0, 10.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y),
+		Transform::from_xyz(camera_pos.x, camera_pos.y, camera_pos.z).looking_at(look_at, Vec3::Y),
 		Projection::Perspective(PerspectiveProjection::default()),
 		CameraController {
-			speed: 10.0,
-			sensitivity: 0.001,
+			speed: 20.0,
+			sensitivity: 0.005,
 			yaw: -90.0_f32.to_radians(),
-			pitch: -10.0_f32.to_radians(),
+			pitch: -20.0_f32.to_radians(),
 		},
 	));
 }
@@ -61,7 +69,7 @@ fn setup_terrain(
 	seed: Res<TerrainSeed>,
 ) {
 	let size = 100;
-	let scale = 0.1;
+	let scale = 1.0; // No scaling - use terrain at full size
 	let height_scale = 5.0;
 
 	// Create noise generator with seed
@@ -158,11 +166,36 @@ fn setup_terrain(
 		..default()
 	});
 
-	commands.spawn((
-		Mesh3d(mesh_handle),
-		MeshMaterial3d::<StandardMaterial>(material_handle),
-		Transform::from_scale(Vec3::splat(scale)),
-	));
+	let terrain_entity = commands
+		.spawn((
+			Mesh3d(mesh_handle),
+			MeshMaterial3d::<StandardMaterial>(material_handle),
+			Transform::from_scale(Vec3::splat(scale)),
+		))
+		.id();
+
+	log::info!(
+		"Terrain spawned: size={}, scale={}, height_scale={}, entity={:?}, transform scale={:?}",
+		size,
+		scale,
+		height_scale,
+		terrain_entity,
+		Vec3::splat(scale)
+	);
+
+	// Log terrain bounds
+	let min_x = -size as f32 / 2.0 * scale;
+	let max_x = size as f32 / 2.0 * scale;
+	let min_z = -size as f32 / 2.0 * scale;
+	let max_z = size as f32 / 2.0 * scale;
+	log::info!(
+		"Terrain bounds: X=[{:.2}, {:.2}], Z=[{:.2}, {:.2}], Height scale={:.2}",
+		min_x,
+		max_x,
+		min_z,
+		max_z,
+		height_scale
+	);
 }
 
 fn camera_controller(
@@ -217,5 +250,50 @@ fn camera_controller(
 	if movement.length() > 0.0 {
 		movement = movement.normalize() * controller.speed * time.delta_secs();
 		transform.translation += movement;
+	}
+}
+
+fn setup_debug_ui(mut commands: Commands) {
+	log::info!("Setting up debug UI");
+
+	commands
+		.spawn((
+			Node {
+				position_type: PositionType::Absolute,
+				top: Val::Px(10.0),
+				left: Val::Px(10.0),
+				padding: UiRect::all(Val::Px(10.0)),
+				..default()
+			},
+			BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
+			CoordinateDisplay,
+		))
+		.with_children(|parent| {
+			parent.spawn((
+				Text::new("Position: (0.00, 0.00, 0.00)"),
+				TextFont { font_size: 20.0, ..default() },
+				TextColor(Color::WHITE),
+			));
+		});
+}
+
+fn update_coordinate_display(
+	camera_query: Query<&Transform, (With<Camera3d>, Without<CoordinateDisplay>)>,
+	mut text_query: Query<&mut Text>,
+	coordinate_display_query: Query<Entity, With<CoordinateDisplay>>,
+	children_query: Query<&Children>,
+) {
+	if let Ok(transform) = camera_query.single() {
+		let pos = transform.translation;
+		// Find the coordinate display entity and its children
+		if let Ok(display_entity) = coordinate_display_query.single() {
+			if let Ok(children) = children_query.get(display_entity) {
+				if let Some(&text_entity) = children.first() {
+					if let Ok(mut text) = text_query.get_mut(text_entity) {
+						text.0 = format!("Position: ({:.2}, {:.2}, {:.2})", pos.x, pos.y, pos.z);
+					}
+				}
+			}
+		}
 	}
 }
