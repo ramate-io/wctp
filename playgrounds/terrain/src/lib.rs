@@ -1,15 +1,15 @@
 use bevy::prelude::*;
 use std::f32::consts::PI;
 
+mod camera;
 mod chunk;
 mod chunk_manager;
 mod terrain;
-mod camera;
 mod ui;
 
-pub use chunk::{ChunkCoord, ChunkConfig, LoadedChunks};
-pub use terrain::TerrainConfig;
 pub use camera::CameraController;
+pub use chunk::{ChunkConfig, ChunkCoord, LoadedChunks};
+pub use terrain::TerrainConfig;
 
 pub struct TerrainPlugin {
 	pub seed: u32,
@@ -20,16 +20,15 @@ impl Plugin for TerrainPlugin {
 		app.insert_resource(TerrainConfig::new(self.seed))
 			.insert_resource(ChunkConfig::default())
 			.insert_resource(LoadedChunks::default())
-			.add_systems(Startup, (
-				camera::setup_camera,
-				setup_lighting,
-				ui::setup_debug_ui,
-			))
-			.add_systems(Update, (
-				camera::camera_controller,
-				chunk_manager::manage_chunks,
-				ui::update_coordinate_display,
-			));
+			.add_systems(Startup, (camera::setup_camera, setup_lighting, ui::setup_debug_ui))
+			.add_systems(
+				Update,
+				(
+					camera::camera_controller,
+					chunk_manager::manage_chunks,
+					ui::update_coordinate_display,
+				),
+			);
 	}
 }
 

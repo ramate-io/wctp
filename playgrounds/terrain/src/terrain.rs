@@ -6,7 +6,7 @@ use noise::{NoiseFn, Perlin};
 #[derive(Resource)]
 pub struct TerrainConfig {
 	pub seed: u32,
-	pub resolution: usize, // vertices per chunk side
+	pub base_resolution: usize, // Full resolution vertices per chunk side
 	pub height_scale: f32,
 }
 
@@ -14,9 +14,27 @@ impl TerrainConfig {
 	pub fn new(seed: u32) -> Self {
 		Self {
 			seed,
-			resolution: 50, // 50x50 vertices per chunk
+			base_resolution: 50, // 50x50 vertices per chunk at full resolution
 			height_scale: 5.0,
 		}
+	}
+
+	/// Calculate resolution for a chunk based on Manhattan distance from camera
+	/// Distance 0 (camera chunk) and 1 (immediate neighbors) always use full resolution
+	/// Further chunks use decreasing resolution based on a power curve
+	pub fn resolution_for_distance(&self, distance: i32) -> usize {
+		// Camera chunk and immediate neighbors always full resolution
+		if distance <= 2 {
+			return self.base_resolution;
+		}
+
+		// For distance >= 2, use exponential decay: resolution = base / 2^(distance-1)
+		// This gives: distance 2 -> base/2, distance 3 -> base/4, distance 4 -> base/8, etc.
+		let divisor = 2_i32.pow((distance - 1) as u32);
+		let resolution = self.base_resolution / divisor as usize;
+
+		// Ensure minimum resolution of at least 4 vertices (2x2 grid minimum)
+		resolution.max(4)
 	}
 }
 
@@ -24,10 +42,10 @@ impl TerrainConfig {
 pub fn generate_chunk_mesh(
 	chunk_coord: &ChunkCoord,
 	chunk_size: f32,
+	resolution: usize,
 	config: &TerrainConfig,
 	perlin: &Perlin,
 ) -> Mesh {
-	let resolution = config.resolution;
 	let mut vertices = Vec::new();
 	let mut indices = Vec::new();
 	let mut normals = Vec::new();
@@ -130,10 +148,11 @@ pub fn spawn_chunk(
 	materials: &mut ResMut<Assets<StandardMaterial>>,
 	chunk_coord: ChunkCoord,
 	chunk_size: f32,
+	resolution: usize,
 	config: &TerrainConfig,
 	perlin: &Perlin,
 ) -> Entity {
-	let mesh = generate_chunk_mesh(&chunk_coord, chunk_size, config, perlin);
+	let mesh = generate_chunk_mesh(&chunk_coord, chunk_size, resolution, config, perlin);
 	let mesh_handle = meshes.add(mesh);
 
 	let material_handle = materials.add(StandardMaterial {
@@ -155,10 +174,11 @@ pub fn spawn_chunk(
 		.id();
 
 	log::debug!(
-		"Spawned chunk at ({}, {}) at world position {:?}",
+		"Spawned chunk at ({}, {}) at world position {:?} with resolution {}",
 		chunk_coord.x,
 		chunk_coord.z,
-		world_pos
+		world_pos,
+		resolution
 	);
 
 	entity

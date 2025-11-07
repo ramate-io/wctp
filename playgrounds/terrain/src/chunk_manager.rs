@@ -1,7 +1,7 @@
+use crate::chunk::{get_chunks_to_load, ChunkConfig, ChunkCoord, LoadedChunks, TerrainChunk};
+use crate::terrain::{spawn_chunk, TerrainConfig};
 use bevy::prelude::*;
 use noise::Perlin;
-use crate::chunk::{ChunkCoord, ChunkConfig, LoadedChunks, TerrainChunk, get_chunks_to_load};
-use crate::terrain::{TerrainConfig, spawn_chunk};
 
 /// System that manages chunk loading and unloading based on camera position
 pub fn manage_chunks(
@@ -42,15 +42,23 @@ pub fn manage_chunks(
 		log::debug!("Unloaded chunk at ({}, {})", coord.x, coord.z);
 	}
 
-	// Load new chunks
+	// Load new chunks with appropriate resolution based on distance
+	let center_chunk = ChunkCoord::from_world_pos(camera_pos, chunk_config.chunk_size);
 	for coord in chunks_to_load {
 		if !loaded_chunks.is_loaded(&coord) {
+			// Calculate Manhattan distance from camera chunk
+			let distance = center_chunk.manhattan_distance(&coord);
+
+			// Get resolution for this distance
+			let resolution = terrain_config.resolution_for_distance(distance);
+
 			spawn_chunk(
 				&mut commands,
 				&mut meshes,
 				&mut materials,
 				coord,
 				chunk_config.chunk_size,
+				resolution,
 				&terrain_config,
 				&perlin,
 			);
@@ -58,4 +66,3 @@ pub fn manage_chunks(
 		}
 	}
 }
-
