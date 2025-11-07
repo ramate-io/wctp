@@ -14,7 +14,7 @@ impl TerrainConfig {
 	pub fn new(seed: u32) -> Self {
 		Self {
 			seed,
-			base_resolution: 50, // 50x50 vertices per chunk at full resolution
+			base_resolution: 128, // 50x50 vertices per chunk at full resolution
 			height_scale: 5.0,
 		}
 	}
@@ -166,7 +166,7 @@ pub fn spawn_chunk(
 
 	let entity = commands
 		.spawn((
-			TerrainChunk { coord: chunk_coord },
+			TerrainChunk { coord: chunk_coord, resolution },
 			Mesh3d(mesh_handle),
 			MeshMaterial3d::<StandardMaterial>(material_handle),
 			Transform::from_translation(world_pos),

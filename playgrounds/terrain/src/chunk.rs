@@ -41,6 +41,7 @@ impl ChunkCoord {
 #[derive(Component, Debug, Clone, Copy)]
 pub struct TerrainChunk {
 	pub coord: ChunkCoord,
+	pub resolution: usize,
 }
 
 /// Resource tracking loaded chunks

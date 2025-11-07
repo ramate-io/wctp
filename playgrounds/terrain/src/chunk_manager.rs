@@ -28,22 +28,63 @@ pub fn manage_chunks(
 	// Create noise generator (reused for all chunks)
 	let perlin = Perlin::new(terrain_config.seed);
 
-	// Unload chunks that are too far away
+	let center_chunk = ChunkCoord::from_world_pos(camera_pos, chunk_config.chunk_size);
+
+	// Check existing chunks for resolution updates or unloading
 	let mut chunks_to_unload = Vec::new();
+	let mut chunks_to_regenerate = Vec::new();
+
 	for (entity, chunk) in chunk_query.iter() {
 		if !chunks_to_load_set.contains(&chunk.coord) {
+			// Chunk is out of range, unload it
 			chunks_to_unload.push((entity, chunk.coord));
+		} else {
+			// Chunk is still in range, check if resolution needs updating
+			let distance = center_chunk.manhattan_distance(&chunk.coord);
+			let required_resolution = terrain_config.resolution_for_distance(distance);
+
+			if chunk.resolution != required_resolution {
+				// Resolution changed, need to regenerate
+				chunks_to_regenerate.push((entity, chunk.coord, required_resolution));
+			}
 		}
 	}
 
+	// Unload chunks that are too far away
 	for (entity, coord) in chunks_to_unload {
 		commands.entity(entity).despawn();
 		loaded_chunks.mark_unloaded(&coord);
 		log::debug!("Unloaded chunk at ({}, {})", coord.x, coord.z);
 	}
 
+	// Regenerate chunks that need resolution updates
+	for (entity, coord, new_resolution) in chunks_to_regenerate {
+		commands.entity(entity).despawn();
+		loaded_chunks.mark_unloaded(&coord);
+
+		// Respawn at new resolution
+		let distance = center_chunk.manhattan_distance(&coord);
+		spawn_chunk(
+			&mut commands,
+			&mut meshes,
+			&mut materials,
+			coord,
+			chunk_config.chunk_size,
+			new_resolution,
+			&terrain_config,
+			&perlin,
+		);
+		loaded_chunks.mark_loaded(coord);
+		log::debug!(
+			"Regenerated chunk at ({}, {}) from distance {} with resolution {}",
+			coord.x,
+			coord.z,
+			distance,
+			new_resolution
+		);
+	}
+
 	// Load new chunks with appropriate resolution based on distance
-	let center_chunk = ChunkCoord::from_world_pos(camera_pos, chunk_config.chunk_size);
 	for coord in chunks_to_load {
 		if !loaded_chunks.is_loaded(&coord) {
 			// Calculate Manhattan distance from camera chunk
