@@ -170,9 +170,11 @@ pub fn spawn_attached_cube(
 	let half_size = cube_size * 0.5;
 	let cube_mesh_handle = meshes.add(Cuboid::new(cube_size, cube_size, cube_size));
 
-	// Create blue material
+	// Create blue material with better reflectance
 	let material = materials.add(StandardMaterial {
 		base_color: Color::srgb(0.3, 0.3, 0.8), // Blue
+		metallic: 0.0,
+		perceptual_roughness: 0.4, // Less rough for more light reflection/bounce
 		..default()
 	});
 

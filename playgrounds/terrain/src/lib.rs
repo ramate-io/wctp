@@ -44,16 +44,46 @@ impl Plugin for TerrainPlugin {
 }
 
 fn setup_lighting(mut commands: Commands) {
-	// Ambient light
+	// Ambient light - significantly increased to simulate global illumination
+	// This provides base lighting for all surfaces, including back faces
 	commands.insert_resource(AmbientLight {
 		color: Color::WHITE,
-		brightness: 0.3,
+		brightness: 2.0, // Much higher for better back-face illumination (simulates bounced light)
 		affects_lightmapped_meshes: true,
 	});
 
-	// Directional light (sun)
+	// Main directional light (sun) - primary light source
 	commands.spawn((
 		DirectionalLight { illuminance: 10000.0, shadows_enabled: true, ..default() },
 		Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -PI / 4.0, PI / 4.0, 0.0)),
+	));
+
+	// Fill light from opposite direction - reduces harsh shadows
+	commands.spawn((
+		DirectionalLight {
+			illuminance: 500.0,     // Increased fill light
+			shadows_enabled: false, // No shadows for fill light
+			..default()
+		},
+		Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, PI / 4.0, -PI / 4.0, 0.0)),
+	));
+
+	// Additional fill lights from sides for omnidirectional illumination
+	// Left side
+	commands.spawn((
+		DirectionalLight { illuminance: 500.0, shadows_enabled: false, ..default() },
+		Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, 0.0, PI / 2.0, 0.0)),
+	));
+
+	// Right side
+	commands.spawn((
+		DirectionalLight { illuminance: 500.0, shadows_enabled: false, ..default() },
+		Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, 0.0, -PI / 2.0, 0.0)),
+	));
+
+	// Top-down fill light
+	commands.spawn((
+		DirectionalLight { illuminance: 500.0, shadows_enabled: false, ..default() },
+		Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -PI / 2.0, 0.0, 0.0)),
 	));
 }

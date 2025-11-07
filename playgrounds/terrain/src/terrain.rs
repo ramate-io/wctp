@@ -166,7 +166,14 @@ pub fn spawn_chunk(
 	feature_registry: Option<&FeatureRegistry>,
 ) -> Entity {
 	// Use unwrapped coordinate for mesh generation to ensure seamless terrain
-	let mesh = generate_chunk_mesh(&unwrapped_coord, chunk_size, resolution, config, perlin, feature_registry);
+	let mesh = generate_chunk_mesh(
+		&unwrapped_coord,
+		chunk_size,
+		resolution,
+		config,
+		perlin,
+		feature_registry,
+	);
 	let mesh_handle = meshes.add(mesh);
 
 	// Make the origin chunk (0, 0) reddish for easy verification
@@ -180,7 +187,7 @@ pub fn spawn_chunk(
 	let material_handle = materials.add(StandardMaterial {
 		base_color,
 		metallic: 0.0,
-		perceptual_roughness: 0.8,
+		perceptual_roughness: 0.7, // Less rough for more light reflection/bounce
 		..default()
 	});
 
