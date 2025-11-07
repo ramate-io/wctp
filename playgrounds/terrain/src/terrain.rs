@@ -28,7 +28,7 @@ impl TerrainConfig {
 			return self.base_resolution;
 		}
 
-		// For distance >= 2, use exponential decay: resolution = base / 2^(distance-1)
+		// For distance > 2, use exponential decay: resolution = base / 2^(distance-1)
 		// This gives: distance 2 -> base/2, distance 3 -> base/4, distance 4 -> base/8, etc.
 		let divisor = 2_i32.pow((distance - 1) as u32);
 		let resolution = self.base_resolution / divisor as usize;
@@ -52,7 +52,8 @@ pub fn generate_chunk_mesh(
 	let mut uvs = Vec::new();
 
 	// Calculate world offset for this chunk
-	let chunk_origin = chunk_coord.to_world_origin(chunk_size);
+	// Use unwrapped coordinates for noise generation to ensure seamless wrapping
+	let chunk_origin_unwrapped = chunk_coord.to_unwrapped_world_pos(chunk_size);
 	let step = chunk_size / resolution as f32;
 
 	// Generate vertices
@@ -61,9 +62,9 @@ pub fn generate_chunk_mesh(
 			let xf = x as f32;
 			let zf = z as f32;
 
-			// World position
-			let world_x = chunk_origin.x + xf * step;
-			let world_z = chunk_origin.z + zf * step;
+			// World position (unwrapped for seamless noise generation)
+			let world_x = chunk_origin_unwrapped.x + xf * step;
+			let world_z = chunk_origin_unwrapped.z + zf * step;
 
 			// Generate height using multiple octaves of noise
 			let mut height = 0.0;
@@ -142,17 +143,22 @@ pub fn generate_chunk_mesh(
 }
 
 /// Spawn a terrain chunk entity
+/// wrapped_coord: Used for indexing/uniqueness (wrapped to world bounds)
+/// unwrapped_coord: Used for world position (actual position in space)
 pub fn spawn_chunk(
 	commands: &mut Commands,
 	meshes: &mut ResMut<Assets<Mesh>>,
 	materials: &mut ResMut<Assets<StandardMaterial>>,
-	chunk_coord: ChunkCoord,
+	wrapped_coord: ChunkCoord,
+	unwrapped_coord: ChunkCoord,
 	chunk_size: f32,
+	_world_size_chunks: i32,
 	resolution: usize,
 	config: &TerrainConfig,
 	perlin: &Perlin,
 ) -> Entity {
-	let mesh = generate_chunk_mesh(&chunk_coord, chunk_size, resolution, config, perlin);
+	// Use unwrapped coordinate for mesh generation to ensure seamless terrain
+	let mesh = generate_chunk_mesh(&unwrapped_coord, chunk_size, resolution, config, perlin);
 	let mesh_handle = meshes.add(mesh);
 
 	let material_handle = materials.add(StandardMaterial {
@@ -162,11 +168,12 @@ pub fn spawn_chunk(
 		..default()
 	});
 
-	let world_pos = chunk_coord.to_world_origin(chunk_size);
+	// Use unwrapped coordinate for world position (spawn at actual location)
+	let world_pos = unwrapped_coord.to_unwrapped_world_pos(chunk_size);
 
 	let entity = commands
 		.spawn((
-			TerrainChunk { coord: chunk_coord, resolution },
+			TerrainChunk { coord: wrapped_coord, resolution }, // Store wrapped for indexing
 			Mesh3d(mesh_handle),
 			MeshMaterial3d::<StandardMaterial>(material_handle),
 			Transform::from_translation(world_pos),
@@ -174,9 +181,11 @@ pub fn spawn_chunk(
 		.id();
 
 	log::debug!(
-		"Spawned chunk at ({}, {}) at world position {:?} with resolution {}",
-		chunk_coord.x,
-		chunk_coord.z,
+		"Spawned chunk wrapped=({}, {}) unwrapped=({}, {}) at world position {:?} with resolution {}",
+		wrapped_coord.x,
+		wrapped_coord.z,
+		unwrapped_coord.x,
+		unwrapped_coord.z,
 		world_pos,
 		resolution
 	);
