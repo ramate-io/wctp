@@ -7,6 +7,7 @@ mod chunk_manager;
 mod geography;
 mod terrain;
 mod ui;
+mod units;
 
 pub use geography::FeatureRegistry;
 
@@ -22,7 +23,8 @@ impl Plugin for TerrainPlugin {
 	fn build(&self, app: &mut App) {
 		// Set up geographic features
 		let mut feature_registry = geography::FeatureRegistry::new();
-		feature_registry.add_feature(Box::new(geography::canyons::CanyonFeature::new(self.seed, 1000)));
+		feature_registry
+			.add_feature(Box::new(geography::canyons::CanyonFeature::new(self.seed, 1000)));
 
 		app.insert_resource(TerrainConfig::new(self.seed))
 			.insert_resource(ChunkConfig::default())
@@ -35,6 +37,7 @@ impl Plugin for TerrainPlugin {
 					camera::camera_controller,
 					chunk_manager::manage_chunks,
 					ui::update_coordinate_display,
+					units::spawn_attached_cube,
 				),
 			);
 	}
