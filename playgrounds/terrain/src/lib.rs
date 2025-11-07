@@ -4,6 +4,7 @@ use std::f32::consts::PI;
 mod camera;
 mod chunk;
 mod chunk_manager;
+mod geography;
 mod terrain;
 mod ui;
 
