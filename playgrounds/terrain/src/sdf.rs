@@ -50,9 +50,9 @@ impl<'a> PerlinTerrainSdf<'a> {
 		height = (height / max_value) * self.config.height_scale;
 
 		// Apply geographic features (canyons, etc.)
-		if let Some(registry) = &self.feature_registry {
+		/*if let Some(registry) = &self.feature_registry {
 			height = registry.apply_features(world_x, world_z, height, &self.config);
-		}
+		}*/
 
 		height
 	}
@@ -60,9 +60,20 @@ impl<'a> PerlinTerrainSdf<'a> {
 
 impl<'a> Sdf for PerlinTerrainSdf<'a> {
 	fn distance(&self, p: Vec3) -> f32 {
-		// SDF: f(p) = p.y - height(p.x, p.z)
-		// Negative = below terrain (inside), Positive = above terrain (outside)
+		// Compute surface height from noise
 		let terrain_height = self.height_at(p.x, p.z);
-		p.y - terrain_height
+
+		// Define bedrock level (bottom of world)
+		let bedrock_level = -self.config.height_scale * 2.0;
+
+		// Distance to surface
+		let d_surface = p.y - terrain_height;
+
+		// Distance to bedrock (negative below bedrock)
+		let d_bedrock = bedrock_level - p.y;
+
+		// Take the maximum (intersection of half-spaces)
+		// This keeps the interior solid between surface and bedrock.
+		d_surface.max(d_bedrock)
 	}
 }
