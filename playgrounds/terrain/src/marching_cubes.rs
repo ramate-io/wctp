@@ -53,32 +53,41 @@ pub fn get_cube_index(corners: [f32; 8]) -> usize {
 
 /// Interpolate vertex position along an edge
 #[inline]
-pub fn interpolate_vertex(edge: usize, cube_pos: Vec3, cube_size: f32, corners: [f32; 8]) -> Vec3 {
-	let (v0_idx, v1_idx) = EDGE_VERTEX_INDICES[edge];
-	let d0 = corners[v0_idx];
-	let d1 = corners[v1_idx];
-
-	// Canonical corner positions (matches bitfield layout)
-	let vertex_positions = [
-		Vec3::new(0.0, 0.0, 0.0),                   // 0
-		Vec3::new(cube_size, 0.0, 0.0),             // 1
-		Vec3::new(0.0, 0.0, cube_size),             // 2
-		Vec3::new(cube_size, 0.0, cube_size),       // 3
-		Vec3::new(0.0, cube_size, 0.0),             // 4
-		Vec3::new(cube_size, cube_size, 0.0),       // 5
-		Vec3::new(0.0, cube_size, cube_size),       // 6
-		Vec3::new(cube_size, cube_size, cube_size), // 7
+pub fn interpolate_vertex(
+	edge: usize,
+	cube_origin: Vec3,
+	cube_size: f32,
+	corner_values: [f32; 8],
+) -> Vec3 {
+	// Standard cube corner positions in local space (same as TRIANGULATIONS assumes)
+	const CUBE_CORNERS: [Vec3; 8] = [
+		Vec3::new(0.0, 0.0, 0.0), // 0
+		Vec3::new(1.0, 0.0, 0.0), // 1
+		Vec3::new(1.0, 0.0, 1.0), // 2
+		Vec3::new(0.0, 0.0, 1.0), // 3
+		Vec3::new(0.0, 1.0, 0.0), // 4
+		Vec3::new(1.0, 1.0, 0.0), // 5
+		Vec3::new(1.0, 1.0, 1.0), // 6
+		Vec3::new(0.0, 1.0, 1.0), // 7
 	];
 
-	let p0 = vertex_positions[v0_idx];
-	let p1 = vertex_positions[v1_idx];
+	let (a, b) = EDGE_VERTEX_INDICES[edge];
+	let v1 = CUBE_CORNERS[a];
+	let v2 = CUBE_CORNERS[b];
+	let val1 = corner_values[a];
+	let val2 = corner_values[b];
 
-	// Interpolation along edge (SDF linear interpolation)
-	let denom = d1 - d0;
-	let t = if denom.abs() > 1e-6 { -d0 / denom } else { 0.5 };
+	// Guard against degenerate cases
+	if (val1 - val2).abs() < 1e-6 {
+		return cube_origin + (v1 + v2) * 0.5 * cube_size;
+	}
+
+	// Linear interpolation along edge where field crosses zero
+	let t = (-val1) / (val2 - val1);
 	let t = t.clamp(0.0, 1.0);
 
-	cube_pos + p0 + (p1 - p0) * t
+	let pos_local = v1 + (v2 - v1) * t;
+	cube_origin + pos_local * cube_size
 }
 
 // Full triangulation table - 256 entries, one for each possible cube configuration

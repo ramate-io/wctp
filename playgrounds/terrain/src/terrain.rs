@@ -271,7 +271,8 @@ pub fn generate_chunk_mesh_volumetric(
 						if let Some(v) = edge_vert[edge] {
 							return v;
 						}
-						let pos_local = edge_midpoint(edge, cube_pos_local, cube_size);
+						let pos_local =
+							interpolate_vertex(edge, cube_pos_local, cube_size, corners);
 						let v_index = vertices.len() as u32;
 						vertices.push([pos_local.x, pos_local.y, pos_local.z]);
 						edge_vert[edge] = Some(v_index);
