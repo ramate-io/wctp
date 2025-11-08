@@ -1,10 +1,10 @@
 use crate::chunk::{ChunkCoord, TerrainChunk};
 use crate::geography::FeatureRegistry;
+use crate::sdf::{PerlinTerrainSdf, Sdf};
 use bevy::prelude::*;
-use noise::{NoiseFn, Perlin};
 
 /// Configuration for terrain generation
-#[derive(Resource)]
+#[derive(Resource, Clone)]
 pub struct TerrainConfig {
 	pub seed: u32,
 	pub base_resolution: usize, // Full resolution vertices per chunk side
@@ -39,13 +39,12 @@ impl TerrainConfig {
 	}
 }
 
-/// Generate a terrain mesh for a specific chunk
+/// Generate a terrain mesh for a specific chunk by sampling an SDF
 pub fn generate_chunk_mesh(
 	chunk_coord: &ChunkCoord,
 	chunk_size: f32,
 	resolution: usize,
 	config: &TerrainConfig,
-	perlin: &Perlin,
 	feature_registry: Option<&FeatureRegistry>,
 ) -> Mesh {
 	let mut vertices = Vec::new();
@@ -53,12 +52,15 @@ pub fn generate_chunk_mesh(
 	let mut normals = Vec::new();
 	let mut uvs = Vec::new();
 
+	// Create SDF for terrain generation
+	let sdf = PerlinTerrainSdf::new(config.seed, config.clone(), feature_registry);
+
 	// Calculate world offset for this chunk
 	// Use unwrapped coordinates for noise generation to ensure seamless wrapping
 	let chunk_origin_unwrapped = chunk_coord.to_unwrapped_world_pos(chunk_size);
 	let step = chunk_size / resolution as f32;
 
-	// Generate vertices
+	// Generate vertices by sampling the SDF
 	for z in 0..=resolution {
 		for x in 0..=resolution {
 			let xf = x as f32;
@@ -68,27 +70,11 @@ pub fn generate_chunk_mesh(
 			let world_x = chunk_origin_unwrapped.x + xf * step;
 			let world_z = chunk_origin_unwrapped.z + zf * step;
 
-			// Generate height using multiple octaves of noise
-			let mut height = 0.0;
-			let mut amplitude = 1.0;
-			let mut frequency = 0.05;
-			let mut max_value = 0.0;
-
-			for _ in 0..4 {
-				let sample =
-					perlin.get([world_x as f64 * frequency, world_z as f64 * frequency]) as f32;
-				height += sample * amplitude;
-				max_value += amplitude;
-				amplitude *= 0.5;
-				frequency *= 2.0;
-			}
-
-			height = (height / max_value) * config.height_scale;
-
-			// Apply geographic features (canyons, etc.)
-			if let Some(registry) = feature_registry {
-				height = registry.apply_features(world_x, world_z, height, config);
-			}
+			// Sample the SDF to find surface height
+			// For a heightfield SDF, we can find y where distance(Vec3::new(x, y, z)) == 0
+			// Since distance(p) = p.y - height(p.x, p.z), we solve: y = height(x, z)
+			// We'll use a simple binary search along Y to find the zero crossing
+			let height = find_surface_height(&sdf, world_x, world_z, config.height_scale);
 
 			// Local position relative to chunk origin
 			let local_x = xf * step;
@@ -149,6 +135,42 @@ pub fn generate_chunk_mesh(
 	mesh
 }
 
+/// Find the surface height by sampling the SDF
+/// Uses binary search along Y axis to find where distance crosses zero
+fn find_surface_height(sdf: &impl Sdf, world_x: f32, world_z: f32, max_height: f32) -> f32 {
+	// Search range: from well below ground to well above max terrain height
+	let y_min = -max_height * 2.0;
+	let y_max = max_height * 2.0;
+	let epsilon = 0.01; // Precision threshold
+
+	// Binary search for zero crossing
+	let mut low = y_min;
+	let mut high = y_max;
+
+	for _ in 0..32 {
+		// Limit iterations to prevent infinite loops
+		let mid = (low + high) * 0.5;
+		let distance = sdf.distance(Vec3::new(world_x, mid, world_z));
+
+		if distance.abs() < epsilon {
+			return mid;
+		}
+
+		if distance > 0.0 {
+			// Above surface, search lower
+			high = mid;
+		} else {
+			// Below surface, search higher
+			low = mid;
+		}
+	}
+
+	// Fallback: if binary search didn't converge, use the midpoint
+	// For a heightfield SDF, we can also directly compute height
+	// But for now, return the best guess
+	(low + high) * 0.5
+}
+
 /// Spawn a terrain chunk entity
 /// wrapped_coord: Used for indexing/uniqueness (wrapped to world bounds)
 /// unwrapped_coord: Used for world position (actual position in space)
@@ -162,18 +184,11 @@ pub fn spawn_chunk(
 	_world_size_chunks: i32,
 	resolution: usize,
 	config: &TerrainConfig,
-	perlin: &Perlin,
 	feature_registry: Option<&FeatureRegistry>,
 ) -> Entity {
 	// Use unwrapped coordinate for mesh generation to ensure seamless terrain
-	let mesh = generate_chunk_mesh(
-		&unwrapped_coord,
-		chunk_size,
-		resolution,
-		config,
-		perlin,
-		feature_registry,
-	);
+	let mesh =
+		generate_chunk_mesh(&unwrapped_coord, chunk_size, resolution, config, feature_registry);
 	let mesh_handle = meshes.add(mesh);
 
 	// Make the origin chunk (0, 0) reddish for easy verification

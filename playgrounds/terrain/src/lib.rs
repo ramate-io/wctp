@@ -5,6 +5,7 @@ mod camera;
 mod chunk;
 mod chunk_manager;
 mod geography;
+pub mod sdf;
 mod terrain;
 mod ui;
 mod units;

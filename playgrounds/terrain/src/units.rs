@@ -1,17 +1,16 @@
 use crate::chunk::{ChunkConfig, ChunkCoord, TerrainChunk};
 use crate::geography::FeatureRegistry;
+use crate::sdf::{PerlinTerrainSdf, Sdf};
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
-use noise::{NoiseFn, Perlin};
 
-/// Get the terrain height at a world position
-/// Uses the same noise generation as terrain mesh creation for consistency
+/// Get the terrain height at a world position using the SDF
+/// Uses the same SDF as terrain mesh creation for consistency
 pub fn get_terrain_height_at(
 	world_pos: Vec3,
 	chunk_query: &Query<(&TerrainChunk, &Transform)>,
 	chunk_config: &ChunkConfig,
 	terrain_config: &TerrainConfig,
-	perlin: &Perlin,
 	feature_registry: Option<&FeatureRegistry>,
 ) -> Option<f32> {
 	// Find which chunk this position is in
@@ -26,31 +25,17 @@ pub fn get_terrain_height_at(
 	for (chunk, _transform) in chunk_query.iter() {
 		if chunk.coord == chunk_coord {
 			log::debug!("Found matching chunk!");
-			// Note: world_pos.y is ignored, we're only using x and z for terrain lookup
-			// Use world_pos directly since we only need x and z
+			// Create SDF to sample terrain height
+			let sdf = PerlinTerrainSdf::new(
+				terrain_config.seed,
+				terrain_config.clone(),
+				feature_registry,
+			);
+
+			// Use binary search to find surface height (same as in terrain generation)
 			let world_x = world_pos.x;
 			let world_z = world_pos.z;
-
-			let mut height = 0.0;
-			let mut amplitude = 1.0;
-			let mut frequency = 0.05;
-			let mut max_value = 0.0;
-
-			for _ in 0..4 {
-				let sample =
-					perlin.get([world_x as f64 * frequency, world_z as f64 * frequency]) as f32;
-				height += sample * amplitude;
-				max_value += amplitude;
-				amplitude *= 0.5;
-				frequency *= 2.0;
-			}
-
-			height = (height / max_value) * terrain_config.height_scale;
-
-			// Apply geographic features
-			if let Some(registry) = feature_registry {
-				height = registry.apply_features(world_x, world_z, height, terrain_config);
-			}
+			let height = find_surface_height(&sdf, world_x, world_z, terrain_config.height_scale);
 
 			log::debug!("Terrain height at ({}, {}) = {}", world_x, world_z, height);
 			return Some(height);
@@ -59,6 +44,40 @@ pub fn get_terrain_height_at(
 
 	log::warn!("No matching chunk found for coord ({}, {})", chunk_coord.x, chunk_coord.z);
 	None
+}
+
+/// Find the surface height by sampling the SDF
+/// Uses binary search along Y axis to find where distance crosses zero
+fn find_surface_height(sdf: &impl Sdf, world_x: f32, world_z: f32, max_height: f32) -> f32 {
+	// Search range: from well below ground to well above max terrain height
+	let y_min = -max_height * 2.0;
+	let y_max = max_height * 2.0;
+	let epsilon = 0.01; // Precision threshold
+
+	// Binary search for zero crossing
+	let mut low = y_min;
+	let mut high = y_max;
+
+	for _ in 0..32 {
+		// Limit iterations to prevent infinite loops
+		let mid = (low + high) * 0.5;
+		let distance = sdf.distance(Vec3::new(world_x, mid, world_z));
+
+		if distance.abs() < epsilon {
+			return mid;
+		}
+
+		if distance > 0.0 {
+			// Above surface, search lower
+			high = mid;
+		} else {
+			// Below surface, search higher
+			low = mid;
+		}
+	}
+
+	// Fallback: if binary search didn't converge, use the midpoint
+	(low + high) * 0.5
 }
 
 /// Attach a mesh to terrain by positioning it so it sits on the surface
@@ -70,7 +89,6 @@ pub fn attach_cuboid_to_terrain(
 	chunk_query: &Query<(&TerrainChunk, &Transform)>,
 	chunk_config: &ChunkConfig,
 	terrain_config: &TerrainConfig,
-	perlin: &Perlin,
 	feature_registry: Option<&FeatureRegistry>,
 ) -> Option<Vec3> {
 	// Sample terrain heights in the area where the mesh will be placed
@@ -96,7 +114,6 @@ pub fn attach_cuboid_to_terrain(
 				chunk_query,
 				chunk_config,
 				terrain_config,
-				perlin,
 				feature_registry,
 			) {
 				min_terrain_height = min_terrain_height.min(height);
@@ -182,9 +199,6 @@ pub fn spawn_attached_cube(
 	let world_x = 0.0;
 	let world_z = 0.0;
 
-	// Create Perlin noise generator
-	let perlin = Perlin::new(terrain_config.seed);
-
 	log::info!(
 		"Spawning attached cube: size={}, half_size={}, world_pos=({}, {})",
 		cube_size,
@@ -202,7 +216,6 @@ pub fn spawn_attached_cube(
 		&chunk_query,
 		&chunk_config,
 		&terrain_config,
-		&perlin,
 		feature_registry.as_deref(),
 	) {
 		log::info!("Successfully attached cube at position {:?}", position);
