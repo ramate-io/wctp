@@ -1,29 +1,30 @@
+//! Marching Cubes lookup and helpers
+//!
+//! Coordinate system (bitfield):
+//! i = cube corner index [0..7]
+//! x = (i & 1) >> 0
+//! y = (i & 2) >> 1
+//! z = (i & 4) >> 2
+//!
+//! Vertex layout (canonical):
+//!
+//! ```text
+//!        z
+//!        ↑
+//!        |
+//!        |
+//!        2-------3
+//!       /|      /|
+//!      6-------7 |
+//!      | |     | |
+//!      | 0-----|-1 ----> x
+//!      |/      |/
+//!      4-------5
+//!     /
+//!    y
+//! ```
 use bevy::prelude::*;
 
-/// Marching Cubes lookup and helpers
-///
-/// Coordinate system (bitfield):
-/// i = cube corner index [0..7]
-/// x = (i & 1) >> 0
-/// y = (i & 2) >> 1
-/// z = (i & 4) >> 2
-///
-/// Vertex layout (canonical):
-///
-///        z
-///        ↑
-///        |
-///        |
-///        2-------3
-///       /|      /|
-///      6-------7 |
-///      | |     | |
-///      | 0-----|-1 ----> x
-///      |/      |/
-///      4-------5
-///     /
-///    y
-///
 pub const EDGE_VERTEX_INDICES: [(usize, usize); 12] = [
 	(0, 1), // edge 0
 	(1, 2), // edge 1

@@ -1,6 +1,5 @@
 use crate::chunk::{ChunkCoord, TerrainChunk};
-use crate::geography::FeatureRegistry;
-use crate::marching_cubes::EDGE_VERTEX_INDICES;
+// use crate::geography::FeatureRegistry;
 use crate::sdf::{PerlinTerrainSdf, Sdf};
 use bevy::prelude::*;
 
@@ -49,117 +48,9 @@ pub fn generate_chunk_mesh(
 	chunk_size: f32,
 	resolution: usize,
 	config: &TerrainConfig,
-	feature_registry: Option<&FeatureRegistry>,
+	// feature_registry: Option<&FeatureRegistry>,
 ) -> Mesh {
-	if config.use_volumetric {
-		generate_chunk_mesh_volumetric(
-			chunk_coord,
-			chunk_size,
-			resolution,
-			config,
-			feature_registry,
-		)
-	} else {
-		generate_chunk_mesh_heightfield(
-			chunk_coord,
-			chunk_size,
-			resolution,
-			config,
-			feature_registry,
-		)
-	}
-}
-
-/// Generate mesh using heightfield approach (fast, but no caves/overhangs)
-fn generate_chunk_mesh_heightfield(
-	chunk_coord: &ChunkCoord,
-	chunk_size: f32,
-	resolution: usize,
-	config: &TerrainConfig,
-	feature_registry: Option<&FeatureRegistry>,
-) -> Mesh {
-	let mut vertices = Vec::new();
-	let mut indices = Vec::new();
-	let mut normals = Vec::new();
-	let mut uvs = Vec::new();
-
-	// Create SDF for terrain generation
-	let sdf = PerlinTerrainSdf::new(config.seed, config.clone(), feature_registry);
-
-	// Calculate world offset for this chunk
-	let chunk_origin_unwrapped = chunk_coord.to_unwrapped_world_pos(chunk_size);
-	let step = chunk_size / resolution as f32;
-
-	// Generate vertices by sampling the SDF
-	for z in 0..=resolution {
-		for x in 0..=resolution {
-			let xf = x as f32;
-			let zf = z as f32;
-
-			// World position (unwrapped for seamless noise generation)
-			let world_x = chunk_origin_unwrapped.x + xf * step;
-			let world_z = chunk_origin_unwrapped.z + zf * step;
-
-			// Sample the SDF to find surface height
-			let height = find_surface_height(&sdf, world_x, world_z, config.height_scale);
-
-			// Local position relative to chunk origin
-			let local_x = xf * step;
-			let local_z = zf * step;
-			vertices.push([local_x, height, local_z]);
-			uvs.push([xf / resolution as f32, zf / resolution as f32]);
-		}
-	}
-
-	// Generate indices for triangles
-	for z in 0..resolution {
-		for x in 0..resolution {
-			let i = (z * (resolution + 1) + x) as u32;
-
-			// First triangle
-			indices.push(i);
-			indices.push(i + resolution as u32 + 1);
-			indices.push(i + 1);
-
-			// Second triangle
-			indices.push(i + 1);
-			indices.push(i + resolution as u32 + 1);
-			indices.push(i + resolution as u32 + 2);
-		}
-	}
-
-	// Calculate normals
-	normals.resize(vertices.len(), [0.0, 1.0, 0.0]);
-	for i in (0..indices.len()).step_by(3) {
-		let i0 = indices[i] as usize;
-		let i1 = indices[i + 1] as usize;
-		let i2 = indices[i + 2] as usize;
-
-		let v0 = Vec3::from(vertices[i0]);
-		let v1 = Vec3::from(vertices[i1]);
-		let v2 = Vec3::from(vertices[i2]);
-
-		let edge1 = v1 - v0;
-		let edge2 = v2 - v0;
-		let normal = edge1.cross(edge2).normalize();
-
-		normals[i0] = (Vec3::from(normals[i0]) + normal).normalize().into();
-		normals[i1] = (Vec3::from(normals[i1]) + normal).normalize().into();
-		normals[i2] = (Vec3::from(normals[i2]) + normal).normalize().into();
-	}
-
-	// Create mesh
-	let mut mesh = Mesh::new(
-		bevy::render::mesh::PrimitiveTopology::TriangleList,
-		bevy::render::render_asset::RenderAssetUsages::RENDER_WORLD,
-	);
-
-	mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
-	mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-	mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-	mesh.insert_indices(bevy::render::mesh::Indices::U32(indices));
-
-	mesh
+	generate_chunk_mesh_volumetric(chunk_coord, chunk_size, resolution, config)
 }
 
 pub fn generate_chunk_mesh_volumetric(
@@ -167,9 +58,9 @@ pub fn generate_chunk_mesh_volumetric(
 	chunk_size: f32,
 	res: usize,
 	config: &TerrainConfig,
-	feature_registry: Option<&FeatureRegistry>,
+	// feature_registry: Option<&FeatureRegistry>,
 ) -> Mesh {
-	let sdf = PerlinTerrainSdf::new(config.seed, config.clone(), feature_registry);
+	let sdf = PerlinTerrainSdf::new(config.seed, config.clone());
 
 	// ---------- grid setup ---------------------------------------------------
 	let cube_size = chunk_size / res as f32;
@@ -317,25 +208,6 @@ pub fn generate_chunk_mesh_volumetric(
 	mesh
 }
 
-fn edge_midpoint(edge: usize, cube_pos_local: Vec3, cube_size: f32) -> Vec3 {
-	let (a, b) = EDGE_VERTEX_INDICES[edge];
-	let corner_pos = [
-		Vec3::new(0.0, 0.0, 0.0),
-		Vec3::new(1.0, 0.0, 0.0),
-		Vec3::new(1.0, 0.0, 1.0),
-		Vec3::new(0.0, 0.0, 1.0),
-		Vec3::new(0.0, 1.0, 0.0),
-		Vec3::new(1.0, 1.0, 0.0),
-		Vec3::new(1.0, 1.0, 1.0),
-		Vec3::new(0.0, 1.0, 1.0),
-	];
-	let p1 = corner_pos[a];
-	let p2 = corner_pos[b];
-	// midpoint in local cube space
-	let local_mid = (p1 + p2) * 0.5;
-	cube_pos_local + local_mid * cube_size
-}
-
 /// Calculate normal from SDF gradient
 fn calculate_sdf_normal(sdf: &impl Sdf, p: Vec3) -> Vec3 {
 	// Use smaller epsilon to avoid exaggerating streaks
@@ -356,40 +228,6 @@ fn calculate_sdf_normal(sdf: &impl Sdf, p: Vec3) -> Vec3 {
 	}
 }
 
-/// Find the surface height by sampling the SDF
-/// Uses binary search along Y axis to find where distance crosses zero
-fn find_surface_height(sdf: &impl Sdf, world_x: f32, world_z: f32, max_height: f32) -> f32 {
-	// Search range: from well below ground to well above max terrain height
-	let y_min = -max_height * 2.0;
-	let y_max = max_height * 2.0;
-	let epsilon = 0.01; // Precision threshold
-
-	// Binary search for zero crossing
-	let mut low = y_min;
-	let mut high = y_max;
-
-	for _ in 0..32 {
-		// Limit iterations to prevent infinite loops
-		let mid = (low + high) * 0.5;
-		let distance = sdf.distance(Vec3::new(world_x, mid, world_z));
-
-		if distance.abs() < epsilon {
-			return mid;
-		}
-
-		if distance > 0.0 {
-			// Above surface, search lower
-			high = mid;
-		} else {
-			// Below surface, search higher
-			low = mid;
-		}
-	}
-
-	// Fallback: if binary search didn't converge, use the midpoint
-	(low + high) * 0.5
-}
-
 /// Spawn a terrain chunk entity
 /// wrapped_coord: Used for indexing/uniqueness (wrapped to world bounds)
 /// unwrapped_coord: Used for world position (actual position in space)
@@ -403,11 +241,10 @@ pub fn spawn_chunk(
 	_world_size_chunks: i32,
 	resolution: usize,
 	config: &TerrainConfig,
-	feature_registry: Option<&FeatureRegistry>,
+	// feature_registry: Option<&FeatureRegistry>,
 ) -> Entity {
 	// Use unwrapped coordinate for mesh generation to ensure seamless terrain
-	let mesh =
-		generate_chunk_mesh(&unwrapped_coord, chunk_size, resolution, config, feature_registry);
+	let mesh = generate_chunk_mesh(&unwrapped_coord, chunk_size, resolution, config);
 	let mesh_handle = meshes.add(mesh);
 
 	// Make the origin chunk (0, 0) reddish for easy verification
@@ -432,8 +269,8 @@ pub fn spawn_chunk(
 	let entity = commands
 		.spawn((
 			TerrainChunk { coord: wrapped_coord, resolution }, // Store wrapped for indexing
-			Mesh3d(mesh_handle),
-			MeshMaterial3d::<StandardMaterial>(material_handle),
+			Mesh3d(mesh_handle.clone()),
+			MeshMaterial3d::<StandardMaterial>(material_handle.clone()),
 			Transform::from_translation(world_pos),
 		))
 		.id();

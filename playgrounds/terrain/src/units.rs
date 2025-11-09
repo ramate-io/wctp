@@ -1,5 +1,4 @@
 use crate::chunk::{ChunkConfig, ChunkCoord, TerrainChunk};
-use crate::geography::FeatureRegistry;
 use crate::sdf::{PerlinTerrainSdf, Sdf};
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
@@ -11,7 +10,6 @@ pub fn get_terrain_height_at(
 	chunk_query: &Query<(&TerrainChunk, &Transform)>,
 	chunk_config: &ChunkConfig,
 	terrain_config: &TerrainConfig,
-	feature_registry: Option<&FeatureRegistry>,
 ) -> Option<f32> {
 	// Find which chunk this position is in
 	let (chunk_coord, _) = ChunkCoord::from_world_pos(
@@ -29,7 +27,7 @@ pub fn get_terrain_height_at(
 			let sdf = PerlinTerrainSdf::new(
 				terrain_config.seed,
 				terrain_config.clone(),
-				feature_registry,
+				// feature_registry,
 			);
 
 			// Use binary search to find surface height (same as in terrain generation)
@@ -89,7 +87,6 @@ pub fn attach_cuboid_to_terrain(
 	chunk_query: &Query<(&TerrainChunk, &Transform)>,
 	chunk_config: &ChunkConfig,
 	terrain_config: &TerrainConfig,
-	feature_registry: Option<&FeatureRegistry>,
 ) -> Option<Vec3> {
 	// Sample terrain heights in the area where the mesh will be placed
 	// Sample at multiple points to find the lowest terrain point in this area
@@ -114,7 +111,6 @@ pub fn attach_cuboid_to_terrain(
 				chunk_query,
 				chunk_config,
 				terrain_config,
-				feature_registry,
 			) {
 				min_terrain_height = min_terrain_height.min(height);
 				sample_count_found += 1;
@@ -169,7 +165,6 @@ pub fn spawn_attached_cube(
 	chunk_query: Query<(&TerrainChunk, &Transform)>,
 	chunk_config: Res<ChunkConfig>,
 	terrain_config: Res<TerrainConfig>,
-	feature_registry: Option<Res<FeatureRegistry>>,
 	spawned_query: Query<&AttachedCubeSpawned>,
 ) {
 	// Only spawn once
@@ -216,7 +211,6 @@ pub fn spawn_attached_cube(
 		&chunk_query,
 		&chunk_config,
 		&terrain_config,
-		feature_registry.as_deref(),
 	) {
 		log::info!("Successfully attached cube at position {:?}", position);
 		commands.spawn((

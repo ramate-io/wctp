@@ -12,7 +12,7 @@ pub fn manage_chunks(
 	chunk_config: Res<ChunkConfig>,
 	terrain_config: Res<TerrainConfig>,
 	mut loaded_chunks: ResMut<LoadedChunks>,
-	feature_registry: Option<Res<crate::geography::FeatureRegistry>>,
+	// feature_registry: Option<Res<crate::geography::FeatureRegistry>>,
 ) {
 	let Ok(camera_transform) = camera_query.single() else {
 		return;
@@ -98,7 +98,7 @@ pub fn manage_chunks(
 			chunk_config.world_size_chunks,
 			new_resolution,
 			&terrain_config,
-			feature_registry.as_deref(),
+			// feature_registry.as_deref(),
 		);
 		loaded_chunks.mark_loaded(coord);
 		log::debug!(
@@ -134,7 +134,7 @@ pub fn manage_chunks(
 				chunk_config.world_size_chunks,
 				resolution,
 				&terrain_config,
-				feature_registry.as_deref(),
+				// feature_registry.as_deref(),
 			);
 			loaded_chunks.mark_loaded(chunk_info.wrapped);
 		}

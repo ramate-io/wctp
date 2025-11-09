@@ -1,4 +1,3 @@
-use crate::geography::FeatureRegistry;
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
@@ -14,19 +13,14 @@ pub trait Sdf: Send + Sync {
 
 /// SDF representation of Perlin noise-based terrain
 /// Converts the heightfield `y = height(x, z)` into an SDF: `f(p) = p.y - height(p.x, p.z)`
-pub struct PerlinTerrainSdf<'a> {
+pub struct PerlinTerrainSdf {
 	perlin: Perlin,
 	config: TerrainConfig,
-	feature_registry: Option<&'a FeatureRegistry>,
 }
 
-impl<'a> PerlinTerrainSdf<'a> {
-	pub fn new(
-		seed: u32,
-		config: TerrainConfig,
-		feature_registry: Option<&'a FeatureRegistry>,
-	) -> Self {
-		Self { perlin: Perlin::new(seed), config, feature_registry }
+impl PerlinTerrainSdf {
+	pub fn new(seed: u32, config: TerrainConfig) -> Self {
+		Self { perlin: Perlin::new(seed), config }
 	}
 
 	/// Calculate the terrain height at a given (x, z) position
@@ -36,18 +30,21 @@ impl<'a> PerlinTerrainSdf<'a> {
 		let mut height = 0.0;
 		let mut amplitude = 1.0;
 		let mut frequency = 0.05;
-		let mut max_value = 0.0;
+		// let max_value = 0.0;
 
 		for _ in 0..4 {
 			let sample =
 				self.perlin.get([world_x as f64 * frequency, world_z as f64 * frequency]) as f32;
 			height += sample * amplitude;
-			max_value += amplitude;
+			// max_value += amplitude;
 			amplitude *= 0.5;
 			frequency *= 2.0;
 		}
 
-		height = (height / max_value) * self.config.height_scale;
+		let exponent = 1.2; // >1 exaggerates contrast, <1 flattens
+		let sign = height.signum();
+		let height = sign * height.abs().powf(exponent);
+		let height = height * self.config.height_scale;
 
 		// Apply geographic features (canyons, etc.)
 		/*if let Some(registry) = &self.feature_registry {
@@ -58,7 +55,7 @@ impl<'a> PerlinTerrainSdf<'a> {
 	}
 }
 
-impl<'a> Sdf for PerlinTerrainSdf<'a> {
+impl Sdf for PerlinTerrainSdf {
 	fn distance(&self, p: Vec3) -> f32 {
 		// Compute surface height from noise
 		let terrain_height = self.height_at(p.x, p.z);
