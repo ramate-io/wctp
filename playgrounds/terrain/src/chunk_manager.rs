@@ -1,7 +1,6 @@
 use crate::chunk::{get_chunks_to_load, ChunkConfig, ChunkCoord, LoadedChunks, TerrainChunk};
 use crate::terrain::{spawn_chunk, TerrainConfig};
 use bevy::prelude::*;
-use noise::Perlin;
 
 /// System that manages chunk loading and unloading based on camera position
 pub fn manage_chunks(
@@ -13,6 +12,7 @@ pub fn manage_chunks(
 	chunk_config: Res<ChunkConfig>,
 	terrain_config: Res<TerrainConfig>,
 	mut loaded_chunks: ResMut<LoadedChunks>,
+	// feature_registry: Option<Res<crate::geography::FeatureRegistry>>,
 ) {
 	let Ok(camera_transform) = camera_query.single() else {
 		return;
@@ -24,9 +24,6 @@ pub fn manage_chunks(
 	let chunks_to_load = get_chunks_to_load(camera_pos, &chunk_config);
 	let chunks_to_load_set: std::collections::HashSet<ChunkCoord> =
 		chunks_to_load.iter().map(|info| info.wrapped).collect();
-
-	// Create noise generator (reused for all chunks)
-	let perlin = Perlin::new(terrain_config.seed);
 
 	let (center_wrapped, _center_unwrapped) = ChunkCoord::from_world_pos(
 		camera_pos,
@@ -101,7 +98,7 @@ pub fn manage_chunks(
 			chunk_config.world_size_chunks,
 			new_resolution,
 			&terrain_config,
-			&perlin,
+			// feature_registry.as_deref(),
 		);
 		loaded_chunks.mark_loaded(coord);
 		log::debug!(
@@ -137,7 +134,7 @@ pub fn manage_chunks(
 				chunk_config.world_size_chunks,
 				resolution,
 				&terrain_config,
-				&perlin,
+				// feature_registry.as_deref(),
 			);
 			loaded_chunks.mark_loaded(chunk_info.wrapped);
 		}
