@@ -38,6 +38,31 @@ impl InscribedPolygonSdf {
 		Self { outer_polygon, inner_polygon, plateau_height, base_y }
 	}
 
+	/// Check if a point is inside a polygon using ray casting algorithm
+	fn point_in_polygon(p: Vec2, polygon: &[Vec2]) -> bool {
+		if polygon.len() < 3 {
+			return false;
+		}
+
+		let mut inside = false;
+		let mut j = polygon.len() - 1;
+
+		for i in 0..polygon.len() {
+			let vi = polygon[i];
+			let vj = polygon[j];
+
+			// Check if ray from point going right crosses this edge
+			if ((vi.y > p.y) != (vj.y > p.y))
+				&& (p.x < (vj.x - vi.x) * (p.y - vi.y) / (vj.y - vi.y) + vi.x)
+			{
+				inside = !inside;
+			}
+			j = i;
+		}
+
+		inside
+	}
+
 	/// Calculate signed distance from a point to a polygon in the XZ plane
 	/// Returns negative if inside, positive if outside
 	fn polygon_distance_2d(p: Vec2, polygon: &[Vec2]) -> f32 {
@@ -45,10 +70,12 @@ impl InscribedPolygonSdf {
 			return f32::MAX; // Invalid polygon
 		}
 
-		let mut min_dist = f32::MAX;
-		let mut inside = true;
+		// First check if point is inside
+		let inside = Self::point_in_polygon(p, polygon);
 
-		// Check distance to each edge
+		// Find minimum distance to any edge
+		let mut min_dist = f32::MAX;
+
 		for i in 0..polygon.len() {
 			let v0 = polygon[i];
 			let v1 = polygon[(i + 1) % polygon.len()];
@@ -70,13 +97,6 @@ impl InscribedPolygonSdf {
 
 			// Distance from point to edge
 			let dist_to_edge = (p - closest_on_edge).length();
-
-			// Determine if point is inside or outside using cross product
-			let cross = edge.x * to_point.y - edge.y * to_point.x;
-			if cross < 0.0 {
-				inside = false;
-			}
-
 			min_dist = min_dist.min(dist_to_edge);
 		}
 
@@ -91,34 +111,37 @@ impl InscribedPolygonSdf {
 	/// Get the interpolated height at a point in the XZ plane
 	/// Returns the height based on position between inner and outer polygons
 	fn get_height_at(&self, p: Vec2) -> f32 {
-		// Distance to inner polygon (negative if inside)
-		let dist_inner = Self::polygon_distance_2d(p, &self.inner_polygon);
-
-		// Distance to outer polygon (negative if inside)
-		let dist_outer = Self::polygon_distance_2d(p, &self.outer_polygon);
-
-		// If inside inner polygon, we're on the plateau
-		if dist_inner <= 0.0 {
+		// Check if point is inside inner polygon (plateau)
+		let inside_inner = Self::point_in_polygon(p, &self.inner_polygon);
+		if inside_inner {
 			return self.plateau_height;
 		}
 
-		// If outside outer polygon, we're not in the feature
-		if dist_outer > 0.0 {
+		// Check if point is outside outer polygon (not in feature)
+		let inside_outer = Self::point_in_polygon(p, &self.outer_polygon);
+		if !inside_outer {
 			return 0.0;
 		}
 
 		// We're between inner and outer polygons - interpolate
-		// dist_inner is positive (distance from inner edge)
-		// dist_outer is negative (we're inside outer polygon)
-		// The total distance from inner to outer edge
-		let total_dist = dist_inner - dist_outer; // dist_inner is positive, dist_outer is negative
+		// Calculate distance to inner polygon edge (positive, since we're outside it)
+		let dist_to_inner = Self::polygon_distance_2d(p, &self.inner_polygon);
+
+		// Calculate distance to outer polygon edge (negative, since we're inside it)
+		let dist_to_outer = Self::polygon_distance_2d(p, &self.outer_polygon);
+
+		// Total distance from inner edge to outer edge
+		// dist_to_inner is positive (we're outside inner)
+		// dist_to_outer is negative (we're inside outer)
+		// So total = dist_to_inner - dist_to_outer
+		let total_dist = dist_to_inner - dist_to_outer;
 
 		if total_dist < 1e-6 {
 			return self.plateau_height; // Degenerate case, use plateau height
 		}
 
-		// Interpolate from plateau_height at inner edge to 0 at outer edge
-		let t = dist_inner / total_dist; // 0 at inner edge, 1 at outer edge
+		// Interpolate from plateau_height at inner edge (t=0) to 0 at outer edge (t=1)
+		let t = dist_to_inner / total_dist; // 0 at inner edge, 1 at outer edge
 		self.plateau_height * (1.0 - t)
 	}
 }

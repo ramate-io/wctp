@@ -1,6 +1,11 @@
+pub mod combinators;
 pub mod inscribed_polygon;
 pub mod perlin_terrain;
 
+pub use combinators::{
+	Difference, Elongate, Intersection, RotateY, Round, Scale, SmoothDifference,
+	SmoothIntersection, SmoothUnion, Translate, Union,
+};
 pub use inscribed_polygon::InscribedPolygonSdf;
 pub use perlin_terrain::PerlinTerrainSdf;
 
