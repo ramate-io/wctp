@@ -1,5 +1,7 @@
+pub mod inscribed_polygon;
 pub mod perlin_terrain;
 
+pub use inscribed_polygon::InscribedPolygonSdf;
 pub use perlin_terrain::PerlinTerrainSdf;
 
 use bevy::prelude::*;
