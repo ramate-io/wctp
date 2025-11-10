@@ -298,9 +298,9 @@ pub fn spawn_chunk(
 	// Make the origin chunk (0, 0) reddish for easy verification
 	let is_origin_chunk = wrapped_coord.x == 0 && wrapped_coord.z == 0;
 	let base_color = if is_origin_chunk {
-		Color::srgb(0.8, 0.2, 0.2) // Reddish for origin chunk
+		Color::hsla(46.0, 0.22, 0.62, 1.0) // brown
 	} else {
-		Color::srgb(0.2, 0.6, 0.3) // Green terrain
+		Color::hsla(46.0, 0.22, 0.62, 1.0) // brown
 	};
 
 	let material_handle = materials.add(StandardMaterial {
