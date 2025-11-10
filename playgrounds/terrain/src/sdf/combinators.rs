@@ -1,6 +1,33 @@
 use crate::sdf::Sdf;
 use bevy::prelude::*;
 
+/// Add two SDFs together - adds their heights (for heightfield-like SDFs)
+/// This is useful for adding features to terrain (bumps, depressions, etc.)
+/// The result is the sum of the two surfaces
+pub struct AddY<A, B> {
+	a: A,
+	b: B,
+}
+
+impl<A: Sdf, B: Sdf> AddY<A, B> {
+	pub fn new(a: A, b: B) -> Self {
+		Self { a, b }
+	}
+}
+
+impl<A: Sdf, B: Sdf> Sdf for AddY<A, B> {
+	fn distance(&self, p: Vec3) -> f32 {
+		// For heightfield-like SDFs where distance = p.y - height(x,z):
+		// If d1 = p.y - h1 and d2 = p.y - h2
+		// And we want h_combined = h1 + h2
+		// Then d_combined = p.y - (h1 + h2) = (p.y - h1) + (p.y - h2) - p.y
+		// = d1 + d2 - p.y
+		let da = self.a.distance(p);
+		let db = self.b.distance(p);
+		da + db - p.y
+	}
+}
+
 /// Union of two SDFs - combines them using the minimum distance
 /// This creates the union of the two shapes
 pub struct Union<A, B> {

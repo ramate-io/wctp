@@ -1,4 +1,4 @@
-use crate::sdf::Sdf;
+use crate::sdf::{perlin_terrain::ElevationModulation, Sdf};
 use bevy::prelude::*;
 
 /// SDF for an inscribed polygon feature
@@ -154,6 +154,15 @@ impl Sdf for InscribedPolygonSdf {
 
 		// Return signed distance: negative if below surface, positive if above
 		p.y - surface_y
+	}
+}
+
+impl ElevationModulation for InscribedPolygonSdf {
+	/// Returns the height offset at a given (x, z) position
+	/// This allows the inscribed polygon to be used as a 2.5D elevation modulation
+	fn height_offset(&self, x: f32, z: f32) -> f32 {
+		let p_2d = Vec2::new(x, z);
+		self.get_height_at(p_2d)
 	}
 }
 

@@ -1,6 +1,6 @@
 use crate::chunk::{ChunkCoord, TerrainChunk};
 // use crate::geography::FeatureRegistry;
-use crate::sdf::{PerlinTerrainSdf, Sdf};
+use crate::sdf::{AddY, InscribedPolygonSdf, PerlinTerrainSdf, Sdf};
 use bevy::prelude::*;
 
 /// Configuration for terrain generation
@@ -60,15 +60,63 @@ pub fn generate_chunk_mesh_volumetric(
 	config: &TerrainConfig,
 	// feature_registry: Option<&FeatureRegistry>,
 ) -> Mesh {
+	// Create base terrain SDF
 	let sdf = PerlinTerrainSdf::new(config.seed, config.clone());
+
+	// Create a trapezoid bump near the origin
+	// Outer polygon: large base rectangle
+	let outer_polygon = vec![
+		Vec2::new(-30.0 + 10.0, -30.0 + 10.0), // Bottom-left
+		Vec2::new(30.0 + 10.0, -30.0 + 10.0),  // Bottom-right
+		Vec2::new(30.0 + 10.0, 30.0 + 10.0),   // Top-right
+		Vec2::new(-30.0 + 10.0, 30.0 + 10.0),  // Top-left
+	];
+
+	// Inner polygon: smaller plateau rectangle
+	let inner_polygon = vec![
+		Vec2::new(-10.0 + 10.0, -10.0 + 10.0), // Bottom-left
+		Vec2::new(10.0 + 10.0, -10.0 + 10.0),  // Bottom-right
+		Vec2::new(10.0 + 10.0, 10.0 + 10.0),   // Top-right
+		Vec2::new(-10.0 + 10.0, 10.0 + 10.0),  // Top-left
+	];
+
+	// Create the trapezoid SDF (bump with 15 unit plateau height)
+	let trapezoid_sdf = InscribedPolygonSdf::new(outer_polygon, inner_polygon, 8.0, 0.0);
+
+	// Add the trapezoid to the terrain (raises terrain where trapezoid exists)
+	let sdf = AddY::new(sdf, trapezoid_sdf);
+
+	// Create a trapezoid bump near the origin
+	// Outer polygon: large base rectangle
+	let outer_valley_polygon = vec![
+		Vec2::new(-60.0 + 100.0, -60.0 + 100.0), // Bottom-left
+		Vec2::new(60.0 + 100.0, -60.0 + 100.0),  // Bottom-right
+		Vec2::new(60.0 + 100.0, 60.0 + 100.0),   // Top-right
+		Vec2::new(-60.0 + 100.0, 60.0 + 100.0),  // Top-left
+	];
+
+	// Inner polygon: smaller plateau rectangle
+	let inner_valley_polygon = vec![
+		Vec2::new(-30.0 + 100.0, -30.0 + 100.0), // Bottom-left
+		Vec2::new(30.0 + 100.0, -30.0 + 100.0),  // Bottom-right
+		Vec2::new(30.0 + 100.0, 30.0 + 100.0),   // Top-right
+		Vec2::new(-30.0 + 100.0, 30.0 + 100.0),  // Top-left
+	];
+
+	// Create the valley SDF (depression with 15 unit valley height)
+	let valley_sdf =
+		InscribedPolygonSdf::new(outer_valley_polygon, inner_valley_polygon, -4.0, 0.0);
+
+	// Add the valley to the terrain (lowers terrain where valley exists)
+	let sdf = AddY::new(sdf, valley_sdf);
 
 	// ---------- grid setup ---------------------------------------------------
 	let cube_size = chunk_size / res as f32;
 	let chunk_origin = chunk_coord.to_unwrapped_world_pos(chunk_size);
 
 	// Vertical sampling range in world Y
-	let y_min = -config.height_scale * 2.0;
-	let y_max = config.height_scale * 2.0;
+	let y_min = -config.height_scale * 4.0;
+	let y_max = config.height_scale * 4.0;
 	let y_range = y_max - y_min;
 
 	// Number of cells vertically to roughly match cube_size
