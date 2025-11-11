@@ -1,6 +1,6 @@
 pub mod combinators;
 pub mod perlin_terrain;
-pub mod region_extrusion;
+pub mod region_modulation;
 pub mod tetradhedron;
 pub mod trapezoidal_prism;
 pub mod tube;

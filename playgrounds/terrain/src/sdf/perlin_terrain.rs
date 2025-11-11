@@ -6,7 +6,7 @@ use noise::{NoiseFn, Perlin};
 /// Trait for elevation modulations that modify terrain height in 2.5D
 /// Returns the height offset at a given (x, z) position (Y is ignored)
 pub trait ElevationModulation: Send + Sync {
-	fn height_offset(&self, x: f32, z: f32) -> f32;
+	fn modify_elevation(&self, elevation: f32, x: f32, z: f32) -> f32;
 }
 
 /// SDF representation of Perlin noise-based terrain
@@ -80,7 +80,7 @@ impl Sdf for PerlinTerrainSdf {
 
 		// Apply elevation modulations (2.5D height offsets)
 		for modulation in &self.elevation_modulations {
-			terrain_height += modulation.height_offset(p.x, p.z);
+			terrain_height = modulation.modify_elevation(terrain_height, p.x, p.z);
 		}
 
 		// Define bedrock level (bottom of world)

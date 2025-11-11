@@ -1,7 +1,7 @@
 use crate::chunk::{ChunkCoord, TerrainChunk};
 // use crate::geography::FeatureRegistry;
 use crate::sdf::{
-	region_extrusion::{Region2D, RegionExtrusion},
+	region_modulation::{affine::RegionAffineModulation, extrusion::RegionExtrusion, Region2D},
 	tetradhedron::TetrahedronSdf,
 	trapezoidal_prism::TrapezoidalPrismSdf,
 	AddY, Difference, Ellipse3d, PerlinTerrainSdf, Sdf, TubeSdf, Union,
@@ -69,18 +69,29 @@ pub fn generate_chunk_mesh_volumetric(
 	// Create base terrain SDF
 	let mut sdf = PerlinTerrainSdf::new(config.seed, config.clone());
 
-	let big_valley_sdf = RegionExtrusion::new(
+	let big_valley_sdf = RegionAffineModulation::new(
 		Region2D::Rect {
 			center: Vec2::new(20.0, 20.0),
 			half_extents: Vec2::new(90.0, 90.0),
 			round: 2.0,
 		},
+		0.2,
 		-10.0,
 		10.0,
 		10.0,
 	);
 
 	sdf.add_elevation_modulation(Box::new(big_valley_sdf));
+
+	let intersecting_big_valley_sdf = RegionAffineModulation::new(
+		Region2D::Circle { center: Vec2::new(10.0, 70.0), radius: 80.0 },
+		0.5,
+		-10.0,
+		10.0,
+		10.0,
+	);
+
+	sdf.add_elevation_modulation(Box::new(intersecting_big_valley_sdf));
 
 	// Create a large vertical tube to bore a hole through the terrain
 	// Position it near the origin, going from well below ground to well above
