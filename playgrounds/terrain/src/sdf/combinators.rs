@@ -7,11 +7,12 @@ use bevy::prelude::*;
 pub struct AddY<A, B> {
 	a: A,
 	b: B,
+	factor: f32,
 }
 
 impl<A: Sdf, B: Sdf> AddY<A, B> {
-	pub fn new(a: A, b: B) -> Self {
-		Self { a, b }
+	pub fn new(a: A, b: B, factor: f32) -> Self {
+		Self { a, b, factor }
 	}
 }
 
@@ -24,7 +25,7 @@ impl<A: Sdf, B: Sdf> Sdf for AddY<A, B> {
 		// = d1 + d2 - p.y
 		let da = self.a.distance(p);
 		let db = self.b.distance(p);
-		da + db - p.y
+		da + db * self.factor - p.y
 	}
 }
 

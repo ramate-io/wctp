@@ -1,7 +1,10 @@
 use crate::chunk::{ChunkCoord, TerrainChunk};
 // use crate::geography::FeatureRegistry;
 use crate::sdf::{
-	AddY, Difference, Ellipse3d, InscribedPolygonSdf, PerlinTerrainSdf, Sdf, TubeSdf,
+	region_extrusion::{Region2D, RegionExtrusion},
+	tetradhedron::TetrahedronSdf,
+	trapezoidal_prism::TrapezoidalPrismSdf,
+	AddY, Difference, Ellipse3d, PerlinTerrainSdf, Sdf, TubeSdf, Union,
 };
 use bevy::prelude::*;
 use noise::Perlin;
@@ -66,74 +69,18 @@ pub fn generate_chunk_mesh_volumetric(
 	// Create base terrain SDF
 	let mut sdf = PerlinTerrainSdf::new(config.seed, config.clone());
 
-	// Big valley via inscribed polygon with noise
-	let valley_outer_polygon = vec![
-		Vec2::new(50.0, 50.0),   // Bottom-left
-		Vec2::new(150.0, 50.0),  // Bottom-right
-		Vec2::new(50.0, 150.0),  // Top-right
-		Vec2::new(150.0, 150.0), // Top-left
-	];
-
-	let valley_inner_polygon = vec![
-		Vec2::new(90.0, 90.0),   // Bottom-left
-		Vec2::new(110.0, 90.0),  // Bottom-right
-		Vec2::new(90.0, 110.0),  // Top-right
-		Vec2::new(110.0, 110.0), // Top-left
-	];
-
-	let big_valley_sdf =
-		InscribedPolygonSdf::new(valley_outer_polygon, valley_inner_polygon, -4.0, 0.0)
-			.with_noise(Perlin::new(config.seed))
-			.with_noise_factor(0.01);
+	let big_valley_sdf = RegionExtrusion::new(
+		Region2D::Rect {
+			center: Vec2::new(20.0, 20.0),
+			half_extents: Vec2::new(90.0, 90.0),
+			round: 2.0,
+		},
+		-10.0,
+		10.0,
+		10.0,
+	);
 
 	sdf.add_elevation_modulation(Box::new(big_valley_sdf));
-
-	// Create a trapezoid bump near the origin
-	// Outer polygon: large base rectangle
-	let outer_polygon = vec![
-		Vec2::new(-30.0 + 10.0, -30.0 + 10.0), // Bottom-left
-		Vec2::new(30.0 + 10.0, -30.0 + 10.0),  // Bottom-right
-		Vec2::new(30.0 + 10.0, 30.0 + 10.0),   // Top-right
-		Vec2::new(-30.0 + 10.0, 30.0 + 10.0),  // Top-left
-	];
-
-	// Inner polygon: smaller plateau rectangle
-	let inner_polygon = vec![
-		Vec2::new(-10.0 + 10.0, -10.0 + 10.0), // Bottom-left
-		Vec2::new(10.0 + 10.0, -10.0 + 10.0),  // Bottom-right
-		Vec2::new(10.0 + 10.0, 10.0 + 10.0),   // Top-right
-		Vec2::new(-10.0 + 10.0, 10.0 + 10.0),  // Top-left
-	];
-
-	// Create the trapezoid SDF (bump with 15 unit plateau height)
-	let trapezoid_sdf = InscribedPolygonSdf::new(outer_polygon, inner_polygon, 8.0, 0.0);
-
-	// Add the trapezoid to the terrain (raises terrain where trapezoid exists)
-	let sdf = AddY::new(sdf, trapezoid_sdf);
-
-	// Create a trapezoid bump near the origin
-	// Outer polygon: large base rectangle
-	let outer_valley_polygon = vec![
-		Vec2::new(-60.0 + 100.0, -60.0 + 100.0), // Bottom-left
-		Vec2::new(60.0 + 100.0, -60.0 + 100.0),  // Bottom-right
-		Vec2::new(60.0 + 100.0, 60.0 + 100.0),   // Top-right
-		Vec2::new(-60.0 + 100.0, 60.0 + 100.0),  // Top-left
-	];
-
-	// Inner polygon: smaller plateau rectangle
-	let inner_valley_polygon = vec![
-		Vec2::new(-30.0 + 100.0, -30.0 + 100.0), // Bottom-left
-		Vec2::new(30.0 + 100.0, -30.0 + 100.0),  // Bottom-right
-		Vec2::new(30.0 + 100.0, 30.0 + 100.0),   // Top-right
-		Vec2::new(-30.0 + 100.0, 30.0 + 100.0),  // Top-left
-	];
-
-	// Create the valley SDF (depression with 15 unit valley height)
-	let valley_sdf =
-		InscribedPolygonSdf::new(outer_valley_polygon, inner_valley_polygon, -4.0, 0.0);
-
-	// Add the valley to the terrain (lowers terrain where valley exists)
-	let sdf = AddY::new(sdf, valley_sdf);
 
 	// Create a large vertical tube to bore a hole through the terrain
 	// Position it near the origin, going from well below ground to well above
