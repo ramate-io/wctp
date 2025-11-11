@@ -64,7 +64,29 @@ pub fn generate_chunk_mesh_volumetric(
 	// feature_registry: Option<&FeatureRegistry>,
 ) -> Mesh {
 	// Create base terrain SDF
-	let sdf = PerlinTerrainSdf::new(config.seed, config.clone());
+	let mut sdf = PerlinTerrainSdf::new(config.seed, config.clone());
+
+	// Big valley via inscribed polygon with noise
+	let valley_outer_polygon = vec![
+		Vec2::new(50.0, 50.0),   // Bottom-left
+		Vec2::new(150.0, 50.0),  // Bottom-right
+		Vec2::new(50.0, 150.0),  // Top-right
+		Vec2::new(150.0, 150.0), // Top-left
+	];
+
+	let valley_inner_polygon = vec![
+		Vec2::new(90.0, 90.0),   // Bottom-left
+		Vec2::new(110.0, 90.0),  // Bottom-right
+		Vec2::new(90.0, 110.0),  // Top-right
+		Vec2::new(110.0, 110.0), // Top-left
+	];
+
+	let big_valley_sdf =
+		InscribedPolygonSdf::new(valley_outer_polygon, valley_inner_polygon, -4.0, 0.0)
+			.with_noise(Perlin::new(config.seed))
+			.with_noise_factor(0.01);
+
+	sdf.add_elevation_modulation(Box::new(big_valley_sdf));
 
 	// Create a trapezoid bump near the origin
 	// Outer polygon: large base rectangle

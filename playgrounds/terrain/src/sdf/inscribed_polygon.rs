@@ -1,5 +1,6 @@
 use crate::sdf::{perlin_terrain::ElevationModulation, Sdf};
 use bevy::prelude::*;
+use noise::{NoiseFn, Perlin};
 
 /// SDF for an inscribed polygon feature
 /// Creates a bump or depression with a plateau (inner polygon) and slopes (between inner and outer polygons)
@@ -19,6 +20,10 @@ pub struct InscribedPolygonSdf {
 	plateau_height: f32,
 	/// Base Y coordinate (where the feature sits)
 	base_y: f32,
+	/// The noise applied to the polygon
+	noise: Option<Perlin>,
+	/// The noise factor
+	noise_factor: f32,
 }
 
 impl InscribedPolygonSdf {
@@ -35,7 +40,24 @@ impl InscribedPolygonSdf {
 		plateau_height: f32,
 		base_y: f32,
 	) -> Self {
-		Self { outer_polygon, inner_polygon, plateau_height, base_y }
+		Self {
+			outer_polygon,
+			inner_polygon,
+			plateau_height,
+			base_y,
+			noise: None,
+			noise_factor: 0.0,
+		}
+	}
+
+	pub fn with_noise(mut self, noise: Perlin) -> Self {
+		self.noise = Some(noise);
+		self
+	}
+
+	pub fn with_noise_factor(mut self, noise_factor: f32) -> Self {
+		self.noise_factor = noise_factor;
+		self
 	}
 
 	/// Check if a point is inside a polygon using ray casting algorithm
@@ -150,7 +172,16 @@ impl Sdf for InscribedPolygonSdf {
 	fn distance(&self, p: Vec3) -> f32 {
 		let p_2d = Vec2::new(p.x, p.z);
 		let feature_height = self.get_height_at(p_2d);
-		let surface_y = self.base_y + feature_height;
+		let mut surface_y = self.base_y + feature_height;
+
+		if let Some(noise) = &self.noise {
+			let nval = noise.get([
+				p.x as f64 * self.noise_factor as f64,
+				p.y as f64 * self.noise_factor as f64,
+				p.z as f64 * self.noise_factor as f64,
+			]) as f32;
+			surface_y += nval * self.noise_factor;
+		}
 
 		// Return signed distance: negative if below surface, positive if above
 		p.y - surface_y
