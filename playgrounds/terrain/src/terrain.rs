@@ -1,7 +1,10 @@
 use crate::chunk::{ChunkCoord, TerrainChunk};
 // use crate::geography::FeatureRegistry;
-use crate::sdf::{AddY, InscribedPolygonSdf, PerlinTerrainSdf, Sdf};
+use crate::sdf::{
+	AddY, Difference, Ellipse3d, InscribedPolygonSdf, PerlinTerrainSdf, Sdf, TubeSdf,
+};
 use bevy::prelude::*;
+use noise::Perlin;
 
 /// Configuration for terrain generation
 #[derive(Resource, Clone)]
@@ -109,6 +112,37 @@ pub fn generate_chunk_mesh_volumetric(
 
 	// Add the valley to the terrain (lowers terrain where valley exists)
 	let sdf = AddY::new(sdf, valley_sdf);
+
+	// Create a large vertical tube to bore a hole through the terrain
+	// Position it near the origin, going from well below ground to well above
+	let tube_start = Vec3::new(-30.0, -1.0, -30.0); // Start deep below
+	let tube_end = Vec3::new(-50.0, 4.0, -50.0); // End high above
+
+	// Create a circular cross-section (ellipse with equal radii)
+	// Make it quite large - 15 unit radius
+	let tube_center = Vec3::new(20.0, 0.0, 20.0);
+	let tube_axis = (tube_end - tube_start).normalize();
+
+	// Build orthonormal basis perpendicular to tube axis
+	let right = if tube_axis.x.abs() > tube_axis.z.abs() {
+		Vec3::new(-tube_axis.y, tube_axis.x, 0.0).normalize()
+	} else {
+		Vec3::new(0.0, -tube_axis.z, tube_axis.y).normalize()
+	};
+	let up = tube_axis.cross(right).normalize();
+
+	let tube_ellipse = Ellipse3d {
+		center: tube_center,
+		axes: [right, up],
+		radii: Vec2::new(2.0, 2.0), // Large circular cross-section
+	};
+
+	let tube_sdf = TubeSdf::new(tube_start, tube_end, tube_ellipse)
+		.with_noise(Perlin::new(config.seed))
+		.with_noise_factor(0.4);
+
+	// Use Difference to bore the hole (subtract tube from terrain)
+	let sdf = Difference::new(sdf, tube_sdf);
 
 	// ---------- grid setup ---------------------------------------------------
 	let cube_size = chunk_size / res as f32;

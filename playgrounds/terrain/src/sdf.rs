@@ -1,6 +1,7 @@
 pub mod combinators;
 pub mod inscribed_polygon;
 pub mod perlin_terrain;
+pub mod tube;
 
 pub use combinators::{
 	AddY, Difference, Elongate, Intersection, RotateY, Round, Scale, SmoothDifference,
@@ -8,6 +9,7 @@ pub use combinators::{
 };
 pub use inscribed_polygon::InscribedPolygonSdf;
 pub use perlin_terrain::{ElevationModulation, PerlinTerrainSdf};
+pub use tube::{Ellipse3d, TubeSdf};
 
 use bevy::prelude::*;
 
