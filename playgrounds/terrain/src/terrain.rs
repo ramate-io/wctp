@@ -1,7 +1,10 @@
 use crate::chunk::{ChunkCoord, TerrainChunk};
 // use crate::geography::FeatureRegistry;
 use crate::sdf::{
-	region::{affine::RegionAffineModulation, Region2D, RegionNoise},
+	region::{
+		affine::RegionAffineModulation, branching::BranchingPlan, CircleRegion, RectRegion,
+		Region2D, RegionNoise,
+	},
 	Difference, Ellipse3d, PerlinTerrainSdf, Sdf, TubeSdf,
 };
 use bevy::prelude::*;
@@ -68,30 +71,54 @@ pub fn generate_chunk_mesh_volumetric(
 	let mut sdf = PerlinTerrainSdf::new(config.seed, config.clone());
 
 	let big_valley_sdf = RegionAffineModulation::new(
-		Region2D::Rect {
+		Region2D::Rect(RectRegion {
 			center: Vec2::new(20.0, 20.0),
 			half_extents: Vec2::new(90.0, 90.0),
 			round: 2.0,
-		},
-		0.2,
-		-10.0,
+		}),
+		0.5,
+		0.0,
 		10.0,
 		10.0,
 	)
 	.with_noise(RegionNoise { noise: Perlin::new(config.seed), frequency: 0.2, amplitude: 2.0 });
 
-	sdf.add_elevation_modulation(Box::new(big_valley_sdf));
+	sdf.add_elevation_modulation(Box::new(big_valley_sdf.clone()));
+
+	let strange_monolith = RegionAffineModulation::new(
+		Region2D::Rect(RectRegion {
+			center: Vec2::new(5.0, 5.0),
+			half_extents: Vec2::new(20.0, 20.0),
+			round: 2.0,
+		}),
+		10.0,
+		1.0,
+		10.0,
+		10.0,
+	)
+	.with_noise(RegionNoise { noise: Perlin::new(config.seed), frequency: 0.2, amplitude: 2.0 });
+
+	sdf.add_elevation_modulation(Box::new(strange_monolith));
 
 	let intersecting_big_valley_sdf = RegionAffineModulation::new(
-		Region2D::Circle { center: Vec2::new(10.0, 70.0), radius: 80.0 },
+		Region2D::Circle(CircleRegion { center: Vec2::new(10.0, 70.0), radius: 80.0 }),
 		0.5,
-		-10.0,
+		-1.7,
 		10.0,
 		10.0,
 	)
 	.with_noise(RegionNoise { noise: Perlin::new(config.seed), frequency: 0.2, amplitude: 2.0 });
 
 	sdf.add_elevation_modulation(Box::new(intersecting_big_valley_sdf));
+
+	// branching regions
+	let branch_plan = BranchingPlan::new(big_valley_sdf, Perlin::new(config.seed), 6);
+
+	let modulations = branch_plan.generate_regions();
+
+	for modulation in modulations {
+		sdf.add_elevation_modulation(Box::new(modulation));
+	}
 
 	// Create a large vertical tube to bore a hole through the terrain
 	// Position it near the origin, going from well below ground to well above

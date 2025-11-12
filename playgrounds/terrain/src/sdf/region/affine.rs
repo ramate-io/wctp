@@ -1,10 +1,12 @@
 use crate::sdf::perlin_terrain::ElevationModulation;
 use crate::sdf::region::{Region2D, RegionNoise};
 use bevy::prelude::*;
+use noise::NoiseFn;
 
 /// A unified modulation: applies both scaling (`a`) and offset (`b`) inside a smooth region.
 /// Outside region → a = 1, b = 0
 /// Inside region → a = inner_scale, b = extrusion_height
+#[derive(Debug, Clone)]
 pub struct RegionAffineModulation {
 	pub region: Region2D,
 	pub inner_scale: f32,
@@ -55,6 +57,40 @@ impl RegionAffineModulation {
 		} else {
 			let t = (d + self.inner_radius) / (self.inner_radius + self.outer_radius);
 			Self::smoothstep(t)
+		}
+	}
+
+	pub fn branch_region(&self, noise: &RegionNoise) -> Self {
+		let new_region = self.region.branch_region(noise);
+
+		// use noise to get the new inner scale
+		let new_inner_scale = noise.noise.get([
+			new_region.anchor_point_with_noise(noise).x as f64 * noise.frequency as f64,
+			new_region.anchor_point_with_noise(noise).y as f64 * noise.frequency as f64,
+		]) as f32;
+
+		let new_inner_offset = noise.noise.get([
+			new_region.anchor_point_with_noise(noise).x as f64 * noise.frequency as f64,
+			new_region.anchor_point_with_noise(noise).y as f64 * noise.frequency as f64,
+		]) as f32;
+
+		let new_inner_radius = noise.noise.get([
+			new_region.anchor_point_with_noise(noise).x as f64 * noise.frequency as f64,
+			new_region.anchor_point_with_noise(noise).y as f64 * noise.frequency as f64,
+		]) as f32;
+
+		let new_outer_radius = noise.noise.get([
+			new_region.anchor_point_with_noise(noise).x as f64 * noise.frequency as f64,
+			new_region.anchor_point_with_noise(noise).y as f64 * noise.frequency as f64,
+		]) as f32;
+
+		Self {
+			region: new_region,
+			inner_scale: new_inner_scale,
+			inner_offset: new_inner_offset,
+			inner_radius: new_inner_radius,
+			outer_radius: new_outer_radius,
+			noise: Some(noise.clone()),
 		}
 	}
 }
