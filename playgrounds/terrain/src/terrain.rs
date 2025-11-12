@@ -1,7 +1,7 @@
 use crate::chunk::{ChunkCoord, TerrainChunk};
 // use crate::geography::FeatureRegistry;
 use crate::sdf::{
-	region_modulation::{affine::RegionAffineModulation, Region2D, RegionNoise},
+	region::{affine::RegionAffineModulation, Region2D, RegionNoise},
 	Difference, Ellipse3d, PerlinTerrainSdf, Sdf, TubeSdf,
 };
 use bevy::prelude::*;
@@ -78,7 +78,7 @@ pub fn generate_chunk_mesh_volumetric(
 		10.0,
 		10.0,
 	)
-	.with_noise(RegionNoise { noise: Perlin::new(config.seed), frequency: 0.2, amplitude: 10.0 });
+	.with_noise(RegionNoise { noise: Perlin::new(config.seed), frequency: 0.2, amplitude: 2.0 });
 
 	sdf.add_elevation_modulation(Box::new(big_valley_sdf));
 
@@ -89,7 +89,7 @@ pub fn generate_chunk_mesh_volumetric(
 		10.0,
 		10.0,
 	)
-	.with_noise(RegionNoise { noise: Perlin::new(config.seed), frequency: 0.2, amplitude: 10.0 });
+	.with_noise(RegionNoise { noise: Perlin::new(config.seed), frequency: 0.2, amplitude: 2.0 });
 
 	sdf.add_elevation_modulation(Box::new(intersecting_big_valley_sdf));
 

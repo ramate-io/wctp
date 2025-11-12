@@ -1,16 +1,7 @@
 pub mod affine;
-pub mod extrusion;
 
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
-
-/// Simple easing utilities
-#[inline(always)]
-fn smoothstep(t: f32) -> f32 {
-	// clamp + cubic
-	let t = t.clamp(0.0, 1.0);
-	t * t * (3.0 - 2.0 * t)
-}
 
 /// 2D region types with fast signed distance φ(x,z).
 pub enum Region2D {
