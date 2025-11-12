@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use crate::chunk::LoadedChunks;
+use bevy::prelude::*;
 
 #[derive(Component)]
 pub struct CoordinateDisplay;
@@ -16,7 +16,7 @@ pub fn setup_debug_ui(mut commands: Commands) {
 				padding: UiRect::all(Val::Px(10.0)),
 				..default()
 			},
-			BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.7)),
+			BackgroundColor(Color::hsla(201.0, 0.69, 0.62, 0.7)),
 			CoordinateDisplay,
 		))
 		.with_children(|parent| {
@@ -55,4 +55,3 @@ pub fn update_coordinate_display(
 		}
 	}
 }
-

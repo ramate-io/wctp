@@ -7,6 +7,7 @@ mod chunk_manager;
 mod geography;
 mod marching_cubes;
 pub mod sdf;
+pub mod shaders;
 mod terrain;
 mod ui;
 mod units;
@@ -29,6 +30,7 @@ impl Plugin for TerrainPlugin {
 			.add_feature(Box::new(geography::canyons::CanyonFeature::new(self.seed, 1000)));
 
 		app.insert_resource(TerrainConfig::new(self.seed))
+			.insert_resource(ClearColor(Color::hsla(201.0, 0.69, 0.62, 1.0)))
 			.insert_resource(ChunkConfig::default())
 			.insert_resource(LoadedChunks::default())
 			.insert_resource(feature_registry)

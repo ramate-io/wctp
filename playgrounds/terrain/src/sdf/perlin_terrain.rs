@@ -6,20 +6,30 @@ use noise::{NoiseFn, Perlin};
 /// Trait for elevation modulations that modify terrain height in 2.5D
 /// Returns the height offset at a given (x, z) position (Y is ignored)
 pub trait ElevationModulation: Send + Sync {
-	fn height_offset(&self, x: f32, z: f32) -> f32;
+	fn modify_elevation(&self, elevation: f32, x: f32, z: f32) -> f32;
 }
 
 /// SDF representation of Perlin noise-based terrain
 /// Converts the heightfield `y = height(x, z)` into an SDF: `f(p) = p.y - height(p.x, p.z)`
 pub struct PerlinTerrainSdf {
+	/// The Perlin noise generator
 	perlin: Perlin,
+	/// The terrain configuration
 	config: TerrainConfig,
+	/// The elevation modulations
 	elevation_modulations: Vec<Box<dyn ElevationModulation>>,
+	/// Square describing bounds outside of which terrain is value 0
+	bounds: Option<[Vec2; 4]>,
 }
 
 impl PerlinTerrainSdf {
 	pub fn new(seed: u32, config: TerrainConfig) -> Self {
-		Self { perlin: Perlin::new(seed), config, elevation_modulations: Vec::new() }
+		Self { perlin: Perlin::new(seed), config, elevation_modulations: Vec::new(), bounds: None }
+	}
+
+	pub fn with_bounds(mut self, bounds: [Vec2; 4]) -> Self {
+		self.bounds = Some(bounds);
+		self
 	}
 
 	pub fn add_elevation_modulation(&mut self, modulation: Box<dyn ElevationModulation>) {
@@ -29,6 +39,16 @@ impl PerlinTerrainSdf {
 	/// Calculate the terrain height at a given (x, z) position
 	/// This is the same logic as the original heightfield generation
 	fn height_at(&self, world_x: f32, world_z: f32) -> f32 {
+		if let Some(bounds) = &self.bounds {
+			if world_x < bounds[0].x
+				|| world_x > bounds[1].x
+				|| world_z < bounds[0].y
+				|| world_z > bounds[1].y
+			{
+				return 0.0;
+			}
+		}
+
 		// Generate height using multiple octaves of noise
 		let mut height = 0.0;
 		let mut amplitude = 1.0;
@@ -60,7 +80,7 @@ impl Sdf for PerlinTerrainSdf {
 
 		// Apply elevation modulations (2.5D height offsets)
 		for modulation in &self.elevation_modulations {
-			terrain_height += modulation.height_offset(p.x, p.z);
+			terrain_height = modulation.modify_elevation(terrain_height, p.x, p.z);
 		}
 
 		// Define bedrock level (bottom of world)

@@ -1,7 +1,11 @@
 use crate::chunk::{ChunkCoord, TerrainChunk};
 // use crate::geography::FeatureRegistry;
-use crate::sdf::{AddY, InscribedPolygonSdf, PerlinTerrainSdf, Sdf};
+use crate::sdf::{
+	region_modulation::{affine::RegionAffineModulation, Region2D, RegionNoise},
+	Difference, Ellipse3d, PerlinTerrainSdf, Sdf, TubeSdf,
+};
 use bevy::prelude::*;
+use noise::Perlin;
 
 /// Configuration for terrain generation
 #[derive(Resource, Clone)]
@@ -61,54 +65,64 @@ pub fn generate_chunk_mesh_volumetric(
 	// feature_registry: Option<&FeatureRegistry>,
 ) -> Mesh {
 	// Create base terrain SDF
-	let sdf = PerlinTerrainSdf::new(config.seed, config.clone());
+	let mut sdf = PerlinTerrainSdf::new(config.seed, config.clone());
 
-	// Create a trapezoid bump near the origin
-	// Outer polygon: large base rectangle
-	let outer_polygon = vec![
-		Vec2::new(-30.0 + 10.0, -30.0 + 10.0), // Bottom-left
-		Vec2::new(30.0 + 10.0, -30.0 + 10.0),  // Bottom-right
-		Vec2::new(30.0 + 10.0, 30.0 + 10.0),   // Top-right
-		Vec2::new(-30.0 + 10.0, 30.0 + 10.0),  // Top-left
-	];
+	let big_valley_sdf = RegionAffineModulation::new(
+		Region2D::Rect {
+			center: Vec2::new(20.0, 20.0),
+			half_extents: Vec2::new(90.0, 90.0),
+			round: 2.0,
+		},
+		0.2,
+		-10.0,
+		10.0,
+		10.0,
+	)
+	.with_noise(RegionNoise { noise: Perlin::new(config.seed), frequency: 0.2, amplitude: 10.0 });
 
-	// Inner polygon: smaller plateau rectangle
-	let inner_polygon = vec![
-		Vec2::new(-10.0 + 10.0, -10.0 + 10.0), // Bottom-left
-		Vec2::new(10.0 + 10.0, -10.0 + 10.0),  // Bottom-right
-		Vec2::new(10.0 + 10.0, 10.0 + 10.0),   // Top-right
-		Vec2::new(-10.0 + 10.0, 10.0 + 10.0),  // Top-left
-	];
+	sdf.add_elevation_modulation(Box::new(big_valley_sdf));
 
-	// Create the trapezoid SDF (bump with 15 unit plateau height)
-	let trapezoid_sdf = InscribedPolygonSdf::new(outer_polygon, inner_polygon, 8.0, 0.0);
+	let intersecting_big_valley_sdf = RegionAffineModulation::new(
+		Region2D::Circle { center: Vec2::new(10.0, 70.0), radius: 80.0 },
+		0.5,
+		-10.0,
+		10.0,
+		10.0,
+	)
+	.with_noise(RegionNoise { noise: Perlin::new(config.seed), frequency: 0.2, amplitude: 10.0 });
 
-	// Add the trapezoid to the terrain (raises terrain where trapezoid exists)
-	let sdf = AddY::new(sdf, trapezoid_sdf);
+	sdf.add_elevation_modulation(Box::new(intersecting_big_valley_sdf));
 
-	// Create a trapezoid bump near the origin
-	// Outer polygon: large base rectangle
-	let outer_valley_polygon = vec![
-		Vec2::new(-60.0 + 100.0, -60.0 + 100.0), // Bottom-left
-		Vec2::new(60.0 + 100.0, -60.0 + 100.0),  // Bottom-right
-		Vec2::new(60.0 + 100.0, 60.0 + 100.0),   // Top-right
-		Vec2::new(-60.0 + 100.0, 60.0 + 100.0),  // Top-left
-	];
+	// Create a large vertical tube to bore a hole through the terrain
+	// Position it near the origin, going from well below ground to well above
+	let tube_start = Vec3::new(-30.0, -1.0, -30.0); // Start deep below
+	let tube_end = Vec3::new(-50.0, 4.0, -50.0); // End high above
 
-	// Inner polygon: smaller plateau rectangle
-	let inner_valley_polygon = vec![
-		Vec2::new(-30.0 + 100.0, -30.0 + 100.0), // Bottom-left
-		Vec2::new(30.0 + 100.0, -30.0 + 100.0),  // Bottom-right
-		Vec2::new(30.0 + 100.0, 30.0 + 100.0),   // Top-right
-		Vec2::new(-30.0 + 100.0, 30.0 + 100.0),  // Top-left
-	];
+	// Create a circular cross-section (ellipse with equal radii)
+	// Make it quite large - 15 unit radius
+	let tube_center = Vec3::new(20.0, 0.0, 20.0);
+	let tube_axis = (tube_end - tube_start).normalize();
 
-	// Create the valley SDF (depression with 15 unit valley height)
-	let valley_sdf =
-		InscribedPolygonSdf::new(outer_valley_polygon, inner_valley_polygon, -4.0, 0.0);
+	// Build orthonormal basis perpendicular to tube axis
+	let right = if tube_axis.x.abs() > tube_axis.z.abs() {
+		Vec3::new(-tube_axis.y, tube_axis.x, 0.0).normalize()
+	} else {
+		Vec3::new(0.0, -tube_axis.z, tube_axis.y).normalize()
+	};
+	let up = tube_axis.cross(right).normalize();
 
-	// Add the valley to the terrain (lowers terrain where valley exists)
-	let sdf = AddY::new(sdf, valley_sdf);
+	let tube_ellipse = Ellipse3d {
+		center: tube_center,
+		axes: [right, up],
+		radii: Vec2::new(2.0, 2.0), // Large circular cross-section
+	};
+
+	let tube_sdf = TubeSdf::new(tube_start, tube_end, tube_ellipse)
+		.with_noise(Perlin::new(config.seed))
+		.with_noise_factor(0.4);
+
+	// Use Difference to bore the hole (subtract tube from terrain)
+	let sdf = Difference::new(sdf, tube_sdf);
 
 	// ---------- grid setup ---------------------------------------------------
 	let cube_size = chunk_size / res as f32;
@@ -298,9 +312,9 @@ pub fn spawn_chunk(
 	// Make the origin chunk (0, 0) reddish for easy verification
 	let is_origin_chunk = wrapped_coord.x == 0 && wrapped_coord.z == 0;
 	let base_color = if is_origin_chunk {
-		Color::srgb(0.8, 0.2, 0.2) // Reddish for origin chunk
+		Color::hsla(46.0, 0.22, 0.62, 1.0) // brown
 	} else {
-		Color::srgb(0.2, 0.6, 0.3) // Green terrain
+		Color::hsla(46.0, 0.22, 0.62, 1.0) // brown
 	};
 
 	let material_handle = materials.add(StandardMaterial {
