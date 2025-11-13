@@ -63,17 +63,17 @@ impl RegionAffineModulation {
 		let new_region = self.region.branch_region(noise);
 
 		// use noise to get the new inner scale
-		let new_inner_scale = (1.0 + noise.sample_fbm_double_peak(
+		let new_inner_scale = (0.9 + noise.sample_fbm_double_peak(
 			self.inner_scale, 
 			-self.inner_scale, 
-			0.5,
+			0.3,
 			 0.05
 		)).abs();
 
 		let new_inner_offset = noise.sample_fbm_double_peak(
 			self.inner_offset,
 			-self.inner_offset,
-			2.0,
+			1.0,
 			0.05
 		);
 
