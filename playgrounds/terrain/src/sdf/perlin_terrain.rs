@@ -83,6 +83,18 @@ impl Sdf for PerlinTerrainSdf {
 			terrain_height = modulation.modify_elevation(terrain_height, p.x, p.z);
 		}
 
+		// This keeps the terrain height within a max.
+		// TODO: make this configurable via the TerrainConfig.
+		// Note, if you were to make the coefficient negative, you end up with ridges, 
+		// though for the most part they will be very sharp unless the coefficient is very small.
+		// And, with simply the coefficient, and no base addend, you end up with all ridges peaking at the same height.
+		// So, really, the ideal model is to have a coefficient for ridge and plateau effects. 
+		if terrain_height > 10.0 {
+			terrain_height = 10.0 + (0.75 * (terrain_height - 10.0));
+		} else if terrain_height < -10.0 {
+			terrain_height = -10.0 - (0.75 * (terrain_height + 10.0));
+		}
+
 		// Define bedrock level (bottom of world)
 		let bedrock_level = -self.config.height_scale * 4.0;
 

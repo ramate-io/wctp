@@ -1,10 +1,11 @@
 use crate::sdf::perlin_terrain::ElevationModulation;
-use crate::sdf::region_modulation::{Region2D, RegionNoise};
+use crate::sdf::region::{Region2D, RegionNoise};
 use bevy::prelude::*;
 
 /// A unified modulation: applies both scaling (`a`) and offset (`b`) inside a smooth region.
 /// Outside region → a = 1, b = 0
 /// Inside region → a = inner_scale, b = extrusion_height
+#[derive(Debug, Clone)]
 pub struct RegionAffineModulation {
 	pub region: Region2D,
 	pub inner_scale: f32,
@@ -55,6 +56,48 @@ impl RegionAffineModulation {
 		} else {
 			let t = (d + self.inner_radius) / (self.inner_radius + self.outer_radius);
 			Self::smoothstep(t)
+		}
+	}
+
+	pub fn branch_region(&self, noise: &RegionNoise) -> Self {
+		let new_region = self.region.branch_region(noise);
+
+		// use noise to get the new inner scale
+		let new_inner_scale = (0.9 + noise.sample_fbm_double_peak(
+			self.inner_scale, 
+			-self.inner_scale, 
+			0.3,
+			 0.05
+		)).abs();
+
+		let new_inner_offset = noise.sample_fbm_double_peak(
+			self.inner_offset,
+			-self.inner_offset,
+			1.0,
+			0.05
+		);
+
+		let new_inner_radius = self.inner_radius + noise.sample_fbm_double_peak(
+			self.inner_radius,
+			-self.inner_radius, 
+			self.inner_radius,
+			0.05
+		);
+
+		let new_outer_radius = self.outer_radius + noise.sample_fbm_double_peak(
+			self.outer_radius,
+			-self.outer_radius,
+			self.outer_radius,
+			0.05
+		);
+
+		Self {
+			region: new_region,
+			inner_scale: new_inner_scale,
+			inner_offset: new_inner_offset,
+			inner_radius: new_inner_radius,
+			outer_radius: new_outer_radius,
+			noise: Some(noise.clone()),
 		}
 	}
 }
