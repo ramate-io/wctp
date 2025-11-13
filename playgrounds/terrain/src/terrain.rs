@@ -11,59 +11,14 @@ use crate::sdf::{
 use bevy::prelude::*;
 use noise::Perlin;
 
-/// Configuration for terrain generation
-#[derive(Resource, Clone)]
-pub struct TerrainConfig {
-	pub seed: u32,
-	pub base_resolution: usize, // Full resolution vertices per chunk side
-	pub height_scale: f32,
-	pub use_volumetric: bool, // If true, use marching cubes; if false, use heightfield
+/// Resource containing the terrain SDF for runtime queries
+#[derive(Resource)]
+pub struct TerrainSdf {
+	pub sdf: Box<dyn Sdf>,
 }
 
-impl TerrainConfig {
-	pub fn new(seed: u32) -> Self {
-		Self {
-			seed,
-			base_resolution: 128, // 128x128 vertices per chunk at full resolution
-			height_scale: 5.0,
-			use_volumetric: true, // Default to volumetric for true 3D terrain
-		}
-	}
-
-	/// Calculate resolution for a chunk based on Manhattan distance from camera
-	/// Distance 0 (camera chunk) and 1 (immediate neighbors) always use full resolution
-	/// Further chunks use decreasing resolution based on a power curve
-	pub fn resolution_for_distance(&self, distance: i32) -> usize {
-		// Camera chunk and immediate neighbors always full resolution
-		if distance <= 2 {
-			return self.base_resolution;
-		}
-
-		// For distance > 2, use exponential decay: resolution = base / 2^(distance-1)
-		// This gives: distance 2 -> base/2, distance 3 -> base/4, distance 4 -> base/8, etc.
-		((self.base_resolution as f32) - (distance as f32 * 30.0)).max(32.0) as usize
-	}
-}
-
-/// Generate a terrain mesh for a specific chunk by sampling an SDF
-/// Supports both heightfield (fast, no caves) and volumetric (marching cubes, supports caves)
-pub fn generate_chunk_mesh(
-	chunk_coord: &ChunkCoord,
-	chunk_size: f32,
-	resolution: usize,
-	config: &TerrainConfig,
-	// feature_registry: Option<&FeatureRegistry>,
-) -> Mesh {
-	generate_chunk_mesh_volumetric(chunk_coord, chunk_size, resolution, config)
-}
-
-pub fn generate_chunk_mesh_volumetric(
-	chunk_coord: &ChunkCoord,
-	chunk_size: f32,
-	res: usize,
-	config: &TerrainConfig,
-	// feature_registry: Option<&FeatureRegistry>,
-) -> Mesh {
+/// Create the terrain SDF with all modulations
+pub fn create_terrain_sdf(config: &TerrainConfig) -> Box<dyn Sdf> {
 	// Create base terrain SDF
 	let mut sdf = PerlinTerrainSdf::new(config.seed, config.clone());
 
@@ -157,7 +112,64 @@ pub fn generate_chunk_mesh_volumetric(
 		.with_noise_factor(0.4);
 
 	// Use Difference to bore the hole (subtract tube from terrain)
-	let sdf = Difference::new(sdf, tube_sdf);
+	Box::new(Difference::new(sdf, tube_sdf))
+}
+
+/// Configuration for terrain generation
+#[derive(Resource, Clone)]
+pub struct TerrainConfig {
+	pub seed: u32,
+	pub base_resolution: usize, // Full resolution vertices per chunk side
+	pub height_scale: f32,
+	pub use_volumetric: bool, // If true, use marching cubes; if false, use heightfield
+}
+
+impl TerrainConfig {
+	pub fn new(seed: u32) -> Self {
+		Self {
+			seed,
+			base_resolution: 128, // 128x128 vertices per chunk at full resolution
+			height_scale: 5.0,
+			use_volumetric: true, // Default to volumetric for true 3D terrain
+		}
+	}
+
+	/// Calculate resolution for a chunk based on Manhattan distance from camera
+	/// Distance 0 (camera chunk) and 1 (immediate neighbors) always use full resolution
+	/// Further chunks use decreasing resolution based on a power curve
+	pub fn resolution_for_distance(&self, distance: i32) -> usize {
+		// Camera chunk and immediate neighbors always full resolution
+		if distance <= 2 {
+			return self.base_resolution;
+		}
+
+		// For distance > 2, use exponential decay: resolution = base / 2^(distance-1)
+		// This gives: distance 2 -> base/2, distance 3 -> base/4, distance 4 -> base/8, etc.
+		((self.base_resolution as f32) - (distance as f32 * 30.0)).max(32.0) as usize
+	}
+}
+
+/// Generate a terrain mesh for a specific chunk by sampling an SDF
+/// Supports both heightfield (fast, no caves) and volumetric (marching cubes, supports caves)
+pub fn generate_chunk_mesh(
+	chunk_coord: &ChunkCoord,
+	chunk_size: f32,
+	resolution: usize,
+	config: &TerrainConfig,
+	// feature_registry: Option<&FeatureRegistry>,
+) -> Mesh {
+	generate_chunk_mesh_volumetric(chunk_coord, chunk_size, resolution, config)
+}
+
+pub fn generate_chunk_mesh_volumetric(
+	chunk_coord: &ChunkCoord,
+	chunk_size: f32,
+	res: usize,
+	config: &TerrainConfig,
+	// feature_registry: Option<&FeatureRegistry>,
+) -> Mesh {
+	// Use the same SDF creation logic
+	let sdf = create_terrain_sdf(config);
 
 	// ---------- grid setup ---------------------------------------------------
 	let cube_size = chunk_size / res as f32;
@@ -189,7 +201,7 @@ pub fn generate_chunk_mesh_volumetric(
 			let wz = chunk_origin.z + z as f32 * cube_size;
 			for x in 0..nx {
 				let wx = chunk_origin.x + x as f32 * cube_size;
-				grid[idx(x, y, z)] = sdf.distance(Vec3::new(wx, wy, wz));
+				grid[idx(x, y, z)] = sdf.as_ref().distance(Vec3::new(wx, wy, wz));
 			}
 		}
 	}
@@ -285,7 +297,7 @@ pub fn generate_chunk_mesh_volumetric(
 		.iter()
 		.map(|v| {
 			let world = Vec3::new(v[0] + chunk_origin.x, v[1], v[2] + chunk_origin.z);
-			calculate_sdf_normal(&sdf, world).into()
+			calculate_sdf_normal(sdf.as_ref(), world).into()
 		})
 		.collect();
 
@@ -306,7 +318,7 @@ pub fn generate_chunk_mesh_volumetric(
 }
 
 /// Calculate normal from SDF gradient
-fn calculate_sdf_normal(sdf: &impl Sdf, p: Vec3) -> Vec3 {
+fn calculate_sdf_normal(sdf: &dyn Sdf, p: Vec3) -> Vec3 {
 	// Use smaller epsilon to avoid exaggerating streaks
 	let epsilon = 0.0005;
 	let dx = sdf.distance(Vec3::new(p.x + epsilon, p.y, p.z))
