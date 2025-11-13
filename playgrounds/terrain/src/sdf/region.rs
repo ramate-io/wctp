@@ -47,6 +47,35 @@ pub struct RegionNoise {
 	pub amplitude: f32,
 }
 
+impl RegionNoise {
+	pub fn new(noise: Perlin, frequency: f32, amplitude: f32) -> Self {
+		Self { noise, frequency, amplitude }
+	}
+
+	pub fn sample_fbm(&self, x: f32, z: f32, amplitude: f32, frequency: f32) -> f32 {
+		let mut value = 0.0;
+		let mut amplitude_i = amplitude;
+		let mut frequency_i = frequency;
+		// let max_value = 0.0;
+
+		for _ in 0..4 {
+			let sample =
+				self.noise.get([(x * frequency_i) as f64, (z * frequency_i) as f64]) as f32;
+			value += sample * amplitude_i;
+			// max_value += amplitude;
+			amplitude_i *= 0.5;
+			frequency_i *= 2.0;
+		}
+
+		value
+	}
+
+	pub fn sample_fbm_double_peak(&self, x: f32, z: f32, amplitude: f32, frequency: f32) -> f32 {
+		let value = self.sample_fbm(x, z, amplitude, frequency);
+		value.signum() * (amplitude - value.abs())
+	}
+}
+
 impl Region2D {
 	/// Factory for a convex polygon from CCW vertices (fast & robust).
 	pub fn convex_from_ccw_vertices(verts: &[Vec2]) -> Self {
@@ -128,7 +157,7 @@ impl Region2D {
 	pub fn num_vertices(&self) -> usize {
 		match self {
 			Region2D::ConvexPoly(ConvexPolyRegion { normals, .. }) => normals.len(),
-			_ => 0,
+			_ => 1,
 		}
 	}
 
@@ -146,38 +175,38 @@ impl Region2D {
 		}
 	}
 
-	/// Gets the anchore point with noise for the given index.
-	pub fn anchor_point_with_noise(&self, noise: &RegionNoise) -> Vec2 {
-		// copmpute the index from noise value
-		let index =
-			(noise.noise.get([0.0, 0.0]) as f32 * self.num_vertices() as f32).floor() as usize;
-		self.anchor_point(index)
+	/// Gets the anchor point with noise for the given index.
+	pub fn branching_anchor_point(&self, noise: &RegionNoise) -> Vec2 {
+		let relative_size = self.relative_size();
+		let pow = (relative_size + 1317.0) * (relative_size + 1317.0);
+		let anchor = self.anchor_point(0);
+		let amplitude = (pow % relative_size) * 3.0;
+		let x_offset = noise.sample_fbm_double_peak(anchor.x - 1.0, anchor.y + 1.0, amplitude, 0.05);
+		let z_offset = noise.sample_fbm_double_peak(anchor.x + 1.0, anchor.y - 1.0, amplitude, 0.05);
+		anchor + Vec2::new(x_offset, z_offset)
 	}
 
 	/// Determines the size of the branching region.
-	pub fn branching_size(&self, noise: &RegionNoise) -> f32 {
-		let anchor = self.anchor_point_with_noise(noise);
-		let size = noise.noise.get([
-			anchor.x as f64 * noise.frequency as f64,
-			anchor.y as f64 * noise.frequency as f64,
-		]) as f32;
-		size * self.relative_size()
+	pub fn branching_scale(&self, noise: &RegionNoise) -> f32 {
+		let anchor = self.anchor_point(0);
+		let amplitude = 2.0; // as much as double the size
+		noise.sample_fbm_double_peak(anchor.x - 1.0, anchor.y + 1.0, amplitude, 0.05).abs()
 	}
 
 	/// Scales the region by the given factor.
-	pub fn scale(&self, factor: f32) -> Self {
+	pub fn scale(&self, scale: f32) -> Self {
 		match self {
 			Region2D::Rect(rect_region) => Region2D::Rect(RectRegion {
-				half_extents: rect_region.half_extents * factor,
+				half_extents: rect_region.half_extents * scale,
 				..rect_region.clone()
 			}),
 			Region2D::Circle(circle_region) => Region2D::Circle(CircleRegion {
-				radius: circle_region.radius * factor,
+				radius: circle_region.radius * scale,
 				..circle_region.clone()
 			}),
 			Region2D::ConvexPoly(convex_poly_region) => Region2D::ConvexPoly(ConvexPolyRegion {
-				normals: convex_poly_region.normals.iter().map(|n| n * factor).collect(),
-				offsets: convex_poly_region.offsets.iter().map(|o| o * factor).collect(),
+				normals: convex_poly_region.normals.iter().map(|n| n * scale).collect(),
+				offsets: convex_poly_region.offsets.iter().map(|o| o * scale).collect(),
 				..convex_poly_region.clone()
 			}),
 		}
@@ -201,7 +230,11 @@ impl Region2D {
 	/// Takes some noise and creates a new affine region.
 	pub fn branch_region(&self, noise: &RegionNoise) -> Self {
 		// sample the noise to determine which shape to use
-		self.scale(self.branching_size(noise))
-			.reanchor(self.anchor_point_with_noise(noise))
+		let anchor = self.branching_anchor_point(noise);
+		let scale = self.branching_scale(noise);
+
+		self
+			.reanchor(anchor)
+			.scale(scale)
 	}
 }
