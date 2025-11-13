@@ -133,10 +133,11 @@ pub struct ChunkConfig {
 impl Default for ChunkConfig {
 	fn default() -> Self {
 		Self {
+			// 10 km (100 x 100 meters)
 			chunk_size: 100.0,
-			load_radius: 3,
-			max_render_distance: 5,
-			world_size_chunks: 32, // 32x32 chunks = 3200x3200 world units, wraps around
+			load_radius: 8, // load out to 100 km
+			max_render_distance: 8, // render out to 100 km
+			world_size_chunks: 512, // 512x512 chunks = 25600x25600 world units, wraps around, 2560 km
 		}
 	}
 }

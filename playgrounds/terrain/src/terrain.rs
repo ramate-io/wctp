@@ -2,8 +2,9 @@ use crate::chunk::{ChunkCoord, TerrainChunk};
 // use crate::geography::FeatureRegistry;
 use crate::sdf::{
 	region::{
-		affine::RegionAffineModulation, branching::BranchingPlan, CircleRegion, RectRegion,
+		affine::RegionAffineModulation, rounding::RegionRoundingModulation, branching::BranchingPlan, CircleRegion, RectRegion,
 		Region2D, RegionNoise,
+		grading::RegionGradingModulation,
 	},
 	Difference, Ellipse3d, PerlinTerrainSdf, Sdf, TubeSdf,
 };
@@ -40,11 +41,7 @@ impl TerrainConfig {
 
 		// For distance > 2, use exponential decay: resolution = base / 2^(distance-1)
 		// This gives: distance 2 -> base/2, distance 3 -> base/4, distance 4 -> base/8, etc.
-		let divisor = 2_i32.pow((distance - 1) as u32);
-		let resolution = self.base_resolution / divisor as usize;
-
-		// Ensure minimum resolution of at least 4 vertices (2x2 grid minimum)
-		resolution.max(4)
+		((self.base_resolution as f32) - (distance as f32 * 30.0)).max(32.0) as usize
 	}
 }
 
@@ -102,6 +99,34 @@ pub fn generate_chunk_mesh_volumetric(
 	for modulation in modulations {
 		sdf.add_elevation_modulation(Box::new(modulation));
 	}
+
+	let road_sdf = RegionRoundingModulation::new(
+		Region2D::Rect(RectRegion { center: Vec2::new(0.0, 0.0), half_extents: Vec2::new(80.0, 1.0), round: 0.1 }),
+		0.01,
+		None,
+		0.4,
+		0.2,
+	);
+
+	sdf.add_elevation_modulation(Box::new(road_sdf));
+
+	let start_point = Vec2::new(0.0, 20.0);
+	let start_elevation = sdf.height_at_with_all_modulations(start_point.x, start_point.y);
+	let end_point = Vec2::new(40.0, 20.0);
+	let end_elevation = sdf.height_at_with_all_modulations(end_point.x, end_point.y);
+
+	let graded_road = RegionGradingModulation::new(
+		Region2D::Rect(RectRegion { center: Vec2::new(20.0, 20.0), half_extents: Vec2::new(20.0, 1.0), round: 0.01 }),
+		start_point,
+		start_elevation,
+		end_point,
+		end_elevation,
+		None,
+		0.4,
+		0.1,
+	);
+
+	sdf.add_elevation_modulation(Box::new(graded_road));
 
 	// Create a large vertical tube to bore a hole through the terrain
 	// Position it near the origin, going from well below ground to well above

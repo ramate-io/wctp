@@ -1,4 +1,4 @@
-use crate::sdf::perlin_terrain::ElevationModulation;
+use crate::sdf::perlin_terrain::{ElevationModulation, PerlinTerrainSdf};
 use crate::sdf::region::{Region2D, RegionNoise};
 use bevy::prelude::*;
 
@@ -103,7 +103,7 @@ impl RegionAffineModulation {
 }
 
 impl ElevationModulation for RegionAffineModulation {
-	fn modify_elevation(&self, elevation: f32, x: f32, z: f32) -> f32 {
+	fn modify_elevation(&self, _perlin_terrain: &PerlinTerrainSdf, elevation: f32, x: f32, z: f32, _index: usize) -> f32 {
 		let p = Vec2::new(x, z);
 		let w = self.region_weight(p);
 
