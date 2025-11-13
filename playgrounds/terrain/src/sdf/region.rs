@@ -194,19 +194,20 @@ impl Region2D {
 	}
 
 	/// Scales the region by the given factor.
-	pub fn scale(&self, scale: f32) -> Self {
+	pub fn scale(&self, scale_body: f32, scale_detail: f32) -> Self {
 		match self {
 			Region2D::Rect(rect_region) => Region2D::Rect(RectRegion {
-				half_extents: rect_region.half_extents * scale,
+				half_extents: rect_region.half_extents * scale_body,
+				round: rect_region.round * scale_detail,
 				..rect_region.clone()
 			}),
 			Region2D::Circle(circle_region) => Region2D::Circle(CircleRegion {
-				radius: circle_region.radius * scale,
+				radius: circle_region.radius * scale_body,
 				..circle_region.clone()
 			}),
 			Region2D::ConvexPoly(convex_poly_region) => Region2D::ConvexPoly(ConvexPolyRegion {
-				normals: convex_poly_region.normals.iter().map(|n| n * scale).collect(),
-				offsets: convex_poly_region.offsets.iter().map(|o| o * scale).collect(),
+				normals: convex_poly_region.normals.iter().map(|n| n * scale_body).collect(),
+				offsets: convex_poly_region.offsets.iter().map(|o| o * scale_body).collect(),
 				..convex_poly_region.clone()
 			}),
 		}
@@ -231,10 +232,11 @@ impl Region2D {
 	pub fn branch_region(&self, noise: &RegionNoise) -> Self {
 		// sample the noise to determine which shape to use
 		let anchor = self.branching_anchor_point(noise);
-		let scale = self.branching_scale(noise);
+		let scale_body = self.branching_scale(noise);
+		let scale_detail = self.branching_scale(noise);
 
 		self
 			.reanchor(anchor)
-			.scale(scale)
+			.scale(scale_body, scale_detail)
 	}
 }
