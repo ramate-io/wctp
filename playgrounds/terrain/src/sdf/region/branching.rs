@@ -39,7 +39,6 @@ impl BranchingPlan {
 						let mut noise = noise.unwrap_or(fallback_noise.clone());
 						noise.noise = noise.noise.set_seed(noise.noise.seed() + (i * j * k + i + j + k) as u32);
 						let new_region = region.branch_region(&noise);
-						println!{"new_region({},{},{}): {:?}", i, j, k, new_region};
 						new_regions.push(new_region);
 					}
 					new_regions

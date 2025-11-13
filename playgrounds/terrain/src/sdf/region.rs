@@ -1,5 +1,7 @@
 pub mod affine;
 pub mod branching;
+pub mod rounding;
+pub mod grading;
 
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
@@ -74,6 +76,7 @@ impl RegionNoise {
 		let value = self.sample_fbm(x, z, amplitude, frequency);
 		value.signum() * (amplitude - value.abs())
 	}
+
 }
 
 impl Region2D {
@@ -99,6 +102,11 @@ impl Region2D {
 	#[inline(always)]
 	pub fn sdf(&self, p: Vec2) -> f32 {
 		self.sdf_with_noise(p, None)
+	}
+
+	/// Checks if the point is inside the region.
+	pub fn is_inside(&self, p: Vec2) -> bool {
+		self.sdf(p) < 0.0
 	}
 
 	/// Signed distance with optional noise perturbation

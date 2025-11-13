@@ -2,11 +2,12 @@ use crate::sdf::Sdf;
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
+use std::fmt::Debug;
 
 /// Trait for elevation modulations that modify terrain height in 2.5D
 /// Returns the height offset at a given (x, z) position (Y is ignored)
-pub trait ElevationModulation: Send + Sync {
-	fn modify_elevation(&self, elevation: f32, x: f32, z: f32) -> f32;
+pub trait ElevationModulation: Send + Sync + Debug {
+	fn modify_elevation(&self, perlin_terrain: &PerlinTerrainSdf, elevation: f32, x: f32, z: f32, index: usize) -> f32;
 }
 
 /// SDF representation of Perlin noise-based terrain
@@ -71,17 +72,29 @@ impl PerlinTerrainSdf {
 
 		height
 	}
+
+	/*pub fn height_at_with_modulations_up_to(&self, world_x: f32, world_z: f32, index: usize) -> f32 {
+		let mut terrain_height = self.height_at(world_x, world_z);
+		for (i, modulation) in self.elevation_modulations[..index].iter().enumerate() {
+			println!("modulation: {}, {:?}", i, modulation);
+			terrain_height = modulation.modify_elevation(self, terrain_height, world_x, world_z, i);
+		}
+		terrain_height
+	}*/
+
+	pub fn height_at_with_all_modulations(&self, world_x: f32, world_z: f32) -> f32 {
+		let mut terrain_height = self.height_at(world_x, world_z);
+		for modulation in &self.elevation_modulations {
+			terrain_height = modulation.modify_elevation(self, terrain_height, world_x, world_z, 0);
+		}
+		terrain_height
+	}
 }
 
 impl Sdf for PerlinTerrainSdf {
 	fn distance(&self, p: Vec3) -> f32 {
-		// Compute surface height from noise
-		let mut terrain_height = self.height_at(p.x, p.z);
-
 		// Apply elevation modulations (2.5D height offsets)
-		for modulation in &self.elevation_modulations {
-			terrain_height = modulation.modify_elevation(terrain_height, p.x, p.z);
-		}
+		let mut terrain_height = self.height_at_with_all_modulations(p.x, p.z);
 
 		// This keeps the terrain height within a max.
 		// TODO: make this configurable via the TerrainConfig.
