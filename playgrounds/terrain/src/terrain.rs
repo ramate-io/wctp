@@ -47,7 +47,7 @@ pub fn create_terrain_sdf(config: &TerrainConfig) -> Box<dyn Sdf> {
 	sdf.add_elevation_modulation(Box::new(intersecting_big_valley_sdf));
 
 	// branching regions
-	let branch_plan = BranchingPlan::new(big_valley_sdf, Perlin::new(config.seed), 3, 2);
+	let branch_plan = BranchingPlan::new(big_valley_sdf, Perlin::new(config.seed), 5, 2);
 
 	let modulations = branch_plan.generate_regions();
 
@@ -176,7 +176,7 @@ pub fn generate_chunk_mesh_volumetric(
 	let chunk_origin = chunk_coord.to_unwrapped_world_pos(chunk_size);
 
 	// Vertical sampling range in world Y
-	let y_min = -config.height_scale * 4.0;
+	let y_min = -config.height_scale;
 	let y_max = config.height_scale * 4.0;
 	let y_range = y_max - y_min;
 
