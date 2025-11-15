@@ -52,12 +52,8 @@ mod pipelines;
 mod stages;
 mod types;
 
-use bind_groups::{create_storage_layout_entry, create_uniform_layout_entry};
 use buffers::{new_storage, new_uniform, read_u32, read_vec};
-use pipelines::load_pipeline;
-use stages::{
-	stage_classify, stage_mesh, stage_prefix_add, stage_prefix_block, stage_prefix_local,
-};
+use stages::{ClassifyStage, MeshStage, PrefixAddStage, PrefixBlockStage, PrefixLocalStage};
 pub use types::{Bounds, GpuMeshData, Sampling3D, TerrainConfigGpu};
 
 use bevy::{
@@ -83,17 +79,11 @@ pub struct GpuMarchingCubesPipeline {
 	voxel_count: u32,
 	block_count: u32,
 
-	classify_pipeline: ComputePipeline,
-	prefix_local_pipeline: ComputePipeline,
-	prefix_block_pipeline: ComputePipeline,
-	prefix_add_pipeline: ComputePipeline,
-	mesh_pipeline: ComputePipeline,
-
-	classify_layout: BindGroupLayout,
-	prefix_local_layout: BindGroupLayout,
-	prefix_block_layout: BindGroupLayout,
-	prefix_add_layout: BindGroupLayout,
-	mesh_layout: BindGroupLayout,
+	classify_stage: ClassifyStage,
+	prefix_local_stage: PrefixLocalStage,
+	prefix_block_stage: PrefixBlockStage,
+	prefix_add_stage: PrefixAddStage,
+	mesh_stage: MeshStage,
 }
 
 impl GpuMarchingCubesPipeline {
@@ -116,102 +106,14 @@ impl GpuMarchingCubesPipeline {
 			(sampling.resolution.z + 7) / 8,
 		);
 
-		// --- Layouts per pass ---
-
-		let classify_layout = device.create_bind_group_layout(
-			Some("mc_classify_layout"),
-			&[
-				create_uniform_layout_entry(0),        // sampling
-				create_uniform_layout_entry(1),        // terrain_config
-				create_uniform_layout_entry(2),        // bounds
-				create_uniform_layout_entry(3),        // seed
-				create_storage_layout_entry(4, false), // cube_index
-				create_storage_layout_entry(5, false), // tri_counts
-			],
-		);
-
-		let prefix_local_layout = device.create_bind_group_layout(
-			Some("mc_prefix_local_layout"),
-			&[
-				create_storage_layout_entry(0, true),  // tri_counts (read)
-				create_storage_layout_entry(1, false), // tri_offset (write)
-				create_storage_layout_entry(2, false), // block_sums (write)
-			],
-		);
-
-		let prefix_block_layout = device.create_bind_group_layout(
-			Some("mc_prefix_block_layout"),
-			&[
-				create_storage_layout_entry(0, false), // block_sums
-				create_storage_layout_entry(1, false), // block_prefix
-			],
-		);
-
-		let prefix_add_layout = device.create_bind_group_layout(
-			Some("mc_prefix_add_layout"),
-			&[
-				create_storage_layout_entry(0, false), // tri_offset
-				create_storage_layout_entry(1, true),  // block_prefix (read)
-			],
-		);
-
-		let mesh_layout = device.create_bind_group_layout(
-			Some("mc_mesh_layout"),
-			&[
-				create_uniform_layout_entry(0),        // sampling
-				create_storage_layout_entry(1, true),  // cube_index (read)
-				create_storage_layout_entry(2, true),  // tri_offset (read)
-				create_storage_layout_entry(3, false), // out_positions
-				create_storage_layout_entry(4, false), // out_normals
-				create_storage_layout_entry(5, false), // out_uvs
-				create_uniform_layout_entry(6),        // terrain_config
-				create_uniform_layout_entry(7),        // bounds
-				create_uniform_layout_entry(8),        // seed
-			],
-		);
-
-		// Pipelines - loaded via asset paths to support #import syntax
-		// Note: Asset paths are relative to the assets/ directory
-		let classify_pipeline = load_pipeline(
-			pipeline_cache,
-			asset_server,
-			shaders,
-			"proc/classify_voxels.wgsl",
-			"main",
-			&classify_layout,
-		);
-		let prefix_local_pipeline = load_pipeline(
-			pipeline_cache,
-			asset_server,
-			shaders,
-			"proc/prefix_scan_local.wgsl",
-			"main",
-			&prefix_local_layout,
-		);
-		let prefix_block_pipeline = load_pipeline(
-			pipeline_cache,
-			asset_server,
-			shaders,
-			"proc/block_prefix.wgsl",
-			"main",
-			&prefix_block_layout,
-		);
-		let prefix_add_pipeline = load_pipeline(
-			pipeline_cache,
-			asset_server,
-			shaders,
-			"proc/block_sum.wgsl",
-			"main",
-			&prefix_add_layout,
-		);
-		let mesh_pipeline = load_pipeline(
-			pipeline_cache,
-			asset_server,
-			shaders,
-			"proc/compute_mesh.wgsl",
-			"compute_mesh",
-			&mesh_layout,
-		);
+		// Initialize all stages (creates layouts and loads pipelines)
+		let classify_stage = ClassifyStage::new(device, pipeline_cache, asset_server, shaders);
+		let prefix_local_stage =
+			PrefixLocalStage::new(device, pipeline_cache, asset_server, shaders);
+		let prefix_block_stage =
+			PrefixBlockStage::new(device, pipeline_cache, asset_server, shaders);
+		let prefix_add_stage = PrefixAddStage::new(device, pipeline_cache, asset_server, shaders);
+		let mesh_stage = MeshStage::new(device, pipeline_cache, asset_server, shaders);
 
 		Self {
 			sampling,
@@ -221,16 +123,11 @@ impl GpuMarchingCubesPipeline {
 			dispatch,
 			voxel_count,
 			block_count,
-			classify_pipeline,
-			prefix_local_pipeline,
-			prefix_block_pipeline,
-			prefix_add_pipeline,
-			mesh_pipeline,
-			classify_layout,
-			prefix_local_layout,
-			prefix_block_layout,
-			prefix_add_layout,
-			mesh_layout,
+			classify_stage,
+			prefix_local_stage,
+			prefix_block_stage,
+			prefix_add_stage,
+			mesh_stage,
 		}
 	}
 
@@ -261,10 +158,8 @@ impl GpuMarchingCubesPipeline {
 		let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor::default());
 
 		// PASS 1: classify
-		stage_classify(
+		self.classify_stage.execute(
 			device,
-			&self.classify_layout,
-			&self.classify_pipeline,
 			self.dispatch,
 			&sampling_buf,
 			&cfg_buf,
@@ -276,10 +171,8 @@ impl GpuMarchingCubesPipeline {
 		);
 
 		// PASS 2: prefix_local
-		stage_prefix_local(
+		self.prefix_local_stage.execute(
 			device,
-			&self.prefix_local_layout,
-			&self.prefix_local_pipeline,
 			block_count,
 			&tri_counts,
 			&tri_offset,
@@ -288,20 +181,12 @@ impl GpuMarchingCubesPipeline {
 		);
 
 		// PASS 3: prefix_block
-		stage_prefix_block(
-			device,
-			&self.prefix_block_layout,
-			&self.prefix_block_pipeline,
-			&block_sums,
-			&block_prefix,
-			&mut encoder,
-		);
+		self.prefix_block_stage
+			.execute(device, &block_sums, &block_prefix, &mut encoder);
 
 		// PASS 4: prefix_add
-		stage_prefix_add(
+		self.prefix_add_stage.execute(
 			device,
-			&self.prefix_add_layout,
-			&self.prefix_add_pipeline,
 			block_count,
 			&tri_offset,
 			&block_prefix,
@@ -309,10 +194,8 @@ impl GpuMarchingCubesPipeline {
 		);
 
 		// PASS 5: mesh
-		stage_mesh(
+		self.mesh_stage.execute(
 			device,
-			&self.mesh_layout,
-			&self.mesh_pipeline,
 			self.dispatch,
 			&sampling_buf,
 			&cube_index,

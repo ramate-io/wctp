@@ -9,8 +9,8 @@ mod prefix_add;
 mod prefix_block;
 mod prefix_local;
 
-pub use classify::stage_classify;
-pub use mesh::stage_mesh;
-pub use prefix_add::stage_prefix_add;
-pub use prefix_block::stage_prefix_block;
-pub use prefix_local::stage_prefix_local;
+pub use classify::ClassifyStage;
+pub use mesh::MeshStage;
+pub use prefix_add::PrefixAddStage;
+pub use prefix_block::PrefixBlockStage;
+pub use prefix_local::PrefixLocalStage;
