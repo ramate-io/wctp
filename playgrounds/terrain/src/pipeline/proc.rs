@@ -10,7 +10,6 @@ use bevy::{
 		render_asset::RenderAssetUsages,
 		render_resource::*,
 		renderer::{RenderDevice, RenderQueue},
-		view::Visibility,
 	},
 };
 use bytemuck::{Pod, Zeroable};
@@ -146,12 +145,15 @@ fn read_u32(device: &RenderDevice, queue: &RenderQueue, src: &Buffer, idx: u32) 
 
 fn load_pipeline(
 	pipeline_cache: &mut PipelineCache,
-	shader: Handle<Shader>,
+	shaders: &mut Assets<Shader>,
+	shader_src: &'static str,
+	shader_path: &'static str,
 	entry: &'static str,
 	layout: &BindGroupLayout,
 ) -> ComputePipeline {
 	use std::borrow::Cow;
 
+	let shader = shaders.add(Shader::from_wgsl(shader_src, shader_path));
 	let pipeline_descriptor = ComputePipelineDescriptor {
 		label: Some(Cow::Owned(format!("compute_pipeline_{}", entry))),
 		layout: vec![layout.clone()],
@@ -175,10 +177,96 @@ fn load_pipeline(
 	}
 }
 
+// Helper to create bind group layout entries
+fn create_uniform_layout_entry(binding: u32) -> BindGroupLayoutEntry {
+	BindGroupLayoutEntry {
+		binding,
+		visibility: ShaderStages::COMPUTE,
+		ty: BindingType::Buffer {
+			ty: BufferBindingType::Uniform,
+			has_dynamic_offset: false,
+			min_binding_size: None,
+		},
+		count: None,
+	}
+}
+
+fn create_storage_layout_entry(binding: u32, read_only: bool) -> BindGroupLayoutEntry {
+	BindGroupLayoutEntry {
+		binding,
+		visibility: ShaderStages::COMPUTE,
+		ty: BindingType::Buffer {
+			ty: BufferBindingType::Storage { read_only },
+			has_dynamic_offset: false,
+			min_binding_size: None,
+		},
+		count: None,
+	}
+}
+
+// Helper to create bind group entries
+fn create_buffer_entry(binding: u32, buffer: &Buffer) -> BindGroupEntry {
+	BindGroupEntry {
+		binding,
+		resource: BindingResource::Buffer(BufferBinding { buffer, offset: 0, size: None }),
+	}
+}
+
+// Helper to create a bind group from buffers
+fn create_bind_group(
+	device: &RenderDevice,
+	label: &str,
+	layout: &BindGroupLayout,
+	buffers: &[&Buffer],
+) -> BindGroup {
+	let entries: Vec<BindGroupEntry> = buffers
+		.iter()
+		.enumerate()
+		.map(|(i, buffer)| create_buffer_entry(i as u32, buffer))
+		.collect();
+	device.create_bind_group(Some(label), layout, &entries)
+}
+
 // =================================================================================================
 // TYPESAFE OVERWRITE-PROOF PIPELINE
 // =================================================================================================
-
+// GpuMarchingCubesPipeline
+// ============================================================================
+//
+// WGSL binding expectations (you should match these in your wgsl):
+//
+// classify_voxels.wgsl:
+//   @group(0) @binding(0) var<uniform> sampling : Sampling3D;
+//   @group(0) @binding(1) var<uniform> terrain_config : TerrainConfig;
+//   @group(0) @binding(2) var<uniform> bounds : Bounds;
+//   @group(0) @binding(3) var<uniform> seed : i32;
+//   @group(0) @binding(4) var<storage, read_write> cube_index : array<u32>;
+//   @group(0) @binding(5) var<storage, read_write> tri_counts : array<u32>;
+//
+// prefix_scan_local.wgsl:
+//   @group(0) @binding(0) var<storage, read>       tri_counts : array<u32>;
+//   @group(0) @binding(1) var<storage, read_write> tri_offset : array<u32>;
+//   @group(0) @binding(2) var<storage, read_write> block_sums : array<u32>;
+//
+// block_prefix.wgsl:
+//   @group(0) @binding(0) var<storage, read_write> block_sums : array<u32>;
+//   @group(0) @binding(1) var<storage, read_write> block_prefix : array<u32>;
+//
+// block_sum.wgsl (add block prefix into tri_offset):
+//   @group(0) @binding(0) var<storage, read_write> tri_offset : array<u32>;
+//   @group(0) @binding(1) var<storage, read>       block_prefix : array<u32>;
+//
+// compute_mesh.wgsl (your version from earlier):
+//   @group(0) @binding(0) var<uniform> sampling : Sampling3D;
+//   @group(0) @binding(1) var<storage, read> cube_index : array<u32>;
+//   @group(0) @binding(2) var<storage, read> tri_offset : array<u32>;
+//   @group(0) @binding(3) var<storage, read_write> out_positions : array<vec3<f32>>;
+//   @group(0) @binding(4) var<storage, read_write> out_normals   : array<vec3<f32>>;
+//   @group(0) @binding(5) var<storage, read_write> out_uvs       : array<vec2<f32>>;
+//   @group(0) @binding(6) var<uniform> terrain_config : TerrainConfig;
+//   @group(0) @binding(7) var<uniform> bounds : Bounds;
+//   @group(0) @binding(8) var<uniform> seed : i32;
+// ============================================================================
 pub struct GpuMarchingCubesPipeline {
 	sampling: Sampling3D,
 	terrain_cfg: TerrainConfigGpu,
@@ -195,7 +283,11 @@ pub struct GpuMarchingCubesPipeline {
 	prefix_add_pipeline: ComputePipeline,
 	mesh_pipeline: ComputePipeline,
 
-	layout: BindGroupLayout,
+	classify_layout: BindGroupLayout,
+	prefix_local_layout: BindGroupLayout,
+	prefix_block_layout: BindGroupLayout,
+	prefix_add_layout: BindGroupLayout,
+	mesh_layout: BindGroupLayout,
 }
 
 impl GpuMarchingCubesPipeline {
@@ -217,49 +309,101 @@ impl GpuMarchingCubesPipeline {
 			(sampling.resolution.z + 7) / 8,
 		);
 
-		// --- Shared layout (all shaders use same BG layout) ---
-		let layout_entries = &[BindGroupLayoutEntry {
-			binding: 0,
-			visibility: ShaderStages::COMPUTE,
-			ty: BindingType::Buffer {
-				ty: BufferBindingType::Storage { read_only: false },
-				has_dynamic_offset: false,
-				min_binding_size: None,
-			},
-			count: None,
-		}];
-		let layout =
-			device.create_bind_group_layout(Some("compute_bind_group_layout"), layout_entries);
+		// --- Layouts per pass ---
 
-		// Load shaders through Bevy's asset system
-		let classify_shader = shaders.add(Shader::from_wgsl(
+		let classify_layout = device.create_bind_group_layout(
+			Some("mc_classify_layout"),
+			&[
+				create_uniform_layout_entry(0),        // sampling
+				create_uniform_layout_entry(1),        // terrain_config
+				create_uniform_layout_entry(2),        // bounds
+				create_uniform_layout_entry(3),        // seed
+				create_storage_layout_entry(4, false), // cube_index
+				create_storage_layout_entry(5, false), // tri_counts
+			],
+		);
+
+		let prefix_local_layout = device.create_bind_group_layout(
+			Some("mc_prefix_local_layout"),
+			&[
+				create_storage_layout_entry(0, true),  // tri_counts (read)
+				create_storage_layout_entry(1, false), // tri_offset (write)
+				create_storage_layout_entry(2, false), // block_sums (write)
+			],
+		);
+
+		let prefix_block_layout = device.create_bind_group_layout(
+			Some("mc_prefix_block_layout"),
+			&[
+				create_storage_layout_entry(0, false), // block_sums
+				create_storage_layout_entry(1, false), // block_prefix
+			],
+		);
+
+		let prefix_add_layout = device.create_bind_group_layout(
+			Some("mc_prefix_add_layout"),
+			&[
+				create_storage_layout_entry(0, false), // tri_offset
+				create_storage_layout_entry(1, true),  // block_prefix (read)
+			],
+		);
+
+		let mesh_layout = device.create_bind_group_layout(
+			Some("mc_mesh_layout"),
+			&[
+				create_uniform_layout_entry(0),        // sampling
+				create_storage_layout_entry(1, true),  // cube_index (read)
+				create_storage_layout_entry(2, true),  // tri_offset (read)
+				create_storage_layout_entry(3, false), // out_positions
+				create_storage_layout_entry(4, false), // out_normals
+				create_storage_layout_entry(5, false), // out_uvs
+				create_uniform_layout_entry(6),        // terrain_config
+				create_uniform_layout_entry(7),        // bounds
+				create_uniform_layout_entry(8),        // seed
+			],
+		);
+
+		// Pipelines
+		let classify_pipeline = load_pipeline(
+			pipeline_cache,
+			shaders,
 			include_str!("../assets/proc/classify_voxels.wgsl"),
 			"classify_voxels.wgsl",
-		));
-		let prefix_local_shader = shaders.add(Shader::from_wgsl(
+			"main",
+			&classify_layout,
+		);
+		let prefix_local_pipeline = load_pipeline(
+			pipeline_cache,
+			shaders,
 			include_str!("../assets/proc/prefix_scan_local.wgsl"),
 			"prefix_scan_local.wgsl",
-		));
-		let prefix_block_shader = shaders.add(Shader::from_wgsl(
+			"main",
+			&prefix_local_layout,
+		);
+		let prefix_block_pipeline = load_pipeline(
+			pipeline_cache,
+			shaders,
 			include_str!("../assets/proc/block_prefix.wgsl"),
 			"block_prefix.wgsl",
-		));
-		let prefix_add_shader = shaders.add(Shader::from_wgsl(
+			"main",
+			&prefix_block_layout,
+		);
+		let prefix_add_pipeline = load_pipeline(
+			pipeline_cache,
+			shaders,
 			include_str!("../assets/proc/block_sum.wgsl"),
 			"block_sum.wgsl",
-		));
-		let mesh_shader = shaders.add(Shader::from_wgsl(
+			"main",
+			&prefix_add_layout,
+		);
+		let mesh_pipeline = load_pipeline(
+			pipeline_cache,
+			shaders,
 			include_str!("../assets/proc/compute_mesh.wgsl"),
 			"compute_mesh.wgsl",
-		));
-
-		let classify_pipeline = load_pipeline(pipeline_cache, classify_shader, "main", &layout);
-		let prefix_local_pipeline =
-			load_pipeline(pipeline_cache, prefix_local_shader, "main", &layout);
-		let prefix_block_pipeline =
-			load_pipeline(pipeline_cache, prefix_block_shader, "main", &layout);
-		let prefix_add_pipeline = load_pipeline(pipeline_cache, prefix_add_shader, "main", &layout);
-		let mesh_pipeline = load_pipeline(pipeline_cache, mesh_shader, "compute_mesh", &layout);
+			"compute_mesh",
+			&mesh_layout,
+		);
 
 		Self {
 			sampling,
@@ -274,108 +418,86 @@ impl GpuMarchingCubesPipeline {
 			prefix_block_pipeline,
 			prefix_add_pipeline,
 			mesh_pipeline,
-			layout,
+			classify_layout,
+			prefix_local_layout,
+			prefix_block_layout,
+			prefix_add_layout,
+			mesh_layout,
 		}
 	}
 
-	// =================================================================================================
-	// TYPESAFE: compute() allocates fresh buffers, runs, reads back, and returns CPU mesh data
-	// =================================================================================================
 	pub fn compute(&self, device: &RenderDevice, queue: &RenderQueue) -> GpuMeshData {
 		let voxel_count = self.voxel_count;
 		let block_count = self.block_count;
 
-		// Allocate new buffers — NEVER reused, cannot overwrite
+		// Allocate fresh buffers each call (no overwrites)
 		let cube_index = new_storage(device, voxel_count as usize * 4);
 		let tri_counts = new_storage(device, voxel_count as usize * 4);
 		let tri_offset = new_storage(device, voxel_count as usize * 4);
 		let block_sums = new_storage(device, block_count as usize * 4);
 		let block_prefix = new_storage(device, block_count as usize * 4);
 
-		// Output buffers
+		// Output (max: 15 verts per voxel)
 		let max_verts = voxel_count * 15;
 		let out_pos = new_storage(device, max_verts as usize * 12);
 		let out_normals = new_storage(device, max_verts as usize * 12);
 		let out_uvs = new_storage(device, max_verts as usize * 8);
 
-		// Uniform packs
+		// Uniform buffers for this call
 		let sampling_buf = new_uniform(device, &self.sampling);
 		let cfg_buf = new_uniform(device, &self.terrain_cfg);
 		let bounds_buf = new_uniform(device, &self.bounds);
 		let seed_buf = new_uniform(device, &self.seed);
 
-		// Build bind groups on demand for each pass
-		// PASS 1: classify - needs cube_index and tri_counts
-		let classify_bind_entries = &[BindGroupEntry {
-			binding: 0,
-			resource: BindingResource::Buffer(BufferBinding {
-				buffer: &cube_index,
-				offset: 0,
-				size: None,
-			}),
-		}];
-		let classify_bind = device.create_bind_group(
-			Some("classify_bind_group"),
-			&self.layout,
-			classify_bind_entries,
+		// PASS 1: classify
+		let classify_bind = create_bind_group(
+			device,
+			"mc_classify_bind",
+			&self.classify_layout,
+			&[&sampling_buf, &cfg_buf, &bounds_buf, &seed_buf, &cube_index, &tri_counts],
 		);
 
-		// PASS 2: prefix_local - needs tri_counts, tri_offset, block_sums
-		let prefix_local_bind_entries = &[BindGroupEntry {
-			binding: 0,
-			resource: BindingResource::Buffer(BufferBinding {
-				buffer: &tri_counts,
-				offset: 0,
-				size: None,
-			}),
-		}];
-		let prefix_local_bind = device.create_bind_group(
-			Some("prefix_local_bind_group"),
-			&self.layout,
-			prefix_local_bind_entries,
+		// PASS 2: prefix_local
+		let prefix_local_bind = create_bind_group(
+			device,
+			"mc_prefix_local_bind",
+			&self.prefix_local_layout,
+			&[&tri_counts, &tri_offset, &block_sums],
 		);
 
-		// PASS 3: prefix_block - needs block_sums, block_prefix
-		let prefix_block_bind_entries = &[BindGroupEntry {
-			binding: 0,
-			resource: BindingResource::Buffer(BufferBinding {
-				buffer: &block_sums,
-				offset: 0,
-				size: None,
-			}),
-		}];
-		let prefix_block_bind = device.create_bind_group(
-			Some("prefix_block_bind_group"),
-			&self.layout,
-			prefix_block_bind_entries,
+		// PASS 3: prefix_block
+		let prefix_block_bind = create_bind_group(
+			device,
+			"mc_prefix_block_bind",
+			&self.prefix_block_layout,
+			&[&block_sums, &block_prefix],
 		);
 
-		// PASS 4: prefix_add - needs tri_offset, block_prefix
-		let prefix_add_bind_entries = &[BindGroupEntry {
-			binding: 0,
-			resource: BindingResource::Buffer(BufferBinding {
-				buffer: &tri_offset,
-				offset: 0,
-				size: None,
-			}),
-		}];
-		let prefix_add_bind = device.create_bind_group(
-			Some("prefix_add_bind_group"),
-			&self.layout,
-			prefix_add_bind_entries,
+		// PASS 4: prefix_add
+		let prefix_add_bind = create_bind_group(
+			device,
+			"mc_prefix_add_bind",
+			&self.prefix_add_layout,
+			&[&tri_offset, &block_prefix],
 		);
 
-		// PASS 5: mesh - needs out_positions, out_normals, out_uvs
-		let mesh_bind_entries = &[BindGroupEntry {
-			binding: 0,
-			resource: BindingResource::Buffer(BufferBinding {
-				buffer: &out_pos,
-				offset: 0,
-				size: None,
-			}),
-		}];
-		let mesh_bind =
-			device.create_bind_group(Some("mesh_bind_group"), &self.layout, mesh_bind_entries);
+		// PASS 5: mesh
+		let mesh_bind = create_bind_group(
+			device,
+			"mc_mesh_bind",
+			&self.mesh_layout,
+			&[
+				&sampling_buf,
+				&cube_index,
+				&tri_offset,
+				&out_pos,
+				&out_normals,
+				&out_uvs,
+				&cfg_buf,
+				&bounds_buf,
+				&seed_buf,
+			],
+		);
 
 		// ---------------- Run compute passes ----------------
 		let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor::default());
