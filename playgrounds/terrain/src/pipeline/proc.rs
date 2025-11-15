@@ -1,23 +1,46 @@
-use crate::{terrain::TerrainConfig, Bounds};
+use crate::terrain::TerrainConfig;
 use bevy::{
 	prelude::*,
 	render::{
 		render_resource::*,
-		renderer::{Queue, RenderDevice},
+		renderer::{RenderDevice, RenderQueue},
 	},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
 pub struct Bounds {
 	pub enabled: u32,
 	pub min: Vec2,
 	pub max: Vec2,
 }
 
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
 pub struct Sampling3D {
 	pub chunk_origin: Vec3,
 	pub chunk_size: Vec3,
 	pub resolution: UVec3,
+}
+
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[repr(C)]
+pub struct TerrainConfigGpu {
+	pub seed: u32,
+	pub base_resolution: u32,
+	pub height_scale: f32,
+	pub use_volumetric: u32, // bool as u32
+}
+
+impl From<&TerrainConfig> for TerrainConfigGpu {
+	fn from(config: &TerrainConfig) -> Self {
+		Self {
+			seed: config.seed,
+			base_resolution: config.base_resolution as u32,
+			height_scale: config.height_scale,
+			use_volumetric: config.use_volumetric as u32,
+		}
+	}
 }
 
 pub struct GpuMarchingCubesPipeline {
@@ -62,6 +85,8 @@ pub struct GpuMarchingCubesPipeline {
 impl GpuMarchingCubesPipeline {
 	pub fn new(
 		device: &RenderDevice,
+		pipeline_cache: &mut PipelineCache,
+		shaders: &mut Assets<Shader>,
 		sampling: Sampling3D,
 		terrain_config: TerrainConfig,
 		bounds: Bounds,
@@ -146,76 +171,97 @@ impl GpuMarchingCubesPipeline {
 		// ----------------------------------------------------------
 		// Load and build all compute pipelines
 		// ----------------------------------------------------------
-		let classify_pipeline =
-			create_compute_pipeline(device, "proc/classify_voxels.wgsl", "main");
+		let classify_shader = shaders.add(Shader::from_wgsl(
+			include_str!("../assets/proc/classify_voxels.wgsl"),
+			"classify_voxels.wgsl",
+		));
+		let prefix_local_shader = shaders.add(Shader::from_wgsl(
+			include_str!("../assets/proc/prefix_scan_local.wgsl"),
+			"prefix_scan_local.wgsl",
+		));
+		let prefix_block_shader = shaders.add(Shader::from_wgsl(
+			include_str!("../assets/proc/block_prefix.wgsl"),
+			"block_prefix.wgsl",
+		));
+		let prefix_add_shader = shaders.add(Shader::from_wgsl(
+			include_str!("../assets/proc/block_sum.wgsl"),
+			"block_sum.wgsl",
+		));
+		let mesh_shader = shaders.add(Shader::from_wgsl(
+			include_str!("../assets/proc/compute_mesh.wgsl"),
+			"compute_mesh.wgsl",
+		));
+
+		let classify_pipeline = create_compute_pipeline(pipeline_cache, &classify_shader, "main");
 		let prefix_local_pipeline =
-			create_compute_pipeline(device, "proc/prefix_scan_local.wgsl", "main");
+			create_compute_pipeline(pipeline_cache, &prefix_local_shader, "main");
 		let prefix_block_pipeline =
-			create_compute_pipeline(device, "proc/prefix_scan_blocks.wgsl", "main");
+			create_compute_pipeline(pipeline_cache, &prefix_block_shader, "main");
 		let prefix_add_pipeline =
-			create_compute_pipeline(device, "proc/prefix_add_offsets.wgsl", "main");
-		let mesh_pipeline =
-			create_compute_pipeline(device, "proc/compute_mesh.wgsl", "compute_mesh");
+			create_compute_pipeline(pipeline_cache, &prefix_add_shader, "main");
+		let mesh_pipeline = create_compute_pipeline(pipeline_cache, &mesh_shader, "compute_mesh");
 
 		// ----------------------------------------------------------
 		// Create bind groups
 		// (Helper function shown below)
 		// ----------------------------------------------------------
 
+		// Create uniform buffers for structs
+		let sampling_buffer = create_uniform_buffer(device, &sampling);
+		let terrain_config_gpu = TerrainConfigGpu::from(&terrain_config);
+		let terrain_config_buffer = create_uniform_buffer(device, &terrain_config_gpu);
+		let bounds_buffer = create_uniform_buffer(device, &bounds);
+		let seed_buffer = create_uniform_buffer(device, &seed);
+
 		let classify_bind = create_bind_group(
 			device,
-			&classify_pipeline,
 			&[
-				(&sampling, BufferBindingType::Uniform),
-				(&terrain_config, BufferBindingType::Uniform),
-				(&bounds, BufferBindingType::Uniform),
-				(&seed, BufferBindingType::Uniform),
-				(&cube_index, BufferBindingType::Storage),
-				(&tri_counts, BufferBindingType::Storage),
+				(&sampling_buffer, BufferBindingType::Uniform),
+				(&terrain_config_buffer, BufferBindingType::Uniform),
+				(&bounds_buffer, BufferBindingType::Uniform),
+				(&seed_buffer, BufferBindingType::Uniform),
+				(&cube_index, BufferBindingType::Storage { read_only: false }),
+				(&tri_counts, BufferBindingType::Storage { read_only: false }),
 			],
 		);
 
 		let prefix_local_bind = create_bind_group(
 			device,
-			&prefix_local_pipeline,
 			&[
-				(&tri_counts, BufferBindingType::Storage),
-				(&tri_offset, BufferBindingType::Storage),
-				(&block_sums, BufferBindingType::Storage),
+				(&tri_counts, BufferBindingType::Storage { read_only: false }),
+				(&tri_offset, BufferBindingType::Storage { read_only: false }),
+				(&block_sums, BufferBindingType::Storage { read_only: false }),
 			],
 		);
 
 		let prefix_block_bind = create_bind_group(
 			device,
-			&prefix_block_pipeline,
 			&[
-				(&block_sums, BufferBindingType::Storage),
-				(&block_prefix, BufferBindingType::Storage),
+				(&block_sums, BufferBindingType::Storage { read_only: false }),
+				(&block_prefix, BufferBindingType::Storage { read_only: false }),
 			],
 		);
 
 		let prefix_add_bind = create_bind_group(
 			device,
-			&prefix_add_pipeline,
 			&[
-				(&tri_offset, BufferBindingType::Storage),
-				(&block_prefix, BufferBindingType::Storage),
+				(&tri_offset, BufferBindingType::Storage { read_only: false }),
+				(&block_prefix, BufferBindingType::Storage { read_only: false }),
 			],
 		);
 
 		let mesh_bind = create_bind_group(
 			device,
-			&mesh_pipeline,
 			&[
-				(&sampling, BufferBindingType::Uniform),
-				(&cube_index, BufferBindingType::Storage),
-				(&tri_offset, BufferBindingType::Storage),
-				(&out_positions, BufferBindingType::Storage),
-				(&out_normals, BufferBindingType::Storage),
-				(&out_uvs, BufferBindingType::Storage),
-				(&terrain_config, BufferBindingType::Uniform),
-				(&bounds, BufferBindingType::Uniform),
-				(&seed, BufferBindingType::Uniform),
+				(&sampling_buffer, BufferBindingType::Uniform),
+				(&cube_index, BufferBindingType::Storage { read_only: true }),
+				(&tri_offset, BufferBindingType::Storage { read_only: true }),
+				(&out_positions, BufferBindingType::Storage { read_only: false }),
+				(&out_normals, BufferBindingType::Storage { read_only: false }),
+				(&out_uvs, BufferBindingType::Storage { read_only: false }),
+				(&terrain_config_buffer, BufferBindingType::Uniform),
+				(&bounds_buffer, BufferBindingType::Uniform),
+				(&seed_buffer, BufferBindingType::Uniform),
 			],
 		);
 
@@ -260,7 +306,7 @@ impl GpuMarchingCubesPipeline {
 		}
 	}
 
-	pub fn compute(&mut self, device: &RenderDevice, queue: &Queue) {
+	pub fn compute(&mut self, device: &RenderDevice, queue: &RenderQueue) {
 		let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor {
 			label: Some("marching cubes encoder"),
 		});
@@ -315,4 +361,94 @@ impl GpuMarchingCubesPipeline {
 
 		queue.submit(std::iter::once(encoder.finish()));
 	}
+}
+
+// Helper function to create a compute pipeline using PipelineCache
+fn create_compute_pipeline(
+	pipeline_cache: &mut PipelineCache,
+	shader: &Handle<Shader>,
+	entry_point: &'static str,
+) -> ComputePipeline {
+	use std::borrow::Cow;
+
+	// Create the pipeline descriptor
+	let pipeline_descriptor = ComputePipelineDescriptor {
+		label: Some(Cow::Owned(format!("compute_pipeline_{}", entry_point))),
+		layout: vec![],
+		shader: shader.clone(),
+		shader_defs: vec![],
+		entry_point: Cow::Borrowed(entry_point),
+		push_constant_ranges: vec![],
+		zero_initialize_workgroup_memory: false,
+	};
+
+	// Queue the pipeline for compilation
+	let pipeline_id = pipeline_cache.queue_compute_pipeline(pipeline_descriptor);
+
+	// Process the pipeline cache to compile the pipeline
+	// In a real application, this would happen asynchronously over multiple frames
+	// For initialization, we'll process until it's ready
+	loop {
+		pipeline_cache.process_queue();
+		if let Some(pipeline) = pipeline_cache.get_compute_pipeline(pipeline_id) {
+			return pipeline.clone();
+		}
+		// Small yield to prevent tight loop (though this is blocking initialization)
+		std::thread::yield_now();
+	}
+}
+
+// Helper function to create a uniform buffer from a struct
+fn create_uniform_buffer<T: bytemuck::Pod>(device: &RenderDevice, data: &T) -> Buffer {
+	use bytemuck::bytes_of;
+	let bytes = bytes_of(data);
+	device.create_buffer_with_data(&BufferInitDescriptor {
+		label: Some("uniform_buffer"),
+		contents: bytes,
+		usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+	})
+}
+
+// Helper function to create a bind group
+fn create_bind_group(
+	device: &RenderDevice,
+	bindings: &[(&Buffer, BufferBindingType)],
+) -> BindGroup {
+	let mut entries = Vec::new();
+	let mut layout_entries = Vec::new();
+
+	for (i, (buffer, binding_type)) in bindings.iter().enumerate() {
+		let binding = i as u32;
+		entries.push(BindGroupEntry {
+			binding,
+			resource: BindingResource::Buffer(BufferBinding {
+				buffer: buffer.clone(),
+				offset: 0,
+				size: None,
+			}),
+		});
+
+		layout_entries.push(BindGroupLayoutEntry {
+			binding,
+			visibility: ShaderStages::COMPUTE,
+			ty: match binding_type {
+				BufferBindingType::Uniform => BindingType::Buffer {
+					ty: BufferBindingType::Uniform,
+					has_dynamic_offset: false,
+					min_binding_size: None,
+				},
+				&BufferBindingType::Storage { read_only } => BindingType::Buffer {
+					ty: BufferBindingType::Storage { read_only },
+					has_dynamic_offset: false,
+					min_binding_size: None,
+				},
+			},
+			count: None,
+		});
+	}
+
+	let layout =
+		device.create_bind_group_layout(Some("compute_bind_group_layout"), &layout_entries);
+
+	device.create_bind_group(Some("compute_bind_group"), &layout, &entries)
 }

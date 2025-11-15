@@ -21,6 +21,7 @@ bevy = { workspace = true }
 
 # Procedural generation
 noise = "0.9"
+bytemuck = { version = "1.14", features = ["derive"] }
 
 [lints]
 workspace = true
