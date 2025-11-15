@@ -6,6 +6,7 @@ mod chunk;
 mod chunk_manager;
 mod geography;
 mod marching_cubes;
+pub mod pipeline;
 pub mod sdf;
 pub mod shaders;
 mod terrain;
@@ -30,9 +31,7 @@ impl Plugin for TerrainPlugin {
 			.add_feature(Box::new(geography::canyons::CanyonFeature::new(self.seed, 1000)));
 
 		let terrain_config = TerrainConfig::new(self.seed);
-		let terrain_sdf = terrain::TerrainSdf {
-			sdf: terrain::create_terrain_sdf(&terrain_config),
-		};
+		let terrain_sdf = terrain::TerrainSdf { sdf: terrain::create_terrain_sdf(&terrain_config) };
 
 		app.insert_resource(terrain_config)
 			.insert_resource(terrain_sdf)
