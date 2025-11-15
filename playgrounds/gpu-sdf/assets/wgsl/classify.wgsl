@@ -2,8 +2,8 @@
 #import proc::perlin_terrain
 
 struct Sampling3D {
-    world_origin : vec3<f32>,   // world offset
-    world_size   : vec3<f32>,   // actual size in world units
+    chunk_origin : vec3<f32>,   // world offset
+    chunk_size   : vec3<f32>,   // actual size in world units
     resolution   : vec3<u32>,   // voxel resolution (nx, ny, nz)
 };
 
@@ -28,10 +28,10 @@ fn main(@builtin(global_invocation_id) gid : vec3<u32>) {
 
     // --- Convert voxel index → world coordinates ---
     let grid_f = vec3<f32>(f32(gid.x), f32(gid.y), f32(gid.z));
-    let cell_size = sampling.world_size / vec3<f32>(sampling.resolution);
+    let cell_size = sampling.chunk_size / vec3<f32>(sampling.resolution);
 
     // Evaluate SDF at the 8 cube corners
-    let p = sampling.world_origin + grid_f * cell_size;
+    let p = sampling.chunk_origin + grid_f * cell_size;
 
     // 8 samples
     let d000 = sdf(p + cell_size * vec3<f32>(0.0, 0.0, 0.0));

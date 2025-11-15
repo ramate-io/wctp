@@ -6,8 +6,8 @@
 // ============================================================================
 
 struct Sampling3D {
-    world_origin : vec3<f32>,
-    world_size   : vec3<f32>,
+    chunk_origin : vec3<f32>,
+    chunk_size   : vec3<f32>,
     resolution   : vec3<u32>,
 };
 
@@ -45,9 +45,9 @@ fn classify(@builtin(global_invocation_id) gid : vec3<u32>) {
     }
 
     let grid_f = vec3<f32>(f32(gid.x), f32(gid.y), f32(gid.z));
-    let cell_size = sampling.world_size / vec3<f32>(sampling.resolution);
+    let cell_size = sampling.chunk_size / vec3<f32>(sampling.resolution);
 
-    let p = sampling.world_origin + grid_f * cell_size;
+    let p = sampling.chunk_origin + grid_f * cell_size;
 
     // Evaluate eight SDF corners
     let d000 = sdf(p + cell_size * vec3<f32>(0.0, 0.0, 0.0), terrain_config, bounds, seed);
