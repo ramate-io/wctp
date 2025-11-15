@@ -1,239 +1,18 @@
 // =================================================================================================
 // GPU MARCHING CUBES — TYPE SAFE PIPELINE
+// =================================================================================================
 // Bevy 0.17 — fully self-contained and overwrite-safe
 // compute() returns immutable CPU-side mesh data
-// =================================================================================================
-
-use bevy::{
-	prelude::*,
-	render::{
-		render_asset::RenderAssetUsages,
-		render_resource::*,
-		renderer::{RenderDevice, RenderQueue},
-	},
-};
-use bytemuck::{Pod, Zeroable};
-
-// =================================================================================================
-// GPU-REPRESENTABLE STRUCTS
-// =================================================================================================
-
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
-pub struct Bounds {
-	pub enabled: u32,
-	pub min: Vec2,
-	pub max: Vec2,
-}
-
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
-pub struct Sampling3D {
-	pub chunk_origin: Vec3,
-	pub chunk_size: Vec3,
-	pub resolution: UVec3,
-}
-
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
-pub struct TerrainConfigGpu {
-	pub seed: u32,
-	pub base_resolution: u32,
-	pub height_scale: f32,
-	pub use_volumetric: u32,
-}
-
-impl From<&crate::terrain::TerrainConfig> for TerrainConfigGpu {
-	fn from(c: &crate::terrain::TerrainConfig) -> Self {
-		Self {
-			seed: c.seed,
-			base_resolution: c.base_resolution as u32,
-			height_scale: c.height_scale,
-			use_volumetric: c.use_volumetric as u32,
-		}
-	}
-}
-
-// =================================================================================================
-// CPU-SIDE RESULT (RETURNED BY compute())
-// =================================================================================================
-
-pub struct GpuMeshData {
-	pub positions: Vec<[f32; 3]>,
-	pub normals: Vec<[f32; 3]>,
-	pub uvs: Vec<[f32; 2]>,
-}
-
-// =================================================================================================
-// BUFFER HELPERS
-// =================================================================================================
-
-fn new_storage(device: &RenderDevice, size_bytes: usize) -> Buffer {
-	device.create_buffer(&BufferDescriptor {
-		label: None,
-		size: size_bytes as u64,
-		usage: BufferUsages::STORAGE | BufferUsages::COPY_SRC | BufferUsages::COPY_DST,
-		mapped_at_creation: false,
-	})
-}
-
-fn new_uniform<T: Pod>(device: &RenderDevice, v: &T) -> Buffer {
-	device.create_buffer_with_data(&BufferInitDescriptor {
-		label: None,
-		contents: bytemuck::bytes_of(v),
-		usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-	})
-}
-
-fn read_vec<T: Pod>(
-	device: &RenderDevice,
-	queue: &RenderQueue,
-	src: &Buffer,
-	count: usize,
-) -> Vec<T> {
-	let size = (count * std::mem::size_of::<T>()) as u64;
-
-	let staging = device.create_buffer(&BufferDescriptor {
-		label: None,
-		size,
-		usage: BufferUsages::MAP_READ | BufferUsages::COPY_DST,
-		mapped_at_creation: false,
-	});
-
-	let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor::default());
-	encoder.copy_buffer_to_buffer(src, 0, &staging, 0, size);
-	queue.submit(Some(encoder.finish()));
-
-	let slice = staging.slice(..);
-	slice.map_async(MapMode::Read, |_| {});
-	device.poll(Maintain::Wait);
-
-	let range = slice.get_mapped_range();
-	let result: Vec<T> = bytemuck::cast_slice(&range).to_vec();
-	drop(range);
-	staging.unmap();
-
-	result
-}
-
-fn read_u32(device: &RenderDevice, queue: &RenderQueue, src: &Buffer, idx: u32) -> u32 {
-	let staging = device.create_buffer(&BufferDescriptor {
-		label: None,
-		size: 4,
-		usage: BufferUsages::MAP_READ | BufferUsages::COPY_DST,
-		mapped_at_creation: false,
-	});
-
-	let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor::default());
-	encoder.copy_buffer_to_buffer(src, (idx * 4) as u64, &staging, 0, 4);
-	queue.submit(Some(encoder.finish()));
-
-	let slice = staging.slice(..);
-	slice.map_async(MapMode::Read, |_| {});
-	device.poll(Maintain::Wait);
-
-	let range = slice.get_mapped_range();
-	let v = u32::from_le_bytes(range[0..4].try_into().unwrap());
-	drop(range);
-	staging.unmap();
-	v
-}
-
-// =================================================================================================
-// PIPELINE CREATION
-// =================================================================================================
-
-fn load_pipeline(
-	pipeline_cache: &mut PipelineCache,
-	shaders: &mut Assets<Shader>,
-	shader_src: &'static str,
-	shader_path: &'static str,
-	entry: &'static str,
-	layout: &BindGroupLayout,
-) -> ComputePipeline {
-	use std::borrow::Cow;
-
-	let shader = shaders.add(Shader::from_wgsl(shader_src, shader_path));
-	let pipeline_descriptor = ComputePipelineDescriptor {
-		label: Some(Cow::Owned(format!("compute_pipeline_{}", entry))),
-		layout: vec![layout.clone()],
-		shader,
-		shader_defs: vec![],
-		entry_point: Cow::Borrowed(entry),
-		push_constant_ranges: vec![],
-		zero_initialize_workgroup_memory: false,
-	};
-
-	// Queue the pipeline for compilation
-	let pipeline_id = pipeline_cache.queue_compute_pipeline(pipeline_descriptor);
-
-	// Process the pipeline cache until the pipeline is ready
-	loop {
-		pipeline_cache.process_queue();
-		if let Some(pipeline) = pipeline_cache.get_compute_pipeline(pipeline_id) {
-			return pipeline.clone();
-		}
-		std::thread::yield_now();
-	}
-}
-
-// Helper to create bind group layout entries
-fn create_uniform_layout_entry(binding: u32) -> BindGroupLayoutEntry {
-	BindGroupLayoutEntry {
-		binding,
-		visibility: ShaderStages::COMPUTE,
-		ty: BindingType::Buffer {
-			ty: BufferBindingType::Uniform,
-			has_dynamic_offset: false,
-			min_binding_size: None,
-		},
-		count: None,
-	}
-}
-
-fn create_storage_layout_entry(binding: u32, read_only: bool) -> BindGroupLayoutEntry {
-	BindGroupLayoutEntry {
-		binding,
-		visibility: ShaderStages::COMPUTE,
-		ty: BindingType::Buffer {
-			ty: BufferBindingType::Storage { read_only },
-			has_dynamic_offset: false,
-			min_binding_size: None,
-		},
-		count: None,
-	}
-}
-
-// Helper to create bind group entries
-fn create_buffer_entry(binding: u32, buffer: &Buffer) -> BindGroupEntry {
-	BindGroupEntry {
-		binding,
-		resource: BindingResource::Buffer(BufferBinding { buffer, offset: 0, size: None }),
-	}
-}
-
-// Helper to create a bind group from buffers
-fn create_bind_group(
-	device: &RenderDevice,
-	label: &str,
-	layout: &BindGroupLayout,
-	buffers: &[&Buffer],
-) -> BindGroup {
-	let entries: Vec<BindGroupEntry> = buffers
-		.iter()
-		.enumerate()
-		.map(|(i, buffer)| create_buffer_entry(i as u32, buffer))
-		.collect();
-	device.create_bind_group(Some(label), layout, &entries)
-}
-
-// =================================================================================================
-// TYPESAFE OVERWRITE-PROOF PIPELINE
-// =================================================================================================
-// GpuMarchingCubesPipeline
-// ============================================================================
 //
-// WGSL binding expectations (you should match these in your wgsl):
+// This module implements a GPU-based Marching Cubes algorithm using compute shaders.
+// The pipeline is split into 5 passes:
+//   1. classify: Classify voxels and compute cube indices
+//   2. prefix_local: Local prefix scan of triangle counts
+//   3. prefix_block: Block-level prefix scan
+//   4. prefix_add: Add block prefixes to local offsets
+//   5. mesh: Generate mesh vertices, normals, and UVs
+//
+// WGSL binding contract (must match these in your shaders):
 //
 // classify_voxels.wgsl:
 //   @group(0) @binding(0) var<uniform> sampling : Sampling3D;
@@ -256,7 +35,7 @@ fn create_bind_group(
 //   @group(0) @binding(0) var<storage, read_write> tri_offset : array<u32>;
 //   @group(0) @binding(1) var<storage, read>       block_prefix : array<u32>;
 //
-// compute_mesh.wgsl (your version from earlier):
+// compute_mesh.wgsl:
 //   @group(0) @binding(0) var<uniform> sampling : Sampling3D;
 //   @group(0) @binding(1) var<storage, read> cube_index : array<u32>;
 //   @group(0) @binding(2) var<storage, read> tri_offset : array<u32>;
@@ -266,7 +45,30 @@ fn create_bind_group(
 //   @group(0) @binding(6) var<uniform> terrain_config : TerrainConfig;
 //   @group(0) @binding(7) var<uniform> bounds : Bounds;
 //   @group(0) @binding(8) var<uniform> seed : i32;
-// ============================================================================
+
+mod bind_groups;
+mod buffers;
+mod pipelines;
+mod types;
+
+use bind_groups::{create_bind_group, create_storage_layout_entry, create_uniform_layout_entry};
+use buffers::{new_storage, new_uniform, read_u32, read_vec};
+use pipelines::load_pipeline;
+pub use types::{Bounds, GpuMeshData, Sampling3D, TerrainConfigGpu};
+
+use bevy::{
+	prelude::*,
+	render::{
+		render_asset::RenderAssetUsages,
+		render_resource::*,
+		renderer::{RenderDevice, RenderQueue},
+	},
+};
+
+// =================================================================================================
+// TYPESAFE OVERWRITE-PROOF PIPELINE
+// =================================================================================================
+
 pub struct GpuMarchingCubesPipeline {
 	sampling: Sampling3D,
 	terrain_cfg: TerrainConfigGpu,
