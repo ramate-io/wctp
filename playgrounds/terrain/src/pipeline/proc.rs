@@ -49,11 +49,15 @@
 mod bind_groups;
 mod buffers;
 mod pipelines;
+mod stages;
 mod types;
 
-use bind_groups::{create_bind_group, create_storage_layout_entry, create_uniform_layout_entry};
+use bind_groups::{create_storage_layout_entry, create_uniform_layout_entry};
 use buffers::{new_storage, new_uniform, read_u32, read_vec};
 use pipelines::load_pipeline;
+use stages::{
+	stage_classify, stage_mesh, stage_prefix_add, stage_prefix_block, stage_prefix_local,
+};
 pub use types::{Bounds, GpuMeshData, Sampling3D, TerrainConfigGpu};
 
 use bevy::{
@@ -96,7 +100,8 @@ impl GpuMarchingCubesPipeline {
 	pub fn new(
 		device: &RenderDevice,
 		pipeline_cache: &mut PipelineCache,
-		shaders: &mut Assets<Shader>,
+		asset_server: &AssetServer,
+		shaders: &Assets<Shader>,
 		sampling: Sampling3D,
 		terrain_cfg_src: &crate::terrain::TerrainConfig,
 		bounds: Bounds,
@@ -165,44 +170,45 @@ impl GpuMarchingCubesPipeline {
 			],
 		);
 
-		// Pipelines
+		// Pipelines - loaded via asset paths to support #import syntax
+		// Note: Asset paths are relative to the assets/ directory
 		let classify_pipeline = load_pipeline(
 			pipeline_cache,
+			asset_server,
 			shaders,
-			include_str!("../assets/proc/classify_voxels.wgsl"),
-			"classify_voxels.wgsl",
+			"proc/classify_voxels.wgsl",
 			"main",
 			&classify_layout,
 		);
 		let prefix_local_pipeline = load_pipeline(
 			pipeline_cache,
+			asset_server,
 			shaders,
-			include_str!("../assets/proc/prefix_scan_local.wgsl"),
-			"prefix_scan_local.wgsl",
+			"proc/prefix_scan_local.wgsl",
 			"main",
 			&prefix_local_layout,
 		);
 		let prefix_block_pipeline = load_pipeline(
 			pipeline_cache,
+			asset_server,
 			shaders,
-			include_str!("../assets/proc/block_prefix.wgsl"),
-			"block_prefix.wgsl",
+			"proc/block_prefix.wgsl",
 			"main",
 			&prefix_block_layout,
 		);
 		let prefix_add_pipeline = load_pipeline(
 			pipeline_cache,
+			asset_server,
 			shaders,
-			include_str!("../assets/proc/block_sum.wgsl"),
-			"block_sum.wgsl",
+			"proc/block_sum.wgsl",
 			"main",
 			&prefix_add_layout,
 		);
 		let mesh_pipeline = load_pipeline(
 			pipeline_cache,
+			asset_server,
 			shaders,
-			include_str!("../assets/proc/compute_mesh.wgsl"),
-			"compute_mesh.wgsl",
+			"proc/compute_mesh.wgsl",
 			"compute_mesh",
 			&mesh_layout,
 		);
@@ -251,98 +257,74 @@ impl GpuMarchingCubesPipeline {
 		let bounds_buf = new_uniform(device, &self.bounds);
 		let seed_buf = new_uniform(device, &self.seed);
 
-		// PASS 1: classify
-		let classify_bind = create_bind_group(
-			device,
-			"mc_classify_bind",
-			&self.classify_layout,
-			&[&sampling_buf, &cfg_buf, &bounds_buf, &seed_buf, &cube_index, &tri_counts],
-		);
-
-		// PASS 2: prefix_local
-		let prefix_local_bind = create_bind_group(
-			device,
-			"mc_prefix_local_bind",
-			&self.prefix_local_layout,
-			&[&tri_counts, &tri_offset, &block_sums],
-		);
-
-		// PASS 3: prefix_block
-		let prefix_block_bind = create_bind_group(
-			device,
-			"mc_prefix_block_bind",
-			&self.prefix_block_layout,
-			&[&block_sums, &block_prefix],
-		);
-
-		// PASS 4: prefix_add
-		let prefix_add_bind = create_bind_group(
-			device,
-			"mc_prefix_add_bind",
-			&self.prefix_add_layout,
-			&[&tri_offset, &block_prefix],
-		);
-
-		// PASS 5: mesh
-		let mesh_bind = create_bind_group(
-			device,
-			"mc_mesh_bind",
-			&self.mesh_layout,
-			&[
-				&sampling_buf,
-				&cube_index,
-				&tri_offset,
-				&out_pos,
-				&out_normals,
-				&out_uvs,
-				&cfg_buf,
-				&bounds_buf,
-				&seed_buf,
-			],
-		);
-
 		// ---------------- Run compute passes ----------------
 		let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor::default());
 
 		// PASS 1: classify
-		{
-			let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
-			pass.set_pipeline(&self.classify_pipeline);
-			pass.set_bind_group(0, &classify_bind, &[]);
-			pass.dispatch_workgroups(self.dispatch.x, self.dispatch.y, self.dispatch.z);
-		}
+		stage_classify(
+			device,
+			&self.classify_layout,
+			&self.classify_pipeline,
+			self.dispatch,
+			&sampling_buf,
+			&cfg_buf,
+			&bounds_buf,
+			&seed_buf,
+			&cube_index,
+			&tri_counts,
+			&mut encoder,
+		);
 
 		// PASS 2: prefix_local
-		{
-			let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
-			pass.set_pipeline(&self.prefix_local_pipeline);
-			pass.set_bind_group(0, &prefix_local_bind, &[]);
-			pass.dispatch_workgroups(block_count, 1, 1);
-		}
+		stage_prefix_local(
+			device,
+			&self.prefix_local_layout,
+			&self.prefix_local_pipeline,
+			block_count,
+			&tri_counts,
+			&tri_offset,
+			&block_sums,
+			&mut encoder,
+		);
 
 		// PASS 3: prefix_block
-		{
-			let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
-			pass.set_pipeline(&self.prefix_block_pipeline);
-			pass.set_bind_group(0, &prefix_block_bind, &[]);
-			pass.dispatch_workgroups(1, 1, 1);
-		}
+		stage_prefix_block(
+			device,
+			&self.prefix_block_layout,
+			&self.prefix_block_pipeline,
+			&block_sums,
+			&block_prefix,
+			&mut encoder,
+		);
 
 		// PASS 4: prefix_add
-		{
-			let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
-			pass.set_pipeline(&self.prefix_add_pipeline);
-			pass.set_bind_group(0, &prefix_add_bind, &[]);
-			pass.dispatch_workgroups(block_count, 1, 1);
-		}
+		stage_prefix_add(
+			device,
+			&self.prefix_add_layout,
+			&self.prefix_add_pipeline,
+			block_count,
+			&tri_offset,
+			&block_prefix,
+			&mut encoder,
+		);
 
 		// PASS 5: mesh
-		{
-			let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
-			pass.set_pipeline(&self.mesh_pipeline);
-			pass.set_bind_group(0, &mesh_bind, &[]);
-			pass.dispatch_workgroups(self.dispatch.x, self.dispatch.y, self.dispatch.z);
-		}
+		stage_mesh(
+			device,
+			&self.mesh_layout,
+			&self.mesh_pipeline,
+			self.dispatch,
+			&sampling_buf,
+			&cube_index,
+			&tri_offset,
+			&out_pos,
+			&out_normals,
+			&out_uvs,
+			&cfg_buf,
+			&bounds_buf,
+			&seed_buf,
+			&mut encoder,
+		);
 
 		queue.submit(std::iter::once(encoder.finish()));
 
