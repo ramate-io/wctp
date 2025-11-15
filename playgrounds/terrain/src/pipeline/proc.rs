@@ -7,8 +7,10 @@
 use bevy::{
 	prelude::*,
 	render::{
+		render_asset::RenderAssetUsages,
 		render_resource::*,
 		renderer::{RenderDevice, RenderQueue},
+		view::Visibility,
 	},
 };
 use bytemuck::{Pod, Zeroable};
@@ -143,28 +145,34 @@ fn read_u32(device: &RenderDevice, queue: &RenderQueue, src: &Buffer, idx: u32) 
 // =================================================================================================
 
 fn load_pipeline(
-	device: &RenderDevice,
-	shader_src: &str,
-	entry: &str,
+	pipeline_cache: &mut PipelineCache,
+	shader: Handle<Shader>,
+	entry: &'static str,
 	layout: &BindGroupLayout,
 ) -> ComputePipeline {
-	let module = device.create_shader_module(ShaderModuleDescriptor {
-		label: None,
-		source: ShaderSource::Wgsl(shader_src.into()),
-	});
+	use std::borrow::Cow;
 
-	let pl = device.create_pipeline_layout(&PipelineLayoutDescriptor {
-		label: None,
-		bind_group_layouts: &[layout],
-		push_constant_ranges: &[],
-	});
+	let pipeline_descriptor = ComputePipelineDescriptor {
+		label: Some(Cow::Owned(format!("compute_pipeline_{}", entry))),
+		layout: vec![layout.clone()],
+		shader,
+		shader_defs: vec![],
+		entry_point: Cow::Borrowed(entry),
+		push_constant_ranges: vec![],
+		zero_initialize_workgroup_memory: false,
+	};
 
-	device.create_compute_pipeline(&ComputePipelineDescriptor {
-		label: None,
-		layout: Some(&pl),
-		module: &module,
-		entry_point: entry,
-	})
+	// Queue the pipeline for compilation
+	let pipeline_id = pipeline_cache.queue_compute_pipeline(pipeline_descriptor);
+
+	// Process the pipeline cache until the pipeline is ready
+	loop {
+		pipeline_cache.process_queue();
+		if let Some(pipeline) = pipeline_cache.get_compute_pipeline(pipeline_id) {
+			return pipeline.clone();
+		}
+		std::thread::yield_now();
+	}
 }
 
 // =================================================================================================
@@ -193,6 +201,8 @@ pub struct GpuMarchingCubesPipeline {
 impl GpuMarchingCubesPipeline {
 	pub fn new(
 		device: &RenderDevice,
+		pipeline_cache: &mut PipelineCache,
+		shaders: &mut Assets<Shader>,
 		sampling: Sampling3D,
 		terrain_cfg_src: &crate::terrain::TerrainConfig,
 		bounds: Bounds,
@@ -208,46 +218,48 @@ impl GpuMarchingCubesPipeline {
 		);
 
 		// --- Shared layout (all shaders use same BG layout) ---
-		let layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-			label: None,
-			entries: &[BindGroupLayoutEntry {
-				binding: 0,
-				visibility: ShaderStages::COMPUTE,
-				ty: BindingType::Buffer {
-					ty: BufferBindingType::Storage { read_only: false },
-					has_dynamic_offset: false,
-					min_binding_size: None,
-				},
-				count: None,
-			}],
-		});
+		let layout_entries = &[BindGroupLayoutEntry {
+			binding: 0,
+			visibility: ShaderStages::COMPUTE,
+			ty: BindingType::Buffer {
+				ty: BufferBindingType::Storage { read_only: false },
+				has_dynamic_offset: false,
+				min_binding_size: None,
+			},
+			count: None,
+		}];
+		let layout =
+			device.create_bind_group_layout(Some("compute_bind_group_layout"), layout_entries);
 
-		let classify_pipeline = load_pipeline(
-			device,
+		// Load shaders through Bevy's asset system
+		let classify_shader = shaders.add(Shader::from_wgsl(
 			include_str!("../assets/proc/classify_voxels.wgsl"),
-			"main",
-			&layout,
-		);
-		let prefix_local_pipeline = load_pipeline(
-			device,
+			"classify_voxels.wgsl",
+		));
+		let prefix_local_shader = shaders.add(Shader::from_wgsl(
 			include_str!("../assets/proc/prefix_scan_local.wgsl"),
-			"main",
-			&layout,
-		);
-		let prefix_block_pipeline = load_pipeline(
-			device,
+			"prefix_scan_local.wgsl",
+		));
+		let prefix_block_shader = shaders.add(Shader::from_wgsl(
 			include_str!("../assets/proc/block_prefix.wgsl"),
-			"main",
-			&layout,
-		);
-		let prefix_add_pipeline =
-			load_pipeline(device, include_str!("../assets/proc/block_sum.wgsl"), "main", &layout);
-		let mesh_pipeline = load_pipeline(
-			device,
+			"block_prefix.wgsl",
+		));
+		let prefix_add_shader = shaders.add(Shader::from_wgsl(
+			include_str!("../assets/proc/block_sum.wgsl"),
+			"block_sum.wgsl",
+		));
+		let mesh_shader = shaders.add(Shader::from_wgsl(
 			include_str!("../assets/proc/compute_mesh.wgsl"),
-			"compute_mesh",
-			&layout,
-		);
+			"compute_mesh.wgsl",
+		));
+
+		let classify_pipeline = load_pipeline(pipeline_cache, classify_shader, "main", &layout);
+		let prefix_local_pipeline =
+			load_pipeline(pipeline_cache, prefix_local_shader, "main", &layout);
+		let prefix_block_pipeline =
+			load_pipeline(pipeline_cache, prefix_block_shader, "main", &layout);
+		let prefix_add_pipeline = load_pipeline(pipeline_cache, prefix_add_shader, "main", &layout);
+		let mesh_pipeline = load_pipeline(pipeline_cache, mesh_shader, "compute_mesh", &layout);
 
 		Self {
 			sampling,
@@ -292,35 +304,123 @@ impl GpuMarchingCubesPipeline {
 		let bounds_buf = new_uniform(device, &self.bounds);
 		let seed_buf = new_uniform(device, &self.seed);
 
-		// Build bind groups on demand
-		let classify_bind = device.create_bind_group(&BindGroupDescriptor {
-			label: None,
-			layout: &self.layout,
-			entries: &[BindGroupEntry {
-				binding: 0,
-				resource: BindingResource::Buffer(BufferBinding {
-					buffer: cube_index.clone(),
-					offset: 0,
-					size: None,
-				}),
-			}],
-		});
+		// Build bind groups on demand for each pass
+		// PASS 1: classify - needs cube_index and tri_counts
+		let classify_bind_entries = &[BindGroupEntry {
+			binding: 0,
+			resource: BindingResource::Buffer(BufferBinding {
+				buffer: &cube_index,
+				offset: 0,
+				size: None,
+			}),
+		}];
+		let classify_bind = device.create_bind_group(
+			Some("classify_bind_group"),
+			&self.layout,
+			classify_bind_entries,
+		);
 
-		// NOTE: You will repeat small bind-group wrappers for each pipeline.
-		// For brevity, omitted here; follow same pattern.
+		// PASS 2: prefix_local - needs tri_counts, tri_offset, block_sums
+		let prefix_local_bind_entries = &[BindGroupEntry {
+			binding: 0,
+			resource: BindingResource::Buffer(BufferBinding {
+				buffer: &tri_counts,
+				offset: 0,
+				size: None,
+			}),
+		}];
+		let prefix_local_bind = device.create_bind_group(
+			Some("prefix_local_bind_group"),
+			&self.layout,
+			prefix_local_bind_entries,
+		);
+
+		// PASS 3: prefix_block - needs block_sums, block_prefix
+		let prefix_block_bind_entries = &[BindGroupEntry {
+			binding: 0,
+			resource: BindingResource::Buffer(BufferBinding {
+				buffer: &block_sums,
+				offset: 0,
+				size: None,
+			}),
+		}];
+		let prefix_block_bind = device.create_bind_group(
+			Some("prefix_block_bind_group"),
+			&self.layout,
+			prefix_block_bind_entries,
+		);
+
+		// PASS 4: prefix_add - needs tri_offset, block_prefix
+		let prefix_add_bind_entries = &[BindGroupEntry {
+			binding: 0,
+			resource: BindingResource::Buffer(BufferBinding {
+				buffer: &tri_offset,
+				offset: 0,
+				size: None,
+			}),
+		}];
+		let prefix_add_bind = device.create_bind_group(
+			Some("prefix_add_bind_group"),
+			&self.layout,
+			prefix_add_bind_entries,
+		);
+
+		// PASS 5: mesh - needs out_positions, out_normals, out_uvs
+		let mesh_bind_entries = &[BindGroupEntry {
+			binding: 0,
+			resource: BindingResource::Buffer(BufferBinding {
+				buffer: &out_pos,
+				offset: 0,
+				size: None,
+			}),
+		}];
+		let mesh_bind =
+			device.create_bind_group(Some("mesh_bind_group"), &self.layout, mesh_bind_entries);
 
 		// ---------------- Run compute passes ----------------
 		let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor::default());
+
+		// PASS 1: classify
 		{
 			let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
-
 			pass.set_pipeline(&self.classify_pipeline);
 			pass.set_bind_group(0, &classify_bind, &[]);
 			pass.dispatch_workgroups(self.dispatch.x, self.dispatch.y, self.dispatch.z);
-
-			// ... fill in same bind-group setup for prefix_local, prefix_block, prefix_add, mesh
 		}
-		queue.submit(Some(encoder.finish()));
+
+		// PASS 2: prefix_local
+		{
+			let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
+			pass.set_pipeline(&self.prefix_local_pipeline);
+			pass.set_bind_group(0, &prefix_local_bind, &[]);
+			pass.dispatch_workgroups(block_count, 1, 1);
+		}
+
+		// PASS 3: prefix_block
+		{
+			let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
+			pass.set_pipeline(&self.prefix_block_pipeline);
+			pass.set_bind_group(0, &prefix_block_bind, &[]);
+			pass.dispatch_workgroups(1, 1, 1);
+		}
+
+		// PASS 4: prefix_add
+		{
+			let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
+			pass.set_pipeline(&self.prefix_add_pipeline);
+			pass.set_bind_group(0, &prefix_add_bind, &[]);
+			pass.dispatch_workgroups(block_count, 1, 1);
+		}
+
+		// PASS 5: mesh
+		{
+			let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
+			pass.set_pipeline(&self.mesh_pipeline);
+			pass.set_bind_group(0, &mesh_bind, &[]);
+			pass.dispatch_workgroups(self.dispatch.x, self.dispatch.y, self.dispatch.z);
+		}
+
+		queue.submit(std::iter::once(encoder.finish()));
 
 		// ---------------- Read back mesh ----------------
 		let last = voxel_count - 1;
@@ -348,16 +448,21 @@ pub fn spawn_mesh_from_gpu(
 	data: &GpuMeshData,
 	origin: Vec3,
 ) {
-	let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
+	let mut mesh = Mesh::new(
+		PrimitiveTopology::TriangleList,
+		RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
+	);
 
 	mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, data.positions.clone());
 	mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, data.normals.clone());
 	mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, data.uvs.clone());
 
-	commands.spawn(PbrBundle {
-		mesh: meshes.add(mesh),
-		material: materials.add(Color::WHITE.into()),
-		transform: Transform::from_translation(origin),
-		..default()
-	});
+	let mesh_handle = meshes.add(mesh);
+	let material_handle = materials.add(StandardMaterial::from(Color::WHITE));
+
+	commands.spawn((
+		Mesh3d(mesh_handle),
+		MeshMaterial3d::<StandardMaterial>(material_handle),
+		Transform::from_translation(origin),
+	));
 }
