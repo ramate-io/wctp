@@ -29,7 +29,13 @@ impl Plugin for TerrainPlugin {
 		feature_registry
 			.add_feature(Box::new(geography::canyons::CanyonFeature::new(self.seed, 1000)));
 
-		app.insert_resource(TerrainConfig::new(self.seed))
+		let terrain_config = TerrainConfig::new(self.seed);
+		let terrain_sdf = terrain::TerrainSdf {
+			sdf: terrain::create_terrain_sdf(&terrain_config),
+		};
+
+		app.insert_resource(terrain_config)
+			.insert_resource(terrain_sdf)
 			.insert_resource(ClearColor(Color::hsla(201.0, 0.69, 0.62, 1.0)))
 			.insert_resource(ChunkConfig::default())
 			.insert_resource(LoadedChunks::default())
