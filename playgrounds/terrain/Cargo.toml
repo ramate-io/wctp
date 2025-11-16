@@ -15,6 +15,7 @@ thiserror = { workspace = true }
 serde = { workspace = true }
 chrono = { workspace = true }
 log = { workspace = true }
+rayon = { workspace = true }
 
 # Bevy core dependencies
 bevy = { workspace = true }
