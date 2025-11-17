@@ -4,8 +4,8 @@
 // Block-level prefix scan
 //
 // WGSL binding contract:
-//   @group(0) @binding(0) var<storage, read_write> block_sums : array<u32>;
-//   @group(0) @binding(1) var<storage, read_write> block_prefix : array<u32>;
+//   @group(0) @binding(0) var<storage, read_write> out_prefix : array<u32>;
+//   @group(0) @binding(1) var<storage, read> block_prefix : array<u32>;
 
 use bevy::render::{
 	render_resource::{
@@ -26,8 +26,8 @@ impl PrefixBlockStage {
 		device.create_bind_group_layout(
 			Some("mc_prefix_block_layout"),
 			&[
-				create_storage_layout_entry(0, false), // block_sums
-				create_storage_layout_entry(1, false), // block_prefix
+				create_storage_layout_entry(0, false), // block_sums (read_write)
+				create_storage_layout_entry(1, true),  // block_prefix (read-only)
 			],
 		)
 	}
