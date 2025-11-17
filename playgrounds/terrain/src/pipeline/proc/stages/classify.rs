@@ -12,23 +12,21 @@
 //   @group(0) @binding(5) var<storage, read_write> tri_counts : array<u32>;
 
 use bevy::{
-	prelude::{AssetServer, Assets, Shader, UVec3},
+	prelude::UVec3,
 	render::{
 		render_resource::{
-			BindGroupLayout, Buffer, CommandEncoder, ComputePassDescriptor, ComputePipeline,
-			PipelineCache,
+			BindGroupLayout, Buffer, CachedComputePipelineId, CommandEncoder,
+			ComputePassDescriptor, PipelineCache,
 		},
 		renderer::RenderDevice,
 	},
 };
 
 use crate::pipeline::proc::bind_groups::{create_bind_group, create_storage_layout_entry, create_uniform_layout_entry};
-use crate::pipeline::proc::pipelines::load_pipeline;
 
-pub struct ClassifyStage {
-	pub layout: BindGroupLayout,
-	pub pipeline: ComputePipeline,
-}
+/// Stage for classifying voxels and computing cube indices.
+/// Uses pipeline ID from resource instead of creating pipelines on the fly.
+pub struct ClassifyStage;
 
 impl ClassifyStage {
 	/// Create the bind group layout for the classify stage.
@@ -46,39 +44,12 @@ impl ClassifyStage {
 		)
 	}
 
-	/// Load the compute pipeline for the classify stage.
-	pub fn load_pipeline(
-		pipeline_cache: &mut PipelineCache,
-		asset_server: &AssetServer,
-		shaders: &Assets<Shader>,
-		layout: &BindGroupLayout,
-	) -> ComputePipeline {
-		load_pipeline(
-			pipeline_cache,
-			asset_server,
-			shaders,
-			"proc/classify_voxels.wgsl",
-			"main",
-			layout,
-		)
-	}
-
-	/// Create a new ClassifyStage with layout and pipeline.
-	pub fn new(
-		device: &RenderDevice,
-		pipeline_cache: &mut PipelineCache,
-		asset_server: &AssetServer,
-		shaders: &Assets<Shader>,
-	) -> Self {
-		let layout = Self::create_layout(device);
-		let pipeline = Self::load_pipeline(pipeline_cache, asset_server, shaders, &layout);
-		Self { layout, pipeline }
-	}
-
-	/// Execute the classify stage.
+	/// Execute the classify stage using pipeline ID from resource.
 	pub fn execute(
-		&self,
 		device: &RenderDevice,
+		pipeline_cache: &PipelineCache,
+		layout: &BindGroupLayout,
+		pipeline_id: CachedComputePipelineId,
 		dispatch: UVec3,
 		sampling_buf: &Buffer,
 		cfg_buf: &Buffer,
@@ -88,15 +59,21 @@ impl ClassifyStage {
 		tri_counts: &Buffer,
 		encoder: &mut CommandEncoder,
 	) {
+		// Get the actual pipeline from the cache
+		let Some(pipeline) = pipeline_cache.get_compute_pipeline(pipeline_id) else {
+			log::warn!("Classify pipeline not ready yet");
+			return;
+		};
+
 		let bind = create_bind_group(
 			device,
 			"mc_classify_bind",
-			&self.layout,
+			layout,
 			&[sampling_buf, cfg_buf, bounds_buf, seed_buf, cube_index, tri_counts],
 		);
 
 		let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
-		pass.set_pipeline(&self.pipeline);
+		pass.set_pipeline(pipeline);
 		pass.set_bind_group(0, &bind, &[]);
 		pass.dispatch_workgroups(dispatch.x, dispatch.y, dispatch.z);
 	}

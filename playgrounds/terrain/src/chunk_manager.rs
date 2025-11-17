@@ -1,5 +1,6 @@
 use crate::chunk::{get_chunks_to_load, ChunkConfig, ChunkCoord, LoadedChunks, TerrainChunk};
 use crate::mesh_generator::{MeshGenerationMode, MeshGenerator};
+use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
 use bevy::render::render_resource::PipelineCache;
@@ -16,14 +17,24 @@ pub fn manage_chunks(
 	terrain_config: Res<TerrainConfig>,
 	mut loaded_chunks: ResMut<LoadedChunks>,
 	mesh_mode: Res<MeshGenerationMode>,
-	// GPU resources (optional, only needed for GPU mode)
+	// GPU resources (required for GPU mode, optional for CPU mode)
 	render_device: Option<Res<RenderDevice>>,
 	render_queue: Option<Res<RenderQueue>>,
-	mut pipeline_cache: Option<ResMut<PipelineCache>>,
-	asset_server: Option<Res<AssetServer>>,
-	shaders: Option<Res<Assets<bevy::render::render_resource::Shader>>>,
+	pipeline_cache: Option<Res<PipelineCache>>,
+	pipelines: Option<Res<MarchingCubesPipelines>>,
 	// feature_registry: Option<Res<crate::geography::FeatureRegistry>>,
 ) {
+	// Early return if GPU mode is requested but resources aren't available yet
+	if *mesh_mode == MeshGenerationMode::Gpu {
+		if render_device.is_none()
+			|| render_queue.is_none()
+			|| pipeline_cache.is_none()
+			|| pipelines.is_none()
+		{
+			warn!("GPU mode requested but resources aren't available");
+			return;
+		}
+	}
 	let Ok(camera_transform) = camera_query.single() else {
 		return;
 	};
@@ -111,9 +122,8 @@ pub fn manage_chunks(
 			&terrain_config,
 			render_device.as_deref(),
 			render_queue.as_deref(),
-			pipeline_cache.as_deref_mut(),
-			asset_server.as_deref(),
-			shaders.as_deref(),
+			pipeline_cache.as_deref(),
+			pipelines.as_deref(),
 		);
 		loaded_chunks.mark_loaded(coord);
 		log::debug!(
@@ -152,9 +162,8 @@ pub fn manage_chunks(
 				&terrain_config,
 				render_device.as_deref(),
 				render_queue.as_deref(),
-				pipeline_cache.as_deref_mut(),
-				asset_server.as_deref(),
-				shaders.as_deref(),
+				pipeline_cache.as_deref(),
+				pipelines.as_deref(),
 			);
 			loaded_chunks.mark_loaded(chunk_info.wrapped);
 		}

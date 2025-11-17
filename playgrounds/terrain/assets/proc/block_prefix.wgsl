@@ -1,7 +1,7 @@
 // prefix_add_offsets.wgsl
 // -------------------------------------------------------
 
-let BLOCK_SIZE : u32 = 256u;
+const BLOCK_SIZE : u32 = 256u;
 
 @group(0) @binding(0)
 var<storage, read_write> out_prefix : array<u32>;

@@ -41,7 +41,7 @@ impl Plugin for TerrainPlugin {
 			.insert_resource(ChunkConfig::default())
 			.insert_resource(LoadedChunks::default())
 			.insert_resource(feature_registry)
-			.insert_resource(mesh_generator::MeshGenerationMode::Gpu) // Default to CPU mode
+			.insert_resource(mesh_generator::MeshGenerationMode::Gpu) // Default to GPU mode
 			.add_systems(Startup, (camera::setup_camera, setup_lighting, ui::setup_debug_ui))
 			.add_systems(
 				Update,
@@ -51,6 +51,19 @@ impl Plugin for TerrainPlugin {
 					ui::update_coordinate_display,
 				),
 			);
+
+		// Set up RenderApp systems for GPU pipeline initialization
+		app.sub_app_mut(bevy::render::RenderApp).add_systems(
+			bevy::render::Render,
+			pipeline::proc::render_setup::setup_marching_cubes_pipelines
+				.in_set(bevy::render::RenderSet::Prepare),
+		);
+
+		// Extract pipelines from RenderApp to MainApp in Extract schedule
+		app.add_systems(
+			bevy::render::ExtractSchedule,
+			pipeline::proc::render_setup::extract_pipelines_to_main_world,
+		);
 	}
 }
 

@@ -15,11 +15,11 @@
 //   @group(0) @binding(8) var<uniform> seed : i32;
 
 use bevy::{
-	prelude::{AssetServer, Assets, Shader, UVec3},
+	prelude::UVec3,
 	render::{
 		render_resource::{
-			BindGroupLayout, Buffer, CommandEncoder, ComputePassDescriptor, ComputePipeline,
-			PipelineCache,
+			BindGroupLayout, Buffer, CachedComputePipelineId, CommandEncoder,
+			ComputePassDescriptor, PipelineCache,
 		},
 		renderer::RenderDevice,
 	},
@@ -28,12 +28,9 @@ use bevy::{
 use crate::pipeline::proc::bind_groups::{
 	create_bind_group, create_storage_layout_entry, create_uniform_layout_entry,
 };
-use crate::pipeline::proc::pipelines::load_pipeline;
 
-pub struct MeshStage {
-	pub layout: BindGroupLayout,
-	pub pipeline: ComputePipeline,
-}
+/// Stage for generating mesh vertices, normals, and UVs.
+pub struct MeshStage;
 
 impl MeshStage {
 	/// Create the bind group layout for the mesh stage.
@@ -54,39 +51,12 @@ impl MeshStage {
 		)
 	}
 
-	/// Load the compute pipeline for the mesh stage.
-	pub fn load_pipeline(
-		pipeline_cache: &mut PipelineCache,
-		asset_server: &AssetServer,
-		shaders: &Assets<Shader>,
-		layout: &BindGroupLayout,
-	) -> ComputePipeline {
-		load_pipeline(
-			pipeline_cache,
-			asset_server,
-			shaders,
-			"proc/compute_mesh.wgsl",
-			"compute_mesh",
-			layout,
-		)
-	}
-
-	/// Create a new MeshStage with layout and pipeline.
-	pub fn new(
-		device: &RenderDevice,
-		pipeline_cache: &mut PipelineCache,
-		asset_server: &AssetServer,
-		shaders: &Assets<Shader>,
-	) -> Self {
-		let layout = Self::create_layout(device);
-		let pipeline = Self::load_pipeline(pipeline_cache, asset_server, shaders, &layout);
-		Self { layout, pipeline }
-	}
-
-	/// Execute the mesh stage.
+	/// Execute the mesh stage using pipeline ID from resource.
 	pub fn execute(
-		&self,
 		device: &RenderDevice,
+		pipeline_cache: &PipelineCache,
+		layout: &BindGroupLayout,
+		pipeline_id: CachedComputePipelineId,
 		dispatch: UVec3,
 		sampling_buf: &Buffer,
 		cube_index: &Buffer,
@@ -99,10 +69,15 @@ impl MeshStage {
 		seed_buf: &Buffer,
 		encoder: &mut CommandEncoder,
 	) {
+		let Some(pipeline) = pipeline_cache.get_compute_pipeline(pipeline_id) else {
+			log::warn!("Mesh pipeline not ready yet");
+			return;
+		};
+
 		let bind = create_bind_group(
 			device,
 			"mc_mesh_bind",
-			&self.layout,
+			layout,
 			&[
 				sampling_buf,
 				cube_index,
@@ -117,7 +92,7 @@ impl MeshStage {
 		);
 
 		let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
-		pass.set_pipeline(&self.pipeline);
+		pass.set_pipeline(pipeline);
 		pass.set_bind_group(0, &bind, &[]);
 		pass.dispatch_workgroups(dispatch.x, dispatch.y, dispatch.z);
 	}

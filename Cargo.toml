@@ -5,8 +5,7 @@ resolver = "2"
 members = [
 
   # playgrounds
-  "playgrounds/terrain",
-  "playgrounds/gpu-sdf"
+  "playgrounds/terrain"
 
 ]
 

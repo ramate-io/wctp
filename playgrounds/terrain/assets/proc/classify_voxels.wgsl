@@ -1,5 +1,6 @@
 #import proc::marching_cubes
-#import proc::perlin_terrain
+#import proc::perlin_terrain::TerrainConfig
+#import proc::perlin_terrain::Bounds
 
 // ============================================================================
 // Classification Pass — computes cubeIndex + triangleCount per voxel

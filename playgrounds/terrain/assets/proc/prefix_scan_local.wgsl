@@ -1,7 +1,7 @@
 // prefix_scan_local.wgsl
 // -------------------------------------------------------
 
-let BLOCK_SIZE : u32 = 256u;
+#import proc::block_sum::BLOCK_SIZE
 
 @group(0) @binding(0)
 var<storage, read>  in_counts : array<u32>;      // tri_counts

@@ -48,11 +48,14 @@
 
 mod bind_groups;
 mod buffers;
-mod pipelines;
+pub mod pipelines_resource;
+pub mod render_setup;
 mod stages;
 mod types;
 
 use buffers::{new_storage, new_uniform, read_u32, read_vec};
+use pipelines_resource::MarchingCubesPipelines;
+use render_setup::MarchingCubesLayouts;
 use stages::{ClassifyStage, MeshStage, PrefixAddStage, PrefixBlockStage, PrefixLocalStage};
 pub use types::{Bounds, GpuMeshData, Sampling3D, TerrainConfigGpu};
 
@@ -71,6 +74,8 @@ use bevy::{
 // TYPESAFE OVERWRITE-PROOF PIPELINE
 // =================================================================================================
 
+/// GPU Marching Cubes pipeline that uses pre-compiled pipeline IDs from RenderApp.
+/// No PipelineCache access needed - pipelines are created once in RenderApp.
 pub struct GpuMarchingCubesPipeline {
 	sampling: Sampling3D,
 	terrain_cfg: TerrainConfigGpu,
@@ -80,20 +85,11 @@ pub struct GpuMarchingCubesPipeline {
 	dispatch: UVec3,
 	voxel_count: u32,
 	block_count: u32,
-
-	classify_stage: ClassifyStage,
-	prefix_local_stage: PrefixLocalStage,
-	prefix_block_stage: PrefixBlockStage,
-	prefix_add_stage: PrefixAddStage,
-	mesh_stage: MeshStage,
 }
 
 impl GpuMarchingCubesPipeline {
+	/// Create a new pipeline instance. Pipelines are pre-compiled in RenderApp.
 	pub fn new(
-		device: &RenderDevice,
-		pipeline_cache: &mut PipelineCache,
-		asset_server: &AssetServer,
-		shaders: &Assets<Shader>,
 		sampling: Sampling3D,
 		terrain_cfg_src: &crate::terrain::TerrainConfig,
 		bounds: Bounds,
@@ -108,15 +104,6 @@ impl GpuMarchingCubesPipeline {
 			(sampling.resolution.z + 7) / 8,
 		);
 
-		// Initialize all stages (creates layouts and loads pipelines)
-		let classify_stage = ClassifyStage::new(device, pipeline_cache, asset_server, shaders);
-		let prefix_local_stage =
-			PrefixLocalStage::new(device, pipeline_cache, asset_server, shaders);
-		let prefix_block_stage =
-			PrefixBlockStage::new(device, pipeline_cache, asset_server, shaders);
-		let prefix_add_stage = PrefixAddStage::new(device, pipeline_cache, asset_server, shaders);
-		let mesh_stage = MeshStage::new(device, pipeline_cache, asset_server, shaders);
-
 		Self {
 			sampling,
 			terrain_cfg: TerrainConfigGpu::from(terrain_cfg_src),
@@ -125,15 +112,18 @@ impl GpuMarchingCubesPipeline {
 			dispatch,
 			voxel_count,
 			block_count,
-			classify_stage,
-			prefix_local_stage,
-			prefix_block_stage,
-			prefix_add_stage,
-			mesh_stage,
 		}
 	}
 
-	pub fn compute(&self, device: &RenderDevice, queue: &RenderQueue) -> GpuMeshData {
+	/// Execute the compute pipeline using pre-compiled pipeline IDs.
+	pub fn compute(
+		&self,
+		device: &RenderDevice,
+		queue: &RenderQueue,
+		pipeline_cache: &PipelineCache,
+		pipelines: &MarchingCubesPipelines,
+		layouts: &MarchingCubesLayouts,
+	) -> GpuMeshData {
 		let voxel_count = self.voxel_count;
 		let block_count = self.block_count;
 
@@ -160,8 +150,11 @@ impl GpuMarchingCubesPipeline {
 		let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor::default());
 
 		// PASS 1: classify
-		self.classify_stage.execute(
+		ClassifyStage::execute(
 			device,
+			pipeline_cache,
+			&layouts.classify,
+			pipelines.classify,
 			self.dispatch,
 			&sampling_buf,
 			&cfg_buf,
@@ -173,8 +166,11 @@ impl GpuMarchingCubesPipeline {
 		);
 
 		// PASS 2: prefix_local
-		self.prefix_local_stage.execute(
+		PrefixLocalStage::execute(
 			device,
+			pipeline_cache,
+			&layouts.prefix_local,
+			pipelines.prefix_local,
 			block_count,
 			&tri_counts,
 			&tri_offset,
@@ -183,12 +179,22 @@ impl GpuMarchingCubesPipeline {
 		);
 
 		// PASS 3: prefix_block
-		self.prefix_block_stage
-			.execute(device, &block_sums, &block_prefix, &mut encoder);
+		PrefixBlockStage::execute(
+			device,
+			pipeline_cache,
+			&layouts.prefix_block,
+			pipelines.prefix_block,
+			&block_sums,
+			&block_prefix,
+			&mut encoder,
+		);
 
 		// PASS 4: prefix_add
-		self.prefix_add_stage.execute(
+		PrefixAddStage::execute(
 			device,
+			pipeline_cache,
+			&layouts.prefix_add,
+			pipelines.prefix_add,
 			block_count,
 			&tri_offset,
 			&block_prefix,
@@ -196,8 +202,11 @@ impl GpuMarchingCubesPipeline {
 		);
 
 		// PASS 5: mesh
-		self.mesh_stage.execute(
+		MeshStage::execute(
 			device,
+			pipeline_cache,
+			&layouts.mesh,
+			pipelines.mesh,
 			self.dispatch,
 			&sampling_buf,
 			&cube_index,

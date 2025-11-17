@@ -1,6 +1,8 @@
 // prefix_scan_blocks.wgsl
 // -------------------------------------------------------
 
+#import proc::block_prefix::BLOCK_SIZE
+
 @group(0) @binding(0)
 var<storage, read_write> block_sums : array<u32>;
 @group(0) @binding(1)

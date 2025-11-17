@@ -1,6 +1,7 @@
 use crate::chunk::ChunkCoord;
 use crate::cpu::CpuMeshGenerator;
 use crate::gpu::GpuMeshGenerator;
+use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
 use bevy::render::render_resource::PipelineCache;
@@ -40,9 +41,8 @@ impl MeshGenerator {
 		// GPU resources (only used if mode is Gpu)
 		device: Option<&RenderDevice>,
 		queue: Option<&RenderQueue>,
-		pipeline_cache: Option<&mut PipelineCache>,
-		asset_server: Option<&AssetServer>,
-		shaders: Option<&Assets<bevy::render::render_resource::Shader>>,
+		pipeline_cache: Option<&PipelineCache>,
+		pipelines: Option<&MarchingCubesPipelines>,
 	) -> Entity {
 		match mode {
 			MeshGenerationMode::Cpu => CpuMeshGenerator::spawn_chunk(
@@ -60,8 +60,7 @@ impl MeshGenerator {
 				let device = device.expect("RenderDevice required for GPU mode");
 				let queue = queue.expect("RenderQueue required for GPU mode");
 				let pipeline_cache = pipeline_cache.expect("PipelineCache required for GPU mode");
-				let asset_server = asset_server.expect("AssetServer required for GPU mode");
-				let shaders = shaders.expect("Shaders required for GPU mode");
+				let pipelines = pipelines.expect("MarchingCubesPipelines required for GPU mode");
 
 				GpuMeshGenerator::spawn_chunk(
 					commands,
@@ -76,8 +75,7 @@ impl MeshGenerator {
 					device,
 					queue,
 					pipeline_cache,
-					asset_server,
-					shaders,
+					pipelines,
 				)
 			}
 		}

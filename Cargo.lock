@@ -2272,19 +2272,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gpu-sdf"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "bevy",
- "chrono",
- "log",
- "noise",
- "serde",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "grid"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

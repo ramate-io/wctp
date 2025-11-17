@@ -1,5 +1,9 @@
 use crate::chunk::{ChunkCoord, TerrainChunk};
-use crate::pipeline::proc::{Bounds, GpuMarchingCubesPipeline, Sampling3D, TerrainMeshSpawner};
+use crate::pipeline::proc::{
+	render_setup::create_layouts_in_main_world, Bounds, GpuMarchingCubesPipeline, Sampling3D,
+	TerrainMeshSpawner,
+};
+use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
@@ -17,10 +21,11 @@ impl GpuMeshGenerator {
 		config: &TerrainConfig,
 		device: &RenderDevice,
 		queue: &RenderQueue,
-		pipeline_cache: &mut PipelineCache,
-		asset_server: &AssetServer,
-		shaders: &Assets<bevy::render::render_resource::Shader>,
+		pipeline_cache: &PipelineCache,
+		pipelines: &MarchingCubesPipelines,
 	) -> Mesh {
+		// Create layouts in main world (since BindGroupLayout is not Clone)
+		let layouts = create_layouts_in_main_world(device);
 		let chunk_origin = chunk_coord.to_unwrapped_world_pos(chunk_size);
 
 		// Vertical sampling range in world Y
@@ -45,20 +50,16 @@ impl GpuMeshGenerator {
 			max: Vec2::ZERO,
 		};
 
-		// Create GPU pipeline
+		// Create GPU pipeline (pipelines are pre-compiled in RenderApp)
 		let pipeline = GpuMarchingCubesPipeline::new(
-			device,
-			pipeline_cache,
-			asset_server,
-			shaders,
 			sampling,
 			config,
 			bounds,
 			config.seed as i32,
 		);
 
-		// Compute mesh on GPU
-		let gpu_data = pipeline.compute(device, queue);
+		// Compute mesh on GPU using pre-compiled pipelines
+		let gpu_data = pipeline.compute(device, queue, pipeline_cache, pipelines, &layouts);
 
 		// Convert to Bevy Mesh
 		TerrainMeshSpawner::mesh_from_gpu_data(&gpu_data)
@@ -77,9 +78,8 @@ impl GpuMeshGenerator {
 		config: &TerrainConfig,
 		device: &RenderDevice,
 		queue: &RenderQueue,
-		pipeline_cache: &mut PipelineCache,
-		asset_server: &AssetServer,
-		shaders: &Assets<bevy::render::render_resource::Shader>,
+		pipeline_cache: &PipelineCache,
+		pipelines: &MarchingCubesPipelines,
 	) -> Entity {
 		// Use unwrapped coordinate for mesh generation to ensure seamless terrain
 		let mesh = Self::generate_chunk_mesh(
@@ -90,8 +90,7 @@ impl GpuMeshGenerator {
 			device,
 			queue,
 			pipeline_cache,
-			asset_server,
-			shaders,
+			pipelines,
 		);
 		let mesh_handle = meshes.add(mesh);
 
