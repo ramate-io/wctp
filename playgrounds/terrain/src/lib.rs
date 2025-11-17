@@ -4,7 +4,7 @@ use std::f32::consts::PI;
 mod camera;
 mod chunk;
 mod chunk_manager;
-mod cpu_marching_cubes;
+mod cpu;
 mod geography;
 mod marching_cubes;
 pub mod pipeline;
