@@ -14,7 +14,6 @@ pub mod sdf;
 pub mod shaders;
 mod terrain;
 mod ui;
-mod units;
 
 pub use geography::FeatureRegistry;
 
@@ -42,7 +41,7 @@ impl Plugin for TerrainPlugin {
 			.insert_resource(ChunkConfig::default())
 			.insert_resource(LoadedChunks::default())
 			.insert_resource(feature_registry)
-			.insert_resource(mesh_generator::MeshGenerationMode::Cpu) // Default to CPU mode
+			.insert_resource(mesh_generator::MeshGenerationMode::Gpu) // Default to CPU mode
 			.add_systems(Startup, (camera::setup_camera, setup_lighting, ui::setup_debug_ui))
 			.add_systems(
 				Update,
