@@ -130,14 +130,14 @@ pub fn init_marching_cubes_pipelines(
 	mut commands: Commands,
 	mut pipeline_cache: ResMut<PipelineCache>,
 	ids: Option<Res<MarchingCubesPipelineIds>>,
-	shader_handles: Option<Res<MarchingCubesShaderHandles>>,
-	shaders: Res<Assets<Shader>>,
+	// shader_handles: Option<Res<MarchingCubesShaderHandles>>,
+	// shaders: Res<Assets<Shader>>,
 ) {
 	// If IDs resource doesn't exist, pipelines are already initialized
 	let Some(ids) = ids else {
 		return;
 	};
-	let Some(shader_handles) = shader_handles else {
+	/*let Some(shader_handles) = shader_handles else {
 		return;
 	};
 
@@ -153,7 +153,7 @@ pub fn init_marching_cubes_pipelines(
 		return; // Wait for shaders to load
 	}
 
-	log::debug!("All shaders loaded, processing pipeline queue");
+	log::debug!("All shaders loaded, processing pipeline queue");*/
 
 	// Process the pipeline queue to advance compilation
 	// This must be called to actually compile the queued pipelines
