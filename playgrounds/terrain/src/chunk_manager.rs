@@ -3,7 +3,6 @@ use crate::mesh_generator::{MeshGenerationMode, MeshGenerator};
 use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
-use bevy::render::render_resource::PipelineCache;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
 
 /// System that manages chunk loading and unloading based on camera position
@@ -20,17 +19,18 @@ pub fn manage_chunks(
 	// GPU resources (required for GPU mode, optional for CPU mode)
 	render_device: Option<Res<RenderDevice>>,
 	render_queue: Option<Res<RenderQueue>>,
-	pipeline_cache: Option<Res<PipelineCache>>,
 	pipelines: Option<Res<MarchingCubesPipelines>>,
 	// feature_registry: Option<Res<crate::geography::FeatureRegistry>>,
 ) {
 	// Early return if GPU mode is requested but resources aren't available yet
 	if *mesh_mode == MeshGenerationMode::Gpu {
-		if render_device.is_none()
-			|| render_queue.is_none()
-			|| pipeline_cache.is_none()
-			|| pipelines.is_none()
-		{
+		log::info!(
+			"GPU mode requested, checking resources: {:?} {:?} {:?}",
+			render_device.is_some(),
+			render_queue.is_some(),
+			pipelines.is_some(),
+		);
+		if render_device.is_none() || render_queue.is_none() || pipelines.is_none() {
 			warn!("GPU mode requested but resources aren't available");
 			return;
 		}
@@ -122,7 +122,6 @@ pub fn manage_chunks(
 			&terrain_config,
 			render_device.as_deref(),
 			render_queue.as_deref(),
-			pipeline_cache.as_deref(),
 			pipelines.as_deref(),
 		);
 		loaded_chunks.mark_loaded(coord);
@@ -162,7 +161,6 @@ pub fn manage_chunks(
 				&terrain_config,
 				render_device.as_deref(),
 				render_queue.as_deref(),
-				pipeline_cache.as_deref(),
 				pipelines.as_deref(),
 			);
 			loaded_chunks.mark_loaded(chunk_info.wrapped);

@@ -75,7 +75,7 @@ gloo-timers = { version = "0.2" }
 chrono = { version = "0.4.41" }
 reqwest = { version = "0.12", features = ["json"] }
 base64 = "0.22"
-bevy = { git = "https://github.com/ramate-io/bevy", rev = "390623a9289c10760e779b19c9b6c245e2179b54" }
+bevy = { version = "0.17.2" }
 js-sys = "0.3"
 log = "0.4"
 console_log = "1"

@@ -4,7 +4,6 @@ use crate::gpu::GpuMeshGenerator;
 use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
-use bevy::render::render_resource::PipelineCache;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
 
 /// Mesh generation mode - selects between CPU and GPU implementations
@@ -41,7 +40,6 @@ impl MeshGenerator {
 		// GPU resources (only used if mode is Gpu)
 		device: Option<&RenderDevice>,
 		queue: Option<&RenderQueue>,
-		pipeline_cache: Option<&PipelineCache>,
 		pipelines: Option<&MarchingCubesPipelines>,
 	) -> Entity {
 		match mode {
@@ -59,7 +57,6 @@ impl MeshGenerator {
 			MeshGenerationMode::Gpu => {
 				let device = device.expect("RenderDevice required for GPU mode");
 				let queue = queue.expect("RenderQueue required for GPU mode");
-				let pipeline_cache = pipeline_cache.expect("PipelineCache required for GPU mode");
 				let pipelines = pipelines.expect("MarchingCubesPipelines required for GPU mode");
 
 				GpuMeshGenerator::spawn_chunk(
@@ -74,7 +71,6 @@ impl MeshGenerator {
 					config,
 					device,
 					queue,
-					pipeline_cache,
 					pipelines,
 				)
 			}

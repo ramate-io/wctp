@@ -1,13 +1,12 @@
 use crate::chunk::{ChunkCoord, TerrainChunk};
+use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
 use crate::pipeline::proc::{
 	render_setup::create_layouts_in_main_world, Bounds, GpuMarchingCubesPipeline, Sampling3D,
 	TerrainMeshSpawner,
 };
-use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
-use bevy::render::render_resource::PipelineCache;
 
 /// GPU-based terrain mesh generator
 pub struct GpuMeshGenerator;
@@ -21,7 +20,6 @@ impl GpuMeshGenerator {
 		config: &TerrainConfig,
 		device: &RenderDevice,
 		queue: &RenderQueue,
-		pipeline_cache: &PipelineCache,
 		pipelines: &MarchingCubesPipelines,
 	) -> Mesh {
 		// Create layouts in main world (since BindGroupLayout is not Clone)
@@ -51,15 +49,10 @@ impl GpuMeshGenerator {
 		};
 
 		// Create GPU pipeline (pipelines are pre-compiled in RenderApp)
-		let pipeline = GpuMarchingCubesPipeline::new(
-			sampling,
-			config,
-			bounds,
-			config.seed as i32,
-		);
+		let pipeline = GpuMarchingCubesPipeline::new(sampling, config, bounds, config.seed as i32);
 
 		// Compute mesh on GPU using pre-compiled pipelines
-		let gpu_data = pipeline.compute(device, queue, pipeline_cache, pipelines, &layouts);
+		let gpu_data = pipeline.compute(device, queue, pipelines, &layouts);
 
 		// Convert to Bevy Mesh
 		TerrainMeshSpawner::mesh_from_gpu_data(&gpu_data)
@@ -78,7 +71,6 @@ impl GpuMeshGenerator {
 		config: &TerrainConfig,
 		device: &RenderDevice,
 		queue: &RenderQueue,
-		pipeline_cache: &PipelineCache,
 		pipelines: &MarchingCubesPipelines,
 	) -> Entity {
 		// Use unwrapped coordinate for mesh generation to ensure seamless terrain
@@ -89,7 +81,6 @@ impl GpuMeshGenerator {
 			config,
 			device,
 			queue,
-			pipeline_cache,
 			pipelines,
 		);
 		let mesh_handle = meshes.add(mesh);
@@ -135,4 +126,3 @@ impl GpuMeshGenerator {
 		entity
 	}
 }
-

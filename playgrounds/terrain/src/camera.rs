@@ -36,7 +36,7 @@ pub fn setup_camera(mut commands: Commands) {
 
 pub fn camera_controller(
 	keyboard_input: Res<ButtonInput<KeyCode>>,
-	mut mouse_motion: EventReader<bevy::input::mouse::MouseMotion>,
+	mut mouse_motion: MessageReader<bevy::input::mouse::MouseMotion>,
 	time: Res<Time>,
 	terrain_sdf: Res<TerrainSdf>,
 	mut query: Query<(&mut Transform, &mut CameraController), With<Camera3d>>,

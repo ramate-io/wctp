@@ -18,8 +18,7 @@ use bevy::{
 	prelude::UVec3,
 	render::{
 		render_resource::{
-			BindGroupLayout, Buffer, CachedComputePipelineId, CommandEncoder,
-			ComputePassDescriptor, PipelineCache,
+			BindGroupLayout, Buffer, CommandEncoder, ComputePassDescriptor,
 		},
 		renderer::RenderDevice,
 	},
@@ -28,6 +27,7 @@ use bevy::{
 use crate::pipeline::proc::bind_groups::{
 	create_bind_group, create_storage_layout_entry, create_uniform_layout_entry,
 };
+use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
 
 /// Stage for generating mesh vertices, normals, and UVs.
 pub struct MeshStage;
@@ -51,12 +51,11 @@ impl MeshStage {
 		)
 	}
 
-	/// Execute the mesh stage using pipeline ID from resource.
+	/// Execute the mesh stage using pipeline from resource.
 	pub fn execute(
 		device: &RenderDevice,
-		pipeline_cache: &PipelineCache,
+		pipelines: &MarchingCubesPipelines,
 		layout: &BindGroupLayout,
-		pipeline_id: CachedComputePipelineId,
 		dispatch: UVec3,
 		sampling_buf: &Buffer,
 		cube_index: &Buffer,
@@ -69,11 +68,6 @@ impl MeshStage {
 		seed_buf: &Buffer,
 		encoder: &mut CommandEncoder,
 	) {
-		let Some(pipeline) = pipeline_cache.get_compute_pipeline(pipeline_id) else {
-			log::warn!("Mesh pipeline not ready yet");
-			return;
-		};
-
 		let bind = create_bind_group(
 			device,
 			"mc_mesh_bind",
@@ -92,7 +86,7 @@ impl MeshStage {
 		);
 
 		let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
-		pass.set_pipeline(pipeline);
+		pass.set_pipeline(&pipelines.mesh);
 		pass.set_bind_group(0, &bind, &[]);
 		pass.dispatch_workgroups(dispatch.x, dispatch.y, dispatch.z);
 	}

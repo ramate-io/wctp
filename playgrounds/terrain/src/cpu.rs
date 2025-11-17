@@ -209,13 +209,13 @@ impl CpuMeshGenerator {
 
 		// ---------- Mesh ---------------------------------------------------------
 		let mut mesh = Mesh::new(
-			bevy::render::mesh::PrimitiveTopology::TriangleList,
-			bevy::render::render_asset::RenderAssetUsages::RENDER_WORLD,
+			bevy::mesh::PrimitiveTopology::TriangleList,
+			bevy::asset::RenderAssetUsages::RENDER_WORLD,
 		);
 		mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
 		mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
 		mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-		mesh.insert_indices(bevy::render::mesh::Indices::U32(indices));
+		mesh.insert_indices(bevy::mesh::Indices::U32(indices));
 		mesh
 	}
 

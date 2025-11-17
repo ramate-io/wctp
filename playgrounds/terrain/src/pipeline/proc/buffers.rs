@@ -4,6 +4,7 @@
 // Utilities for creating GPU buffers and reading data back to CPU
 
 use bevy::render::{
+	render_resource::PollType,
 	render_resource::*,
 	renderer::{RenderDevice, RenderQueue},
 };
@@ -50,7 +51,7 @@ pub fn read_vec<T: Pod>(
 
 	let slice = staging.slice(..);
 	slice.map_async(MapMode::Read, |_| {});
-	device.poll(Maintain::Wait);
+	device.poll(PollType::Wait).expect("Failed to poll buffer");
 
 	let range = slice.get_mapped_range();
 	let result: Vec<T> = bytemuck::cast_slice(&range).to_vec();
@@ -75,7 +76,7 @@ pub fn read_u32(device: &RenderDevice, queue: &RenderQueue, src: &Buffer, idx: u
 
 	let slice = staging.slice(..);
 	slice.map_async(MapMode::Read, |_| {});
-	device.poll(Maintain::Wait);
+	device.poll(PollType::Wait).expect("Failed to poll buffer");
 
 	let range = slice.get_mapped_range();
 	let v = u32::from_le_bytes(range[0..4].try_into().unwrap());

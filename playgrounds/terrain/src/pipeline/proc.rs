@@ -62,9 +62,9 @@ pub use types::{Bounds, GpuMeshData, Sampling3D, TerrainConfigGpu};
 // Re-export main types for convenience
 
 use bevy::{
+	asset::RenderAssetUsages,
 	prelude::*,
 	render::{
-		render_asset::RenderAssetUsages,
 		render_resource::*,
 		renderer::{RenderDevice, RenderQueue},
 	},
@@ -115,12 +115,11 @@ impl GpuMarchingCubesPipeline {
 		}
 	}
 
-	/// Execute the compute pipeline using pre-compiled pipeline IDs.
+	/// Execute the compute pipeline using pre-compiled pipelines.
 	pub fn compute(
 		&self,
 		device: &RenderDevice,
 		queue: &RenderQueue,
-		pipeline_cache: &PipelineCache,
 		pipelines: &MarchingCubesPipelines,
 		layouts: &MarchingCubesLayouts,
 	) -> GpuMeshData {
@@ -152,9 +151,8 @@ impl GpuMarchingCubesPipeline {
 		// PASS 1: classify
 		ClassifyStage::execute(
 			device,
-			pipeline_cache,
+			pipelines,
 			&layouts.classify,
-			pipelines.classify,
 			self.dispatch,
 			&sampling_buf,
 			&cfg_buf,
@@ -168,9 +166,8 @@ impl GpuMarchingCubesPipeline {
 		// PASS 2: prefix_local
 		PrefixLocalStage::execute(
 			device,
-			pipeline_cache,
+			pipelines,
 			&layouts.prefix_local,
-			pipelines.prefix_local,
 			block_count,
 			&tri_counts,
 			&tri_offset,
@@ -181,9 +178,8 @@ impl GpuMarchingCubesPipeline {
 		// PASS 3: prefix_block
 		PrefixBlockStage::execute(
 			device,
-			pipeline_cache,
+			pipelines,
 			&layouts.prefix_block,
-			pipelines.prefix_block,
 			&block_sums,
 			&block_prefix,
 			&mut encoder,
@@ -192,21 +188,19 @@ impl GpuMarchingCubesPipeline {
 		// PASS 4: prefix_add
 		PrefixAddStage::execute(
 			device,
-			pipeline_cache,
+			pipelines,
 			&layouts.prefix_add,
-			pipelines.prefix_add,
-			block_count,
 			&tri_offset,
 			&block_prefix,
+			block_count,
 			&mut encoder,
 		);
 
 		// PASS 5: mesh
 		MeshStage::execute(
 			device,
-			pipeline_cache,
+			pipelines,
 			&layouts.mesh,
-			pipelines.mesh,
 			self.dispatch,
 			&sampling_buf,
 			&cube_index,

@@ -8,14 +8,12 @@
 //   @group(0) @binding(1) var<storage, read> block_prefix : array<u32>;
 
 use bevy::render::{
-	render_resource::{
-		BindGroupLayout, Buffer, CachedComputePipelineId, CommandEncoder, ComputePassDescriptor,
-		PipelineCache,
-	},
+	render_resource::{BindGroupLayout, Buffer, CommandEncoder, ComputePassDescriptor},
 	renderer::RenderDevice,
 };
 
 use crate::pipeline::proc::bind_groups::{create_bind_group, create_storage_layout_entry};
+use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
 
 /// Stage for block-level prefix scan.
 pub struct PrefixBlockStage;
@@ -32,26 +30,20 @@ impl PrefixBlockStage {
 		)
 	}
 
-	/// Execute the prefix_block stage using pipeline ID from resource.
+	/// Execute the prefix_block stage using pipeline from resource.
 	pub fn execute(
 		device: &RenderDevice,
-		pipeline_cache: &PipelineCache,
+		pipelines: &MarchingCubesPipelines,
 		layout: &BindGroupLayout,
-		pipeline_id: CachedComputePipelineId,
 		block_sums: &Buffer,
 		block_prefix: &Buffer,
 		encoder: &mut CommandEncoder,
 	) {
-		let Some(pipeline) = pipeline_cache.get_compute_pipeline(pipeline_id) else {
-			log::warn!("Prefix block pipeline not ready yet");
-			return;
-		};
-
 		let bind =
 			create_bind_group(device, "mc_prefix_block_bind", layout, &[block_sums, block_prefix]);
 
 		let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
-		pass.set_pipeline(pipeline);
+		pass.set_pipeline(&pipelines.prefix_block);
 		pass.set_bind_group(0, &bind, &[]);
 		pass.dispatch_workgroups(1, 1, 1);
 	}

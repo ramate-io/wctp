@@ -10,13 +10,13 @@
 
 use bevy::render::{
 	render_resource::{
-		BindGroupLayout, Buffer, CachedComputePipelineId, CommandEncoder,
-		ComputePassDescriptor, PipelineCache,
+		BindGroupLayout, Buffer, CommandEncoder, ComputePassDescriptor,
 	},
 	renderer::RenderDevice,
 };
 
 use crate::pipeline::proc::bind_groups::{create_bind_group, create_storage_layout_entry};
+use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
 
 /// Stage for local prefix scan of triangle counts.
 pub struct PrefixLocalStage;
@@ -34,23 +34,17 @@ impl PrefixLocalStage {
 		)
 	}
 
-	/// Execute the prefix_local stage using pipeline ID from resource.
+	/// Execute the prefix_local stage using pipeline from resource.
 	pub fn execute(
 		device: &RenderDevice,
-		pipeline_cache: &PipelineCache,
+		pipelines: &MarchingCubesPipelines,
 		layout: &BindGroupLayout,
-		pipeline_id: CachedComputePipelineId,
 		block_count: u32,
 		tri_counts: &Buffer,
 		tri_offset: &Buffer,
 		block_sums: &Buffer,
 		encoder: &mut CommandEncoder,
 	) {
-		let Some(pipeline) = pipeline_cache.get_compute_pipeline(pipeline_id) else {
-			log::warn!("Prefix local pipeline not ready yet");
-			return;
-		};
-
 		let bind = create_bind_group(
 			device,
 			"mc_prefix_local_bind",
@@ -59,7 +53,7 @@ impl PrefixLocalStage {
 		);
 
 		let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
-		pass.set_pipeline(pipeline);
+		pass.set_pipeline(&pipelines.prefix_local);
 		pass.set_bind_group(0, &bind, &[]);
 		pass.dispatch_workgroups(block_count, 1, 1);
 	}
