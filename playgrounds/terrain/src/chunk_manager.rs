@@ -1,5 +1,6 @@
 use crate::chunk::{get_chunks_to_load, ChunkConfig, ChunkCoord, LoadedChunks, TerrainChunk};
-use crate::terrain::{spawn_chunk, TerrainConfig};
+use crate::cpu::spawn_chunk;
+use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
 
 /// System that manages chunk loading and unloading based on camera position
