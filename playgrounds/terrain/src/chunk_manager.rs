@@ -1,6 +1,8 @@
 use crate::chunk::{get_chunks_to_load, ChunkConfig, ChunkCoord, LoadedChunks, TerrainChunk};
 use crate::terrain::{spawn_chunk, TerrainConfig};
 use bevy::prelude::*;
+use bevy::render::renderer::{RenderDevice, RenderQueue};
+use bevy::render::render_resource::PipelineCache;
 
 /// System that manages chunk loading and unloading based on camera position
 pub fn manage_chunks(
@@ -12,6 +14,11 @@ pub fn manage_chunks(
 	chunk_config: Res<ChunkConfig>,
 	terrain_config: Res<TerrainConfig>,
 	mut loaded_chunks: ResMut<LoadedChunks>,
+	render_device: Res<RenderDevice>,
+	render_queue: Res<RenderQueue>,
+	mut pipeline_cache: ResMut<PipelineCache>,
+	asset_server: Res<AssetServer>,
+	shaders: Res<Assets<bevy::render::render_resource::Shader>>,
 	// feature_registry: Option<Res<crate::geography::FeatureRegistry>>,
 ) {
 	let Ok(camera_transform) = camera_query.single() else {
@@ -98,6 +105,11 @@ pub fn manage_chunks(
 			chunk_config.world_size_chunks,
 			new_resolution,
 			&terrain_config,
+			&render_device,
+			&render_queue,
+			&mut pipeline_cache,
+			&asset_server,
+			&shaders,
 			// feature_registry.as_deref(),
 		);
 		loaded_chunks.mark_loaded(coord);
@@ -134,6 +146,11 @@ pub fn manage_chunks(
 				chunk_config.world_size_chunks,
 				resolution,
 				&terrain_config,
+				&render_device,
+				&render_queue,
+				&mut pipeline_cache,
+				&asset_server,
+				&shaders,
 				// feature_registry.as_deref(),
 			);
 			loaded_chunks.mark_loaded(chunk_info.wrapped);

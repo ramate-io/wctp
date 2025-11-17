@@ -56,6 +56,8 @@ use buffers::{new_storage, new_uniform, read_u32, read_vec};
 use stages::{ClassifyStage, MeshStage, PrefixAddStage, PrefixBlockStage, PrefixLocalStage};
 pub use types::{Bounds, GpuMeshData, Sampling3D, TerrainConfigGpu};
 
+// Re-export main types for convenience
+
 use bevy::{
 	prelude::*,
 	render::{
@@ -230,6 +232,56 @@ impl GpuMarchingCubesPipeline {
 // BEVY MESH CONSTRUCTION
 // =================================================================================================
 
+/// Helper struct for spawning meshes from GPU-computed mesh data
+pub struct TerrainMeshSpawner;
+
+impl TerrainMeshSpawner {
+	/// Spawn a mesh entity from GPU-computed mesh data
+	pub fn spawn_mesh(
+		commands: &mut Commands,
+		meshes: &mut Assets<Mesh>,
+		materials: &mut Assets<StandardMaterial>,
+		data: &GpuMeshData,
+		origin: Vec3,
+	) -> Entity {
+		let mut mesh = Mesh::new(
+			PrimitiveTopology::TriangleList,
+			RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
+		);
+
+		mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, data.positions.clone());
+		mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, data.normals.clone());
+		mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, data.uvs.clone());
+
+		let mesh_handle = meshes.add(mesh);
+		let material_handle = materials.add(StandardMaterial::from(Color::WHITE));
+
+		commands
+			.spawn((
+				Mesh3d(mesh_handle),
+				MeshMaterial3d::<StandardMaterial>(material_handle),
+				Transform::from_translation(origin),
+			))
+			.id()
+	}
+
+	/// Convert GPU mesh data to a Bevy Mesh (without spawning)
+	pub fn mesh_from_gpu_data(data: &GpuMeshData) -> Mesh {
+		let mut mesh = Mesh::new(
+			PrimitiveTopology::TriangleList,
+			RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
+		);
+
+		mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, data.positions.clone());
+		mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, data.normals.clone());
+		mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, data.uvs.clone());
+
+		mesh
+	}
+}
+
+/// Legacy function for backward compatibility
+#[deprecated(note = "Use TerrainMeshSpawner::spawn_mesh instead")]
 pub fn spawn_mesh_from_gpu(
 	commands: &mut Commands,
 	meshes: &mut Assets<Mesh>,
@@ -237,21 +289,5 @@ pub fn spawn_mesh_from_gpu(
 	data: &GpuMeshData,
 	origin: Vec3,
 ) {
-	let mut mesh = Mesh::new(
-		PrimitiveTopology::TriangleList,
-		RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
-	);
-
-	mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, data.positions.clone());
-	mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, data.normals.clone());
-	mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, data.uvs.clone());
-
-	let mesh_handle = meshes.add(mesh);
-	let material_handle = materials.add(StandardMaterial::from(Color::WHITE));
-
-	commands.spawn((
-		Mesh3d(mesh_handle),
-		MeshMaterial3d::<StandardMaterial>(material_handle),
-		Transform::from_translation(origin),
-	));
+	TerrainMeshSpawner::spawn_mesh(commands, meshes, materials, data, origin);
 }

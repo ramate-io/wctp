@@ -4,6 +4,7 @@ use std::f32::consts::PI;
 mod camera;
 mod chunk;
 mod chunk_manager;
+mod cpu_marching_cubes;
 mod geography;
 mod marching_cubes;
 pub mod pipeline;
@@ -46,7 +47,6 @@ impl Plugin for TerrainPlugin {
 					camera::camera_controller,
 					chunk_manager::manage_chunks,
 					ui::update_coordinate_display,
-					units::spawn_attached_cube,
 				),
 			);
 	}

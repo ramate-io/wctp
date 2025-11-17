@@ -1,4 +1,5 @@
 use crate::chunk::{ChunkCoord, TerrainChunk};
+use crate::pipeline::proc::{Bounds, GpuMarchingCubesPipeline, Sampling3D, TerrainMeshSpawner};
 // use crate::geography::FeatureRegistry;
 use crate::sdf::{
 	region::{
@@ -8,8 +9,8 @@ use crate::sdf::{
 	Difference, Ellipse3d, PerlinTerrainSdf, Sdf, TubeSdf,
 };
 use bevy::prelude::*;
+use bevy::render::renderer::{RenderDevice, RenderQueue};
 use noise::Perlin;
-use rayon::prelude::*;
 
 /// Resource containing the terrain SDF for runtime queries
 #[derive(Resource)]
@@ -157,213 +158,88 @@ impl TerrainConfig {
 	}
 }
 
-/// Generate a terrain mesh for a specific chunk by sampling an SDF
-/// Supports both heightfield (fast, no caves) and volumetric (marching cubes, supports caves)
+/// Generate a terrain mesh for a specific chunk using GPU-based Marching Cubes
 pub fn generate_chunk_mesh(
 	chunk_coord: &ChunkCoord,
 	chunk_size: f32,
 	resolution: usize,
 	config: &TerrainConfig,
-	// feature_registry: Option<&FeatureRegistry>,
+	device: &RenderDevice,
+	queue: &RenderQueue,
+	pipeline_cache: &mut bevy::render::render_resource::PipelineCache,
+	asset_server: &AssetServer,
+	shaders: &Assets<bevy::render::render_resource::Shader>,
 ) -> Mesh {
-	generate_chunk_mesh_volumetric(chunk_coord, chunk_size, resolution, config)
+	generate_chunk_mesh_gpu(
+		chunk_coord,
+		chunk_size,
+		resolution,
+		config,
+		device,
+		queue,
+		pipeline_cache,
+		asset_server,
+		shaders,
+	)
 }
 
-pub fn generate_chunk_mesh_volumetric(
+/// Generate a terrain mesh using GPU-based Marching Cubes
+pub fn generate_chunk_mesh_gpu(
 	chunk_coord: &ChunkCoord,
 	chunk_size: f32,
 	res: usize,
 	config: &TerrainConfig,
-	// feature_registry: Option<&FeatureRegistry>,
+	device: &RenderDevice,
+	queue: &RenderQueue,
+	pipeline_cache: &mut bevy::render::render_resource::PipelineCache,
+	asset_server: &AssetServer,
+	shaders: &Assets<bevy::render::render_resource::Shader>,
 ) -> Mesh {
-	// Use the same SDF creation logic
-	let sdf = create_terrain_sdf(config);
-
-	// ---------- grid setup ---------------------------------------------------
-	let cube_size = chunk_size / res as f32;
 	let chunk_origin = chunk_coord.to_unwrapped_world_pos(chunk_size);
 
 	// Vertical sampling range in world Y
-	let y_min = -config.height_scale;
-	let y_max = config.height_scale * 4.0;
+	let y_min = -config.height_scale * 2.0;
+	let y_max = config.height_scale * 2.0;
 	let y_range = y_max - y_min;
 
-	// Number of cells vertically to roughly match cube_size
+	// Calculate vertical resolution to match horizontal resolution
+	let cube_size = chunk_size / res as f32;
 	let y_cells = (y_range / cube_size).ceil().max(1.0) as usize;
 
-	// Grid resolution (sample points); cubes are (n-1) in each axis
-	let nx = res + 1;
-	let nz = res + 1;
-	let ny = y_cells + 1;
+	// Set up GPU pipeline parameters
+	let sampling = Sampling3D {
+		chunk_origin,
+		chunk_size: Vec3::new(chunk_size, y_range, chunk_size),
+		resolution: UVec3::new(res as u32, y_cells as u32, res as u32),
+	};
 
-	// Helper: linear index with X fastest, then Z, then Y (consistent)
-	let idx = |x: usize, y: usize, z: usize| -> usize { (y * nz + z) * nx + x };
+	let bounds = Bounds {
+		enabled: 0, // No bounds restriction for now
+		min: Vec2::ZERO,
+		max: Vec2::ZERO,
+	};
 
-	// Scalar field samples
-	let mut grid = vec![0.0f32; nx * ny * nz];
-
-	// ---------- sample SDF in world space (parallelized) --------------------
-	// Parallelize over Y slices for better cache locality
-	// Collect results per Y slice and merge sequentially
-	let config_clone = config.clone();
-	let y_slices: Vec<_> = (0..ny)
-		.into_par_iter()
-		.map(|y| {
-			// Create SDF per thread to avoid Send/Sync issues
-			let thread_sdf = create_terrain_sdf(&config_clone);
-			let wy = y_min + y as f32 * cube_size;
-			let mut slice = vec![0.0f32; nx * nz];
-			for z in 0..nz {
-				let wz = chunk_origin.z + z as f32 * cube_size;
-				for x in 0..nx {
-					let wx = chunk_origin.x + x as f32 * cube_size;
-					slice[z * nx + x] = thread_sdf.as_ref().distance(Vec3::new(wx, wy, wz));
-				}
-			}
-			(y, slice)
-		})
-		.collect();
-
-	// Merge slices into grid
-	for (y, slice) in y_slices {
-		for z in 0..nz {
-			for x in 0..nx {
-				grid[idx(x, y, z)] = slice[z * nx + x];
-			}
-		}
-	}
-
-	// ---------- Marching Cubes (parallelized) --------------------------------
-	use crate::marching_cubes::{get_cube_index, interpolate_vertex, TRIANGULATIONS};
-
-	// Number of cubes along each axis
-	let cx = nx - 1;
-	let cy = ny - 1;
-	let cz = nz - 1;
-
-	// Process cubes in parallel, collecting vertices and indices per cube
-	// We'll merge them with proper index offsets afterward
-	// SAFETY: We're only reading from grid, and each thread reads different indices
-	// Flatten cube coordinates into a single iterator
-	let cube_coords: Vec<_> = (0..cy)
-		.flat_map(|y| (0..cz).flat_map(move |z| (0..cx).map(move |x| (x, y, z))))
-		.collect();
-
-	// Capture grid as a slice for parallel access (read-only)
-	let grid_slice: &[f32] = &grid;
-	let cube_results: Vec<_> = cube_coords
-		.into_par_iter()
-		.filter_map(|(x, y, z)| {
-			// Corner scalar values (standard MC corner ordering assumed by your helpers)
-			// Inline index calculation: (y * nz + z) * nx + x
-			let corners = [
-				grid_slice[(y * nz + z) * nx + x],                   // 0 (0,0,0)
-				grid_slice[(y * nz + z) * nx + (x + 1)],             // 1 (1,0,0)
-				grid_slice[(y * nz + (z + 1)) * nx + (x + 1)],       // 2 (1,0,1)
-				grid_slice[(y * nz + (z + 1)) * nx + x],             // 3 (0,0,1)
-				grid_slice[((y + 1) * nz + z) * nx + x],             // 4 (0,1,0)
-				grid_slice[((y + 1) * nz + z) * nx + (x + 1)],       // 5 (1,1,0)
-				grid_slice[((y + 1) * nz + (z + 1)) * nx + (x + 1)], // 6 (1,1,1)
-				grid_slice[((y + 1) * nz + (z + 1)) * nx + x],       // 7 (0,1,1)
-			];
-
-			let cube_index = get_cube_index(corners);
-			if cube_index == 0 || cube_index == 255 {
-				return None; // fully inside or outside
-			}
-
-			// Local-space cube origin (NOTE: local X/Z, absolute Y)
-			let cube_pos_local =
-				Vec3::new(x as f32 * cube_size, y_min + y as f32 * cube_size, z as f32 * cube_size);
-
-			// Per-cube edge vertex cache (12 edges)
-			let mut edge_vert: [Option<u32>; 12] = [None; 12];
-
-			let mut cube_vertices = Vec::new();
-			let mut cube_indices = Vec::new();
-
-			let tri = &TRIANGULATIONS[cube_index];
-			let mut i = 0;
-			while i + 2 < tri.len() {
-				let e0 = tri[i];
-				if e0 < 0 {
-					break;
-				}
-				let e1 = tri[i + 1];
-				if e1 < 0 {
-					break;
-				}
-				let e2 = tri[i + 2];
-				if e2 < 0 {
-					break;
-				}
-
-				let mut get_vert = |edge: usize| -> u32 {
-					if let Some(v) = edge_vert[edge] {
-						return v;
-					}
-					let pos_local = interpolate_vertex(edge, cube_pos_local, cube_size, corners);
-					let v_index = cube_vertices.len() as u32;
-					cube_vertices.push([pos_local.x, pos_local.y, pos_local.z]);
-					edge_vert[edge] = Some(v_index);
-					v_index
-				};
-
-				let v0 = get_vert(e0 as usize);
-				let v1 = get_vert(e1 as usize);
-				let v2 = get_vert(e2 as usize);
-
-				cube_indices.extend_from_slice(&[v0, v1, v2]);
-				i += 3;
-			}
-
-			if cube_vertices.is_empty() {
-				None
-			} else {
-				Some((cube_vertices, cube_indices))
-			}
-		})
-		.collect();
-
-	// Merge all cube results with proper index offsets
-	let mut vertices: Vec<[f32; 3]> = Vec::new();
-	let mut indices: Vec<u32> = Vec::new();
-
-	for (cube_vertices, cube_indices) in cube_results {
-		let vertex_offset = vertices.len() as u32;
-		vertices.extend(cube_vertices);
-		indices.extend(cube_indices.iter().map(|&idx| idx + vertex_offset));
-	}
-
-	// ---------- Normals & UVs (parallelized) ---------------------------------
-	// Normals: sample SDF gradient in WORLD space for shading correctness.
-	// Convert local X/Z back to world by adding chunk_origin; Y is already absolute.
-	let normals: Vec<[f32; 3]> = vertices
-		.par_iter()
-		.map(|v| {
-			let world = Vec3::new(v[0] + chunk_origin.x, v[1], v[2] + chunk_origin.z);
-			calculate_sdf_normal(sdf.as_ref(), world).into()
-		})
-		.collect();
-
-	// Simple tiled UVs (local X/Z across the chunk)
-	let uvs: Vec<[f32; 2]> =
-		vertices.par_iter().map(|v| [v[0] / chunk_size, v[2] / chunk_size]).collect();
-
-	// ---------- Mesh ---------------------------------------------------------
-	let mut mesh = Mesh::new(
-		bevy::render::mesh::PrimitiveTopology::TriangleList,
-		bevy::render::render_asset::RenderAssetUsages::RENDER_WORLD,
+	// Create GPU pipeline
+	let pipeline = GpuMarchingCubesPipeline::new(
+		device,
+		pipeline_cache,
+		asset_server,
+		shaders,
+		sampling,
+		config,
+		bounds,
+		config.seed as i32,
 	);
-	mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
-	mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-	mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-	mesh.insert_indices(bevy::render::mesh::Indices::U32(indices));
-	mesh
+
+	// Compute mesh on GPU
+	let gpu_data = pipeline.compute(device, queue);
+
+	// Convert to Bevy Mesh
+	TerrainMeshSpawner::mesh_from_gpu_data(&gpu_data)
 }
 
 /// Calculate normal from SDF gradient
-fn calculate_sdf_normal(sdf: &dyn Sdf, p: Vec3) -> Vec3 {
+pub(crate) fn calculate_sdf_normal(sdf: &dyn Sdf, p: Vec3) -> Vec3 {
 	// Use smaller epsilon to avoid exaggerating streaks
 	let epsilon = 0.0005;
 	let dx = sdf.distance(Vec3::new(p.x + epsilon, p.y, p.z))
@@ -395,10 +271,25 @@ pub fn spawn_chunk(
 	_world_size_chunks: i32,
 	resolution: usize,
 	config: &TerrainConfig,
+	device: &RenderDevice,
+	queue: &RenderQueue,
+	pipeline_cache: &mut bevy::render::render_resource::PipelineCache,
+	asset_server: &AssetServer,
+	shaders: &Assets<bevy::render::render_resource::Shader>,
 	// feature_registry: Option<&FeatureRegistry>,
 ) -> Entity {
 	// Use unwrapped coordinate for mesh generation to ensure seamless terrain
-	let mesh = generate_chunk_mesh(&unwrapped_coord, chunk_size, resolution, config);
+	let mesh = generate_chunk_mesh(
+		&unwrapped_coord,
+		chunk_size,
+		resolution,
+		config,
+		device,
+		queue,
+		pipeline_cache,
+		asset_server,
+		shaders,
+	);
 	let mesh_handle = meshes.add(mesh);
 
 	// Make the origin chunk (0, 0) reddish for easy verification

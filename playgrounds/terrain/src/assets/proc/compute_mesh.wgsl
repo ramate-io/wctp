@@ -6,8 +6,8 @@
 // ============================================================================
 
 struct Sampling3D {
-    world_origin : vec3<f32>,   // world offset (chunk_origin)
-    world_size   : vec3<f32>,   // chunk size in world units
+    chunk_origin : vec3<f32>,   // world offset (chunk_origin)
+    chunk_size   : vec3<f32>,   // chunk size in world units
     resolution   : vec3<u32>,   // voxel resolution (nx, ny, nz)
 };
 
@@ -44,7 +44,7 @@ var<uniform> seed : i32;
 // ----------------------------------------------------------------------------
 fn sdf_normal(p : vec3<f32>, config : TerrainConfig, bounds : Bounds, seed   : i32) -> vec3<f32> {
     // Scale epsilon to voxel size so normals stay stable across LOD
-    let voxel = sampling.world_size / vec3<f32>(sampling.resolution);
+    let voxel = sampling.chunk_size / vec3<f32>(sampling.resolution);
     let eps   = min(voxel.x, min(voxel.y, voxel.z)) * 0.5;
 
     let dx = sdf(vec3<f32>(p.x + eps, p.y,        p.z       ), terrain_config, bounds, seed) -
@@ -87,8 +87,8 @@ fn compute_mesh(@builtin(global_invocation_id) gid : vec3<u32>) {
     let tri_base = tri_offset[flat];
 
     let grid_f    = vec3<f32>(f32(gid.x), f32(gid.y), f32(gid.z));
-    let cell_size = sampling.world_size / vec3<f32>(sampling.resolution);
-    let p         = sampling.world_origin + grid_f * cell_size;
+    let cell_size = sampling.chunk_size / vec3<f32>(sampling.resolution);
+    let p         = sampling.chunk_origin + grid_f * cell_size;
 
     // Corner SDF reuse
     let corner = array<f32, 8>(
@@ -132,12 +132,12 @@ fn compute_mesh(@builtin(global_invocation_id) gid : vec3<u32>) {
         out_normals[base + 2u] = sdf_normal(v2, terrain_config, bounds, seed);
 
         // UVs: tile over the chunk in local XZ
-        let local0 = v0 - sampling.world_origin;
-        let local1 = v1 - sampling.world_origin;
-        let local2 = v2 - sampling.world_origin;
+        let local0 = v0 - sampling.chunk_origin;
+        let local1 = v1 - sampling.chunk_origin;
+        let local2 = v2 - sampling.chunk_origin;
 
-        let size_x = sampling.world_size.x;
-        let size_z = sampling.world_size.z;
+        let size_x = sampling.chunk_size.x;
+        let size_z = sampling.chunk_size.z;
 
         out_uvs[base + 0u] = vec2<f32>(local0.x / size_x, local0.z / size_z);
         out_uvs[base + 1u] = vec2<f32>(local1.x / size_x, local1.z / size_z);
