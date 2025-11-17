@@ -6,7 +6,9 @@ mod chunk;
 mod chunk_manager;
 mod cpu;
 mod geography;
+mod gpu;
 mod marching_cubes;
+mod mesh_generator;
 pub mod pipeline;
 pub mod sdf;
 pub mod shaders;
@@ -40,6 +42,7 @@ impl Plugin for TerrainPlugin {
 			.insert_resource(ChunkConfig::default())
 			.insert_resource(LoadedChunks::default())
 			.insert_resource(feature_registry)
+			.insert_resource(mesh_generator::MeshGenerationMode::Cpu) // Default to CPU mode
 			.add_systems(Startup, (camera::setup_camera, setup_lighting, ui::setup_debug_ui))
 			.add_systems(
 				Update,

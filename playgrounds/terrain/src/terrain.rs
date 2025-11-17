@@ -7,7 +7,6 @@ use crate::sdf::{
 	Difference, Ellipse3d, PerlinTerrainSdf, Sdf, TubeSdf,
 };
 use bevy::prelude::*;
-use bevy::render::renderer::{RenderDevice, RenderQueue};
 use noise::Perlin;
 
 /// Resource containing the terrain SDF for runtime queries
