@@ -1,6 +1,9 @@
 use crate::chunk::{get_chunks_to_load, ChunkConfig, ChunkCoord, LoadedChunks, TerrainChunk};
-use crate::terrain::{spawn_chunk, TerrainConfig};
+use crate::mesh_generator::{MeshGenerationMode, MeshGenerator};
+use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
+use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
+use bevy::render::renderer::{RenderDevice, RenderQueue};
 
 /// System that manages chunk loading and unloading based on camera position
 pub fn manage_chunks(
@@ -12,8 +15,26 @@ pub fn manage_chunks(
 	chunk_config: Res<ChunkConfig>,
 	terrain_config: Res<TerrainConfig>,
 	mut loaded_chunks: ResMut<LoadedChunks>,
+	mesh_mode: Res<MeshGenerationMode>,
+	// GPU resources (required for GPU mode, optional for CPU mode)
+	render_device: Option<Res<RenderDevice>>,
+	render_queue: Option<Res<RenderQueue>>,
+	pipelines: Option<Res<MarchingCubesPipelines>>,
 	// feature_registry: Option<Res<crate::geography::FeatureRegistry>>,
 ) {
+	// Early return if GPU mode is requested but resources aren't available yet
+	if *mesh_mode == MeshGenerationMode::Gpu {
+		log::info!(
+			"GPU mode requested, checking resources: {:?} {:?} {:?}",
+			render_device.is_some(),
+			render_queue.is_some(),
+			pipelines.is_some(),
+		);
+		if render_device.is_none() || render_queue.is_none() || pipelines.is_none() {
+			warn!("GPU mode requested but resources aren't available");
+			return;
+		}
+	}
 	let Ok(camera_transform) = camera_query.single() else {
 		return;
 	};
@@ -88,7 +109,8 @@ pub fn manage_chunks(
 		} else {
 			center_wrapped.manhattan_distance(&coord, i32::MAX)
 		};
-		spawn_chunk(
+		MeshGenerator::spawn_chunk(
+			*mesh_mode,
 			&mut commands,
 			&mut meshes,
 			&mut materials,
@@ -98,7 +120,9 @@ pub fn manage_chunks(
 			chunk_config.world_size_chunks,
 			new_resolution,
 			&terrain_config,
-			// feature_registry.as_deref(),
+			render_device.as_deref(),
+			render_queue.as_deref(),
+			pipelines.as_deref(),
 		);
 		loaded_chunks.mark_loaded(coord);
 		log::debug!(
@@ -124,7 +148,8 @@ pub fn manage_chunks(
 			// Get resolution for this distance
 			let resolution = terrain_config.resolution_for_distance(distance);
 
-			spawn_chunk(
+			MeshGenerator::spawn_chunk(
+				*mesh_mode,
 				&mut commands,
 				&mut meshes,
 				&mut materials,
@@ -134,7 +159,9 @@ pub fn manage_chunks(
 				chunk_config.world_size_chunks,
 				resolution,
 				&terrain_config,
-				// feature_registry.as_deref(),
+				render_device.as_deref(),
+				render_queue.as_deref(),
+				pipelines.as_deref(),
 			);
 			loaded_chunks.mark_loaded(chunk_info.wrapped);
 		}

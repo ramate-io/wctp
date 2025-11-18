@@ -50,7 +50,7 @@
           coreutils
           gcc
           rust
-          dafny
+          wayland
           python311
            (texlive.withPackages (ps: with ps; [
             chktex

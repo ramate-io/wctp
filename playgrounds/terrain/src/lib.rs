@@ -4,13 +4,16 @@ use std::f32::consts::PI;
 mod camera;
 mod chunk;
 mod chunk_manager;
+mod cpu;
 mod geography;
+mod gpu;
 mod marching_cubes;
+mod mesh_generator;
+pub mod pipeline;
 pub mod sdf;
 pub mod shaders;
 mod terrain;
 mod ui;
-mod units;
 
 pub use geography::FeatureRegistry;
 
@@ -30,9 +33,7 @@ impl Plugin for TerrainPlugin {
 			.add_feature(Box::new(geography::canyons::CanyonFeature::new(self.seed, 1000)));
 
 		let terrain_config = TerrainConfig::new(self.seed);
-		let terrain_sdf = terrain::TerrainSdf {
-			sdf: terrain::create_terrain_sdf(&terrain_config),
-		};
+		let terrain_sdf = terrain::TerrainSdf { sdf: terrain::create_terrain_sdf(&terrain_config) };
 
 		app.insert_resource(terrain_config)
 			.insert_resource(terrain_sdf)
@@ -40,6 +41,7 @@ impl Plugin for TerrainPlugin {
 			.insert_resource(ChunkConfig::default())
 			.insert_resource(LoadedChunks::default())
 			.insert_resource(feature_registry)
+			.insert_resource(mesh_generator::MeshGenerationMode::Cpu) // Default to GPU mode
 			.add_systems(Startup, (camera::setup_camera, setup_lighting, ui::setup_debug_ui))
 			.add_systems(
 				Update,
@@ -47,9 +49,27 @@ impl Plugin for TerrainPlugin {
 					camera::camera_controller,
 					chunk_manager::manage_chunks,
 					ui::update_coordinate_display,
-					units::spawn_attached_cube,
 				),
 			);
+
+		// Set up RenderApp systems for GPU pipeline initialization
+		app.sub_app_mut(bevy::render::RenderApp).add_systems(
+			bevy::render::Render,
+			pipeline::proc::render_setup::queue_marching_cubes_pipelines
+				.in_set(bevy::render::RenderSystems::Prepare),
+		);
+
+		app.sub_app_mut(bevy::render::RenderApp).add_systems(
+			bevy::render::Render,
+			pipeline::proc::render_setup::init_marching_cubes_pipelines
+				.in_set(bevy::render::RenderSystems::Prepare),
+		);
+
+		// Extract pipelines from RenderApp to MainApp in Extract schedule
+		app.add_systems(
+			bevy::render::ExtractSchedule,
+			pipeline::proc::render_setup::extract_pipelines_to_main_world,
+		);
 	}
 }
 

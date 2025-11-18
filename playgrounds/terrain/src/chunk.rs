@@ -135,9 +135,9 @@ impl Default for ChunkConfig {
 		Self {
 			// 10 km (100 x 100 meters)
 			chunk_size: 100.0,
-			load_radius: 10, // load out to 100 km
+			load_radius: 10,         // load out to 100 km
 			max_render_distance: 10, // render out to 100 km
-			world_size_chunks: 512, // 512x512 chunks = 25600x25600 world units, wraps around, 2560 km
+			world_size_chunks: 512,  // 512x512 chunks = 25600x25600 world units, wraps around, 2560 km
 		}
 	}
 }

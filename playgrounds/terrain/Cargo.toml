@@ -15,12 +15,14 @@ thiserror = { workspace = true }
 serde = { workspace = true }
 chrono = { workspace = true }
 log = { workspace = true }
+rayon = { workspace = true }
 
 # Bevy core dependencies
 bevy = { workspace = true }
 
 # Procedural generation
 noise = "0.9"
+bytemuck = { version = "1.14", features = ["derive"] }
 
 [lints]
 workspace = true

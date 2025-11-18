@@ -75,13 +75,14 @@ gloo-timers = { version = "0.2" }
 chrono = { version = "0.4.41" }
 reqwest = { version = "0.12", features = ["json"] }
 base64 = "0.22"
-bevy = { git = "https://github.com/ramate-io/bevy", rev = "390623a9289c10760e779b19c9b6c245e2179b54" }
+bevy = { version = "0.17.2" }
 js-sys = "0.3"
 log = "0.4"
 console_log = "1"
 lychee-lib = { git = "https://github.com/lycheeverse/lychee", rev = "d6c2bbe6f1e7b9e83889fc1e7fc675a38a7dd75f" }
 comrak = { version = "0.43.0" }
 pulldown-cmark = "0.13.0"
+rayon = { version = "1.11.0" }
 
 # docs
 clap-markdown-ext = { git = "https://github.com/movementlabsxyz/clap-markdown-ext.git", rev = "8f54fe424504bf37fb01dc69aaed8166e429fe6a"}

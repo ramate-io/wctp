@@ -1,7 +1,7 @@
+use crate::sdf::Sdf;
+use crate::terrain::TerrainSdf;
 use bevy::prelude::*;
 use std::f32::consts::PI;
-use crate::terrain::TerrainSdf;
-use crate::sdf::Sdf;
 
 #[derive(Component)]
 pub struct CameraController {
@@ -36,7 +36,7 @@ pub fn setup_camera(mut commands: Commands) {
 
 pub fn camera_controller(
 	keyboard_input: Res<ButtonInput<KeyCode>>,
-	mut mouse_motion: EventReader<bevy::input::mouse::MouseMotion>,
+	mut mouse_motion: MessageReader<bevy::input::mouse::MouseMotion>,
 	time: Res<Time>,
 	terrain_sdf: Res<TerrainSdf>,
 	mut query: Query<(&mut Transform, &mut CameraController), With<Camera3d>>,
@@ -132,8 +132,8 @@ fn character_mode_movement(
 	controller: &mut CameraController,
 ) {
 	const GRAVITY: f32 = -30.0; // Gravity acceleration
-	const GROUND_STICK_DISTANCE: f32 = 0.1; // How close to stick to ground
-	const CHARACTER_HEIGHT: f32 = 0.05; // Eye height above ground (2 meters)
+	const GROUND_STICK_DISTANCE: f32 = 0.0002; // stick 2 cm to ground
+	const CHARACTER_HEIGHT: f32 = 0.002; // Eye height above ground (2 meters)
 	const CHARACTER_SPEED: f32 = 0.1; // Movement speed in character mode
 	const JUMP_FORCE: f32 = 8.0; // Jump velocity
 	const GROUND_FRICTION: f32 = 0.9; // Friction when on ground
@@ -191,25 +191,25 @@ fn character_mode_movement(
 
 	// Apply velocity
 	let new_pos = pos + controller.velocity * dt;
-	
+
 	// Find terrain height at new position
 	let new_terrain_distance = terrain_sdf.sdf.distance(new_pos);
-	
+
 	// If we're going to be below ground, stick to surface
 	if new_terrain_distance < CHARACTER_HEIGHT {
 		// Use binary search to find surface height
 		let surface_height = find_surface_height(&terrain_sdf.sdf, new_pos.x, new_pos.z);
 		let target_y = surface_height + CHARACTER_HEIGHT;
-		
+
 		// Smoothly move to target height
 		let current_y = new_pos.y;
 		let target_y = target_y.max(current_y - 5.0 * dt); // Don't drop too fast
-		
+
 		// Update position: keep X and Z from movement, adjust Y to terrain
 		transform.translation.x = new_pos.x;
 		transform.translation.z = new_pos.z;
 		transform.translation.y = target_y;
-		
+
 		// Reset vertical velocity if we hit the ground
 		if new_terrain_distance <= GROUND_STICK_DISTANCE {
 			controller.velocity.y = 0.0;
@@ -252,4 +252,3 @@ fn find_surface_height(sdf: &Box<dyn Sdf>, world_x: f32, world_z: f32) -> f32 {
 	// Fallback: if binary search didn't converge, use the midpoint
 	(low + high) * 0.5
 }
-
