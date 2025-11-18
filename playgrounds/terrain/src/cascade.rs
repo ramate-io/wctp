@@ -118,4 +118,8 @@ impl<R: ResolutionMap> Cascade<R> {
 		}
 		Ok(chunks)
 	}
+
+	pub fn needs_new_chunks(&self, prev: Vec3, new: Vec3) -> bool {
+		self.position_to_origin(prev) != self.position_to_origin(new)
+	}
 }
