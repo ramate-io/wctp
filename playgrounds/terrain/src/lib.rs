@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use std::f32::consts::PI;
 
 mod camera;
+pub mod cascade;
 mod chunk;
 mod chunk_manager;
 mod cpu;
