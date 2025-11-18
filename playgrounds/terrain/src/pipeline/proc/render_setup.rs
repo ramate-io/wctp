@@ -128,7 +128,7 @@ pub fn queue_marching_cubes_pipelines(
 /// This runs every frame until all pipelines are compiled, then stores them.
 pub fn init_marching_cubes_pipelines(
 	mut commands: Commands,
-	mut pipeline_cache: ResMut<PipelineCache>,
+	pipeline_cache: ResMut<PipelineCache>,
 	ids: Option<Res<MarchingCubesPipelineIds>>,
 	// shader_handles: Option<Res<MarchingCubesShaderHandles>>,
 	// shaders: Res<Assets<Shader>>,
@@ -156,8 +156,7 @@ pub fn init_marching_cubes_pipelines(
 	log::debug!("All shaders loaded, processing pipeline queue");*/
 
 	// Process the pipeline queue to advance compilation
-	// This must be called to actually compile the queued pipelines
-	pipeline_cache.process_queue();
+	// This must be called to actually compile the queued pipeline
 
 	// Check pipeline state for debugging - this will tell us if shaders are loaded
 	let classify_state = pipeline_cache.get_compute_pipeline_state(ids.classify);
