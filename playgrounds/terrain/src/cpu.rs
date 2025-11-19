@@ -1,4 +1,5 @@
-use crate::chunk::{ChunkCoord, TerrainChunk};
+use crate::cascade::CascadeChunk;
+use crate::chunk::TerrainChunk;
 // use crate::geography::FeatureRegistry;
 use crate::sdf::Sdf;
 use crate::terrain::create_terrain_sdf;
@@ -13,19 +14,15 @@ impl CpuMeshGenerator {
 	/// Generate a terrain mesh for a specific chunk by sampling an SDF
 	/// Supports both heightfield (fast, no caves) and volumetric (marching cubes, supports caves)
 	pub fn generate_chunk_mesh(
-		chunk_coord: &ChunkCoord,
-		chunk_size: f32,
-		resolution: usize,
+		cascade_chunk: &CascadeChunk,
 		config: &TerrainConfig,
 		// feature_registry: Option<&FeatureRegistry>,
 	) -> Mesh {
-		Self::generate_chunk_mesh_volumetric(chunk_coord, chunk_size, resolution, config)
+		Self::generate_chunk_mesh_volumetric(cascade_chunk, config)
 	}
 
 	fn generate_chunk_mesh_volumetric(
-		chunk_coord: &ChunkCoord,
-		chunk_size: f32,
-		res: usize,
+		cascade_chunk: &CascadeChunk,
 		config: &TerrainConfig,
 		// feature_registry: Option<&FeatureRegistry>,
 	) -> Mesh {
@@ -33,8 +30,10 @@ impl CpuMeshGenerator {
 		let sdf = create_terrain_sdf(config);
 
 		// ---------- grid setup ---------------------------------------------------
+		let chunk_size = cascade_chunk.size;
+		let res = cascade_chunk.resolution;
 		let cube_size = chunk_size / res as f32;
-		let chunk_origin = chunk_coord.to_unwrapped_world_pos(chunk_size);
+		let chunk_origin = cascade_chunk.origin;
 
 		// Vertical sampling range in world Y
 		let y_min = -config.height_scale;
@@ -244,20 +243,16 @@ impl CpuMeshGenerator {
 		commands: &mut Commands,
 		meshes: &mut ResMut<Assets<Mesh>>,
 		materials: &mut ResMut<Assets<StandardMaterial>>,
-		wrapped_coord: ChunkCoord,
-		unwrapped_coord: ChunkCoord,
-		chunk_size: f32,
-		_world_size_chunks: i32,
-		resolution: usize,
+		cascade_chunk: CascadeChunk,
 		config: &TerrainConfig,
 		// feature_registry: Option<&FeatureRegistry>,
 	) -> Entity {
-		// Use unwrapped coordinate for mesh generation to ensure seamless terrain
-		let mesh = Self::generate_chunk_mesh(&unwrapped_coord, chunk_size, resolution, config);
+		// Generate mesh using cascade chunk
+		let mesh = Self::generate_chunk_mesh(&cascade_chunk, config);
 		let mesh_handle = meshes.add(mesh);
 
-		// Make the origin chunk (0, 0) reddish for easy verification
-		let is_origin_chunk = wrapped_coord.x == 0 && wrapped_coord.z == 0;
+		// Make the origin chunk (0, 0, 0) brown for easy verification
+		let is_origin_chunk = cascade_chunk.origin == Vec3::ZERO;
 		let base_color = if is_origin_chunk {
 			Color::hsla(46.0, 0.22, 0.62, 1.0) // brown
 		} else {
@@ -271,13 +266,13 @@ impl CpuMeshGenerator {
 			..default()
 		});
 
-		// Use unwrapped coordinate for world position (spawn at actual location)
+		// Use cascade chunk origin for world position
 		// Note: mesh vertices are in local space relative to chunk origin
-		let world_pos = unwrapped_coord.to_unwrapped_world_pos(chunk_size);
+		let world_pos = cascade_chunk.origin;
 
 		let entity = commands
 			.spawn((
-				TerrainChunk { coord: wrapped_coord, resolution }, // Store wrapped for indexing
+				TerrainChunk { chunk: cascade_chunk },
 				Mesh3d(mesh_handle.clone()),
 				MeshMaterial3d::<StandardMaterial>(material_handle.clone()),
 				Transform::from_translation(world_pos),
@@ -285,13 +280,10 @@ impl CpuMeshGenerator {
 			.id();
 
 		log::debug!(
-			"Spawned chunk (CPU) wrapped=({}, {}) unwrapped=({}, {}) at world position {:?} with resolution {}",
-			wrapped_coord.x,
-			wrapped_coord.z,
-			unwrapped_coord.x,
-			unwrapped_coord.z,
-			world_pos,
-			resolution
+			"Spawned chunk (CPU) at origin {:?} with size {} and resolution {}",
+			cascade_chunk.origin,
+			cascade_chunk.size,
+			cascade_chunk.resolution
 		);
 
 		entity

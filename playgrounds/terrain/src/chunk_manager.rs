@@ -1,9 +1,24 @@
-use crate::chunk::{get_chunks_to_load, ChunkConfig, ChunkCoord, LoadedChunks, TerrainChunk};
+use crate::cascade::{Cascade, ConstantResolutionMap};
+use crate::chunk::{ChunkConfig, LoadedChunks, TerrainChunk, Vec3Key};
 use crate::mesh_generator::{MeshGenerationMode, MeshGenerator};
 use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
+use std::collections::HashSet;
+
+/// Helper function to wrap a Vec3 coordinate within world bounds
+/// If world_size is 0, returns the coordinate unchanged (no wrapping)
+fn wrap_coordinate(pos: Vec3, world_size: f32) -> Vec3 {
+	if world_size <= 0.0 {
+		return pos;
+	}
+	Vec3::new(
+		((pos.x % world_size) + world_size) % world_size,
+		((pos.y % world_size) + world_size) % world_size,
+		((pos.z % world_size) + world_size) % world_size,
+	)
+}
 
 /// System that manages chunk loading and unloading based on camera position
 pub fn manage_chunks(
@@ -41,129 +56,76 @@ pub fn manage_chunks(
 
 	let camera_pos = camera_transform.translation;
 
-	// Determine which chunks should be loaded
-	let chunks_to_load = get_chunks_to_load(camera_pos, &chunk_config);
-	let chunks_to_load_set: std::collections::HashSet<ChunkCoord> =
-		chunks_to_load.iter().map(|info| info.wrapped).collect();
+	// Create cascade instance
+	let cascade = Cascade {
+		min_size: chunk_config.min_size,
+		number_of_rings: chunk_config.number_of_rings,
+		resolution_map: ConstantResolutionMap { resolution: terrain_config.base_resolution },
+	};
 
-	let (center_wrapped, _center_unwrapped) = ChunkCoord::from_world_pos(
-		camera_pos,
-		chunk_config.chunk_size,
-		chunk_config.world_size_chunks,
-	);
+	// Get chunks from cascade
+	let chunks_to_load = match cascade.chunks(camera_pos) {
+		Ok(chunks) => chunks,
+		Err(e) => {
+			log::error!("Failed to get cascade chunks: {}", e);
+			return;
+		}
+	};
 
-	// Check existing chunks for resolution updates or unloading
-	let mut chunks_to_unload = Vec::new();
-	let mut chunks_to_regenerate = Vec::new();
-
-	for (entity, chunk) in chunk_query.iter() {
-		// Wrap chunk coordinate for comparison
-		let wrapped_chunk_coord = if chunk_config.world_size_chunks > 0 {
-			chunk.coord.wrap(chunk_config.world_size_chunks)
-		} else {
-			chunk.coord
-		};
-
-		if !chunks_to_load_set.contains(&wrapped_chunk_coord) {
-			// Chunk is out of range, unload it
-			chunks_to_unload.push((entity, chunk.coord));
-		} else {
-			// Chunk is still in range, check if resolution needs updating
-			let distance = if chunk_config.world_size_chunks > 0 {
-				center_wrapped
-					.manhattan_distance(&wrapped_chunk_coord, chunk_config.world_size_chunks)
+	// Create set of chunk origins for quick lookup (with wrapping)
+	let chunks_to_load_set: HashSet<Vec3Key> = chunks_to_load
+		.iter()
+		.map(|chunk| {
+			let wrapped_origin = if chunk_config.world_size > 0.0 {
+				wrap_coordinate(chunk.origin, chunk_config.world_size)
 			} else {
-				center_wrapped.manhattan_distance(&wrapped_chunk_coord, i32::MAX)
+				chunk.origin
 			};
-			let required_resolution = terrain_config.resolution_for_distance(distance);
+			Vec3Key(wrapped_origin)
+		})
+		.collect();
 
-			if chunk.resolution != required_resolution {
-				// Resolution changed, need to regenerate
-				chunks_to_regenerate.push((entity, wrapped_chunk_coord, required_resolution));
-			}
+	// Helper to wrap a chunk origin
+	let wrap_chunk_origin = |origin: Vec3| -> Vec3 {
+		if chunk_config.world_size > 0.0 {
+			wrap_coordinate(origin, chunk_config.world_size)
+		} else {
+			origin
+		}
+	};
+
+	// Check existing chunks for unloading
+	let mut chunks_to_unload = Vec::new();
+	for (entity, chunk) in chunk_query.iter() {
+		let wrapped_origin = wrap_chunk_origin(chunk.chunk.origin);
+		if !chunks_to_load_set.contains(&Vec3Key(wrapped_origin)) {
+			chunks_to_unload.push((entity, chunk.chunk.origin));
 		}
 	}
 
 	// Unload chunks that are too far away
-	for (entity, coord) in chunks_to_unload {
+	for (entity, origin) in chunks_to_unload {
 		commands.entity(entity).despawn();
-		loaded_chunks.mark_unloaded(&coord);
-		log::debug!("Unloaded chunk at ({}, {})", coord.x, coord.z);
+		loaded_chunks.mark_unloaded(&wrap_chunk_origin(origin));
+		log::debug!("Unloaded chunk at {:?}", origin);
 	}
 
-	// Regenerate chunks that need resolution updates
-	for (entity, coord, new_resolution) in chunks_to_regenerate {
-		commands.entity(entity).despawn();
-		loaded_chunks.mark_unloaded(&coord);
-
-		// Respawn at new resolution
-		// Find the unwrapped coordinate for this wrapped coord
-		let unwrapped_coord = chunks_to_load
-			.iter()
-			.find(|info| info.wrapped == coord)
-			.map(|info| info.unwrapped)
-			.unwrap_or(coord);
-
-		let distance = if chunk_config.world_size_chunks > 0 {
-			center_wrapped.manhattan_distance(&coord, chunk_config.world_size_chunks)
-		} else {
-			center_wrapped.manhattan_distance(&coord, i32::MAX)
-		};
-		MeshGenerator::spawn_chunk(
-			*mesh_mode,
-			&mut commands,
-			&mut meshes,
-			&mut materials,
-			coord,           // Store wrapped coord for indexing
-			unwrapped_coord, // Use unwrapped for world position
-			chunk_config.chunk_size,
-			chunk_config.world_size_chunks,
-			new_resolution,
-			&terrain_config,
-			render_device.as_deref(),
-			render_queue.as_deref(),
-			pipelines.as_deref(),
-		);
-		loaded_chunks.mark_loaded(coord);
-		log::debug!(
-			"Regenerated chunk at ({}, {}) from distance {} with resolution {}",
-			coord.x,
-			coord.z,
-			distance,
-			new_resolution
-		);
-	}
-
-	// Load new chunks with appropriate resolution based on distance
-	for chunk_info in chunks_to_load {
-		if !loaded_chunks.is_loaded(&chunk_info.wrapped) {
-			// Calculate Manhattan distance from camera chunk (with wrapping)
-			let distance = if chunk_config.world_size_chunks > 0 {
-				center_wrapped
-					.manhattan_distance(&chunk_info.wrapped, chunk_config.world_size_chunks)
-			} else {
-				center_wrapped.manhattan_distance(&chunk_info.wrapped, i32::MAX)
-			};
-
-			// Get resolution for this distance
-			let resolution = terrain_config.resolution_for_distance(distance);
-
+	// Load new chunks from cascade
+	for cascade_chunk in chunks_to_load {
+		let wrapped_origin = wrap_chunk_origin(cascade_chunk.origin);
+		if !loaded_chunks.is_loaded(&wrapped_origin) {
 			MeshGenerator::spawn_chunk(
 				*mesh_mode,
 				&mut commands,
 				&mut meshes,
 				&mut materials,
-				chunk_info.wrapped,   // Store wrapped for indexing
-				chunk_info.unwrapped, // Use unwrapped for world position
-				chunk_config.chunk_size,
-				chunk_config.world_size_chunks,
-				resolution,
+				cascade_chunk,
 				&terrain_config,
 				render_device.as_deref(),
 				render_queue.as_deref(),
 				pipelines.as_deref(),
 			);
-			loaded_chunks.mark_loaded(chunk_info.wrapped);
+			loaded_chunks.mark_loaded(wrapped_origin);
 		}
 	}
 }

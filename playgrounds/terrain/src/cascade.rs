@@ -177,7 +177,7 @@ impl<R: ResolutionMap> Cascade<R> {
 	///
 	/// For the most part, total world size should be a multiple of this value,
 	/// s.t. coordinate wrap arounds align nicely with the chunks.
-	pub fn pan(&self) -> f32 {
+	pub fn span(&self) -> f32 {
 		self.min_size * 3_u32.pow(self.number_of_rings as u32) as f32
 	}
 }
