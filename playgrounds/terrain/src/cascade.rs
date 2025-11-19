@@ -170,6 +170,16 @@ impl<R: ResolutionMap> Cascade<R> {
 	pub fn needs_new_chunks(&self, prev: Vec3, new: Vec3) -> bool {
 		self.position_to_origin(prev) != self.position_to_origin(new)
 	}
+
+	/// Computes the number of units in x = y = z that the cube formed by the cascade spans
+	///
+	/// This is merely the the largest of the rings in the cascade.
+	///
+	/// For the most part, total world size should be a multiple of this value,
+	/// s.t. coordinate wrap arounds align nicely with the chunks.
+	pub fn pan(&self) -> f32 {
+		self.min_size * 3_u32.pow(self.number_of_rings as u32) as f32
+	}
 }
 
 #[derive(Debug, Clone, Copy)]
