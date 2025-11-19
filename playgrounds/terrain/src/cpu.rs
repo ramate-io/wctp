@@ -13,11 +13,12 @@ pub struct CpuMeshGenerator;
 impl CpuMeshGenerator {
 	/// Generate a terrain mesh for a specific chunk by sampling an SDF
 	/// Supports both heightfield (fast, no caves) and volumetric (marching cubes, supports caves)
+	/// Returns None if the chunk is entirely above the terrain surface
 	pub fn generate_chunk_mesh(
 		cascade_chunk: &CascadeChunk,
 		config: &TerrainConfig,
 		// feature_registry: Option<&FeatureRegistry>,
-	) -> Mesh {
+	) -> Option<Mesh> {
 		Self::generate_chunk_mesh_volumetric(cascade_chunk, config)
 	}
 
@@ -25,15 +26,16 @@ impl CpuMeshGenerator {
 		cascade_chunk: &CascadeChunk,
 		config: &TerrainConfig,
 		// feature_registry: Option<&FeatureRegistry>,
-	) -> Mesh {
-		// Use the same SDF creation logic
-		let sdf = create_terrain_sdf(config);
-
+	) -> Option<Mesh> {
 		// ---------- grid setup ---------------------------------------------------
 		let chunk_size = cascade_chunk.size;
 		let res = cascade_chunk.resolution;
 		let cube_size = chunk_size / res as f32;
 		let chunk_origin = cascade_chunk.origin;
+
+		// ---------- early exit optimization: check if chunk is above terrain -------
+		// Create the real SDF (with all modulations/combinators) for height checking
+		let sdf = create_terrain_sdf(config);
 
 		// Grid resolution (sample points); cubes are (n-1) in each axis
 		// Y is now treated the same as X and Z - a voxel cube
@@ -207,7 +209,7 @@ impl CpuMeshGenerator {
 		mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
 		mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
 		mesh.insert_indices(bevy::mesh::Indices::U32(indices));
-		mesh
+		Some(mesh)
 	}
 
 	/// Calculate normal from SDF gradient
@@ -240,7 +242,15 @@ impl CpuMeshGenerator {
 		// feature_registry: Option<&FeatureRegistry>,
 	) -> Entity {
 		// Generate mesh using cascade chunk
-		let mesh = Self::generate_chunk_mesh(&cascade_chunk, config);
+		let Some(mesh) = Self::generate_chunk_mesh(&cascade_chunk, config) else {
+			// Chunk is entirely above terrain, don't spawn it
+			log::info!(
+				"Skipping chunk at origin {:?} - entirely above terrain",
+				cascade_chunk.origin
+			);
+			// Return a dummy entity that will be cleaned up
+			return commands.spawn_empty().id();
+		};
 		let mesh_handle = meshes.add(mesh);
 
 		// Make the origin chunk (0, 0, 0) brown for easy verification

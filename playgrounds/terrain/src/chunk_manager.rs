@@ -115,9 +115,13 @@ pub fn manage_chunks(
 		let wrapped_origin = wrap_chunk_origin(cascade_chunk.origin);
 		if !loaded_chunks.is_loaded(&wrapped_origin) {
 			// if the cascde chunk origin is greater than max height or less than min height, skip
-			if cascade_chunk.origin.y > 20.0 || cascade_chunk.origin.y < -20.0 {
+			/*if cascade_chunk.origin.y > 20.0 || cascade_chunk.origin.y < -100.0 {
+				log::info!(
+					"Skipping chunk at origin {:?} - y is greater than 20 or less than -100",
+					cascade_chunk.origin
+				);
 				continue;
-			}
+			}*/
 
 			MeshGenerator::spawn_chunk(
 				*mesh_mode,
