@@ -188,160 +188,165 @@ mod tests {
 	use super::*;
 	use std::collections::BTreeSet;
 
-	fn zeroth_ring(size: f32, resolution: usize) -> Vec<CascadeChunk> {
+	fn zeroth_ring(size: f32, resolution: usize, lower_left_bottom: Vec3) -> Vec<CascadeChunk> {
 		// Explicit reference for all 27 chunks of a 3x3x3 cube
-		// Organized by z-level: z = -1, z = 0, z = 1
+		// Organized by z-level: z = 0, z = 1, z = 2
+		// Each chunk origin is relative to lower_left_bottom with offsets 0, 1, or 2
 		vec![
-			// z = -1 level (9 chunks)
-			CascadeChunk {
-				origin: Vec3::new(-1.0 * size, -1.0 * size, -1.0 * size),
-				size,
-				resolution,
-			},
-			CascadeChunk {
-				origin: Vec3::new(0.0 * size, -1.0 * size, -1.0 * size),
-				size,
-				resolution,
-			},
-			CascadeChunk {
-				origin: Vec3::new(1.0 * size, -1.0 * size, -1.0 * size),
-				size,
-				resolution,
-			},
-			CascadeChunk {
-				origin: Vec3::new(-1.0 * size, 0.0 * size, -1.0 * size),
-				size,
-				resolution,
-			},
-			CascadeChunk {
-				origin: Vec3::new(0.0 * size, 0.0 * size, -1.0 * size),
-				size,
-				resolution,
-			},
-			CascadeChunk {
-				origin: Vec3::new(1.0 * size, 0.0 * size, -1.0 * size),
-				size,
-				resolution,
-			},
-			CascadeChunk {
-				origin: Vec3::new(-1.0 * size, 1.0 * size, -1.0 * size),
-				size,
-				resolution,
-			},
-			CascadeChunk {
-				origin: Vec3::new(0.0 * size, 1.0 * size, -1.0 * size),
-				size,
-				resolution,
-			},
-			CascadeChunk {
-				origin: Vec3::new(1.0 * size, 1.0 * size, -1.0 * size),
-				size,
-				resolution,
-			},
 			// z = 0 level (9 chunks)
 			CascadeChunk {
-				origin: Vec3::new(-1.0 * size, -1.0 * size, 0.0 * size),
+				origin: lower_left_bottom + Vec3::new(0.0 * size, 0.0 * size, 0.0 * size),
 				size,
 				resolution,
 			},
 			CascadeChunk {
-				origin: Vec3::new(0.0 * size, -1.0 * size, 0.0 * size),
+				origin: lower_left_bottom + Vec3::new(1.0 * size, 0.0 * size, 0.0 * size),
 				size,
 				resolution,
 			},
 			CascadeChunk {
-				origin: Vec3::new(1.0 * size, -1.0 * size, 0.0 * size),
+				origin: lower_left_bottom + Vec3::new(2.0 * size, 0.0 * size, 0.0 * size),
 				size,
 				resolution,
 			},
 			CascadeChunk {
-				origin: Vec3::new(-1.0 * size, 0.0 * size, 0.0 * size),
+				origin: lower_left_bottom + Vec3::new(0.0 * size, 1.0 * size, 0.0 * size),
 				size,
 				resolution,
 			},
 			CascadeChunk {
-				origin: Vec3::new(0.0 * size, 0.0 * size, 0.0 * size),
+				origin: lower_left_bottom + Vec3::new(1.0 * size, 1.0 * size, 0.0 * size),
 				size,
 				resolution,
 			}, // center
 			CascadeChunk {
-				origin: Vec3::new(1.0 * size, 0.0 * size, 0.0 * size),
+				origin: lower_left_bottom + Vec3::new(2.0 * size, 1.0 * size, 0.0 * size),
 				size,
 				resolution,
 			},
 			CascadeChunk {
-				origin: Vec3::new(-1.0 * size, 1.0 * size, 0.0 * size),
+				origin: lower_left_bottom + Vec3::new(0.0 * size, 2.0 * size, 0.0 * size),
 				size,
 				resolution,
 			},
 			CascadeChunk {
-				origin: Vec3::new(0.0 * size, 1.0 * size, 0.0 * size),
+				origin: lower_left_bottom + Vec3::new(1.0 * size, 2.0 * size, 0.0 * size),
 				size,
 				resolution,
 			},
 			CascadeChunk {
-				origin: Vec3::new(1.0 * size, 1.0 * size, 0.0 * size),
+				origin: lower_left_bottom + Vec3::new(2.0 * size, 2.0 * size, 0.0 * size),
 				size,
 				resolution,
 			},
 			// z = 1 level (9 chunks)
 			CascadeChunk {
-				origin: Vec3::new(-1.0 * size, -1.0 * size, 1.0 * size),
+				origin: lower_left_bottom + Vec3::new(0.0 * size, 0.0 * size, 1.0 * size),
 				size,
 				resolution,
 			},
 			CascadeChunk {
-				origin: Vec3::new(0.0 * size, -1.0 * size, 1.0 * size),
+				origin: lower_left_bottom + Vec3::new(1.0 * size, 0.0 * size, 1.0 * size),
 				size,
 				resolution,
 			},
 			CascadeChunk {
-				origin: Vec3::new(1.0 * size, -1.0 * size, 1.0 * size),
+				origin: lower_left_bottom + Vec3::new(2.0 * size, 0.0 * size, 1.0 * size),
 				size,
 				resolution,
 			},
 			CascadeChunk {
-				origin: Vec3::new(-1.0 * size, 0.0 * size, 1.0 * size),
+				origin: lower_left_bottom + Vec3::new(0.0 * size, 1.0 * size, 1.0 * size),
 				size,
 				resolution,
 			},
 			CascadeChunk {
-				origin: Vec3::new(0.0 * size, 0.0 * size, 1.0 * size),
+				origin: lower_left_bottom + Vec3::new(1.0 * size, 1.0 * size, 1.0 * size),
 				size,
 				resolution,
 			},
 			CascadeChunk {
-				origin: Vec3::new(1.0 * size, 0.0 * size, 1.0 * size),
+				origin: lower_left_bottom + Vec3::new(2.0 * size, 1.0 * size, 1.0 * size),
 				size,
 				resolution,
 			},
 			CascadeChunk {
-				origin: Vec3::new(-1.0 * size, 1.0 * size, 1.0 * size),
+				origin: lower_left_bottom + Vec3::new(0.0 * size, 2.0 * size, 1.0 * size),
 				size,
 				resolution,
 			},
 			CascadeChunk {
-				origin: Vec3::new(0.0 * size, 1.0 * size, 1.0 * size),
+				origin: lower_left_bottom + Vec3::new(1.0 * size, 2.0 * size, 1.0 * size),
 				size,
 				resolution,
 			},
 			CascadeChunk {
-				origin: Vec3::new(1.0 * size, 1.0 * size, 1.0 * size),
+				origin: lower_left_bottom + Vec3::new(2.0 * size, 2.0 * size, 1.0 * size),
+				size,
+				resolution,
+			},
+			// z = 2 level (9 chunks)
+			CascadeChunk {
+				origin: lower_left_bottom + Vec3::new(0.0 * size, 0.0 * size, 2.0 * size),
+				size,
+				resolution,
+			},
+			CascadeChunk {
+				origin: lower_left_bottom + Vec3::new(1.0 * size, 0.0 * size, 2.0 * size),
+				size,
+				resolution,
+			},
+			CascadeChunk {
+				origin: lower_left_bottom + Vec3::new(2.0 * size, 0.0 * size, 2.0 * size),
+				size,
+				resolution,
+			},
+			CascadeChunk {
+				origin: lower_left_bottom + Vec3::new(0.0 * size, 1.0 * size, 2.0 * size),
+				size,
+				resolution,
+			},
+			CascadeChunk {
+				origin: lower_left_bottom + Vec3::new(1.0 * size, 1.0 * size, 2.0 * size),
+				size,
+				resolution,
+			},
+			CascadeChunk {
+				origin: lower_left_bottom + Vec3::new(2.0 * size, 1.0 * size, 2.0 * size),
+				size,
+				resolution,
+			},
+			CascadeChunk {
+				origin: lower_left_bottom + Vec3::new(0.0 * size, 2.0 * size, 2.0 * size),
+				size,
+				resolution,
+			},
+			CascadeChunk {
+				origin: lower_left_bottom + Vec3::new(1.0 * size, 2.0 * size, 2.0 * size),
+				size,
+				resolution,
+			},
+			CascadeChunk {
+				origin: lower_left_bottom + Vec3::new(2.0 * size, 2.0 * size, 2.0 * size),
 				size,
 				resolution,
 			},
 		]
 	}
 
-	fn nth_ring(size: f32, resolution: usize) -> Vec<CascadeChunk> {
+	fn nth_ring(size: f32, resolution: usize, lower_left_bottom: Vec3) -> Vec<CascadeChunk> {
 		// Get the zeroth ring (all 27 chunks)
-		let all_chunks = zeroth_ring(size, resolution);
+		let all_chunks = zeroth_ring(size, resolution, lower_left_bottom);
 
 		// Convert to BTreeSet to easily remove the middle chunk
 		let mut chunks_set: BTreeSet<CascadeChunk> = all_chunks.into_iter().collect();
 
-		// Remove the middle chunk (center at origin 0,0,0)
-		let center_chunk = CascadeChunk { origin: Vec3::new(0.0, 0.0, 0.0), size, resolution };
+		// Remove the middle chunk (center is at lower_left_bottom + (1*size, 1*size, 1*size))
+		let center_chunk = CascadeChunk {
+			origin: lower_left_bottom + Vec3::new(1.0 * size, 1.0 * size, 1.0 * size),
+			size,
+			resolution,
+		};
 		chunks_set.remove(&center_chunk);
 
 		// Convert back to Vec
@@ -370,7 +375,9 @@ mod tests {
 		assert_eq!(chunks_sorted.len(), 27);
 
 		// now form a reference vector for the 3x3x3 cube
-		let reference_chunks_vec = zeroth_ring(1.0, 1);
+		// lower_left_bottom for the 0th ring is center - (min_size, min_size, min_size)
+		let lower_left_bottom = Vec3::new(0.0, 0.0, 0.0) - Vec3::new(1.0, 1.0, 1.0);
+		let reference_chunks_vec = zeroth_ring(1.0, 1, lower_left_bottom);
 		assert_eq!(reference_chunks_vec.len(), 27);
 
 		// Convert reference to BTreeSet for comparison
@@ -381,6 +388,128 @@ mod tests {
 
 		// Assert that we build out the 3x3x3 cube correctly
 		assert_eq!(chunks_sorted, reference_sorted);
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_cascade_concentric_rings() -> Result<(), String> {
+		let cascade = Cascade {
+			min_size: 1.0,
+			number_of_rings: 2,
+			resolution_map: ConstantResolutionMap { resolution: 1 },
+		};
+		let chunks = cascade.chunks(Vec3::new(0.0, 0.0, 0.0))?;
+
+		// Center chunk + 26 chunks from ring 0 + 26 chunks from ring 1 = 53 chunks
+		assert_eq!(chunks.len(), 53);
+
+		// Build expected reference
+		let mut expected_chunks = BTreeSet::new();
+
+		// Center chunk
+		let center_chunk =
+			CascadeChunk { origin: Vec3::new(0.0, 0.0, 0.0), size: 1.0, resolution: 1 };
+		expected_chunks.insert(center_chunk);
+
+		// Ring 0: lower_left_bottom = center - (min_size, min_size, min_size)
+		let ring0_lower_left_bottom = Vec3::new(0.0, 0.0, 0.0) - Vec3::new(1.0, 1.0, 1.0);
+		let ring0_chunks = nth_ring(1.0, 1, ring0_lower_left_bottom);
+		for chunk in ring0_chunks {
+			expected_chunks.insert(chunk);
+		}
+
+		// Ring 1: size = 3, lower_left_bottom = ring0_lower_left_bottom - (3, 3, 3)
+		let ring1_size = 3.0;
+		let ring1_lower_left_bottom = ring0_lower_left_bottom - Vec3::new(3.0, 3.0, 3.0);
+		let ring1_chunks = nth_ring(ring1_size, 1, ring1_lower_left_bottom);
+		for chunk in ring1_chunks {
+			expected_chunks.insert(chunk);
+		}
+
+		// Convert actual chunks to BTreeSet
+		let mut chunks_sorted = BTreeSet::new();
+		for chunk in chunks {
+			chunks_sorted.insert(chunk);
+		}
+
+		assert_eq!(chunks_sorted, expected_chunks);
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_cascade_size_greater_than_one() -> Result<(), String> {
+		let cascade = Cascade {
+			min_size: 2.5,
+			number_of_rings: 1,
+			resolution_map: ConstantResolutionMap { resolution: 2 },
+		};
+		let chunks = cascade.chunks(Vec3::new(0.0, 0.0, 0.0))?;
+
+		// Center chunk + 26 chunks from ring 0 = 27 chunks
+		assert_eq!(chunks.len(), 27);
+
+		// Build expected reference
+		let mut expected_chunks = BTreeSet::new();
+
+		// Center chunk
+		let center_chunk =
+			CascadeChunk { origin: Vec3::new(0.0, 0.0, 0.0), size: 2.5, resolution: 2 };
+		expected_chunks.insert(center_chunk);
+
+		// Ring 0: lower_left_bottom = center - (min_size, min_size, min_size)
+		let ring0_lower_left_bottom = Vec3::new(0.0, 0.0, 0.0) - Vec3::new(2.5, 2.5, 2.5);
+		let ring0_chunks = nth_ring(2.5, 2, ring0_lower_left_bottom);
+		for chunk in ring0_chunks {
+			expected_chunks.insert(chunk);
+		}
+
+		// Convert actual chunks to BTreeSet
+		let mut chunks_sorted = BTreeSet::new();
+		for chunk in chunks {
+			chunks_sorted.insert(chunk);
+		}
+
+		assert_eq!(chunks_sorted, expected_chunks);
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_cascade_size_less_than_one() -> Result<(), String> {
+		let cascade = Cascade {
+			min_size: 0.5,
+			number_of_rings: 1,
+			resolution_map: ConstantResolutionMap { resolution: 3 },
+		};
+		let chunks = cascade.chunks(Vec3::new(0.0, 0.0, 0.0))?;
+
+		// Center chunk + 26 chunks from ring 0 = 27 chunks
+		assert_eq!(chunks.len(), 27);
+
+		// Build expected reference
+		let mut expected_chunks = BTreeSet::new();
+
+		// Center chunk
+		let center_chunk =
+			CascadeChunk { origin: Vec3::new(0.0, 0.0, 0.0), size: 0.5, resolution: 3 };
+		expected_chunks.insert(center_chunk);
+
+		// Ring 0: lower_left_bottom = center - (min_size, min_size, min_size)
+		let ring0_lower_left_bottom = Vec3::new(0.0, 0.0, 0.0) - Vec3::new(0.5, 0.5, 0.5);
+		let ring0_chunks = nth_ring(0.5, 3, ring0_lower_left_bottom);
+		for chunk in ring0_chunks {
+			expected_chunks.insert(chunk);
+		}
+
+		// Convert actual chunks to BTreeSet
+		let mut chunks_sorted = BTreeSet::new();
+		for chunk in chunks {
+			chunks_sorted.insert(chunk);
+		}
+
+		assert_eq!(chunks_sorted, expected_chunks);
 
 		Ok(())
 	}
