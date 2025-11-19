@@ -168,10 +168,9 @@ pub struct ChunkConfig {
 impl Default for ChunkConfig {
 	fn default() -> Self {
 		Self {
-			min_size: 100.0,      // 100m chunks
-			number_of_rings: 2,   // 2 rings: center + 2 rings = 3^2 = 9x span = 900m total
-			world_size: 0.0,      // No wrapping by default
+			min_size: 10.0,     // 10 km chunks
+			number_of_rings: 4, // 2 rings: center + 2 rings = 3^2 = 9x span = 900m total
+			world_size: 0.0,    // No wrapping by default
 		}
 	}
 }
-
