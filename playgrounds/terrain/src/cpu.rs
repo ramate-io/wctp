@@ -35,18 +35,11 @@ impl CpuMeshGenerator {
 		let cube_size = chunk_size / res as f32;
 		let chunk_origin = cascade_chunk.origin;
 
-		// Vertical sampling range in world Y
-		let y_min = -config.height_scale;
-		let y_max = config.height_scale * 4.0;
-		let y_range = y_max - y_min;
-
-		// Number of cells vertically to roughly match cube_size
-		let y_cells = (y_range / cube_size).ceil().max(1.0) as usize;
-
 		// Grid resolution (sample points); cubes are (n-1) in each axis
+		// Y is now treated the same as X and Z - a voxel cube
 		let nx = res + 1;
+		let ny = res + 1;
 		let nz = res + 1;
-		let ny = y_cells + 1;
 
 		// Helper: linear index with X fastest, then Z, then Y (consistent)
 		let idx = |x: usize, y: usize, z: usize| -> usize { (y * nz + z) * nx + x };
@@ -63,7 +56,8 @@ impl CpuMeshGenerator {
 			.map(|y| {
 				// Create SDF per thread to avoid Send/Sync issues
 				let thread_sdf = create_terrain_sdf(&config_clone);
-				let wy = y_min + y as f32 * cube_size;
+				// Y is now treated the same as X and Z - relative to chunk origin
+				let wy = chunk_origin.y + y as f32 * cube_size;
 				let mut slice = vec![0.0f32; nx * nz];
 				for z in 0..nz {
 					let wz = chunk_origin.z + z as f32 * cube_size;
@@ -124,12 +118,9 @@ impl CpuMeshGenerator {
 					return None; // fully inside or outside
 				}
 
-				// Local-space cube origin (NOTE: local X/Z, absolute Y)
-				let cube_pos_local = Vec3::new(
-					x as f32 * cube_size,
-					y_min + y as f32 * cube_size,
-					z as f32 * cube_size,
-				);
+				// Local-space cube origin (all dimensions relative to chunk origin)
+				let cube_pos_local =
+					Vec3::new(x as f32 * cube_size, y as f32 * cube_size, z as f32 * cube_size);
 
 				// Per-cube edge vertex cache (12 edges)
 				let mut edge_vert: [Option<u32>; 12] = [None; 12];
@@ -193,11 +184,12 @@ impl CpuMeshGenerator {
 
 		// ---------- Normals & UVs (parallelized) ---------------------------------
 		// Normals: sample SDF gradient in WORLD space for shading correctness.
-		// Convert local X/Z back to world by adding chunk_origin; Y is already absolute.
+		// Convert local coordinates back to world by adding chunk_origin.
 		let normals: Vec<[f32; 3]> = vertices
 			.par_iter()
 			.map(|v| {
-				let world = Vec3::new(v[0] + chunk_origin.x, v[1], v[2] + chunk_origin.z);
+				let world =
+					Vec3::new(v[0] + chunk_origin.x, v[1] + chunk_origin.y, v[2] + chunk_origin.z);
 				Self::calculate_sdf_normal(sdf.as_ref(), world).into()
 			})
 			.collect();
