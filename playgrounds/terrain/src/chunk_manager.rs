@@ -59,8 +59,10 @@ pub fn manage_chunks(
 	// Create cascade instance
 	let cascade = Cascade {
 		min_size: chunk_config.min_size,
-		number_of_rings: chunk_config.number_of_rings,
-		resolution_map: ConstantResolutionMap { resolution: terrain_config.base_resolution },
+		number_of_rings: chunk_config.number_of_rings as u8,
+		resolution_map: ConstantResolutionMap { res_2: terrain_config.base_res_2 },
+		grid_radius: 1,
+		grid_multiple: 1,
 	};
 
 	// Get chunks from cascade

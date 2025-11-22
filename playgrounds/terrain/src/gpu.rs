@@ -67,7 +67,7 @@ impl GpuMeshGenerator {
 			"Spawned chunk (GPU stub) at origin {:?} with size {} and resolution {}",
 			cascade_chunk.origin,
 			cascade_chunk.size,
-			cascade_chunk.resolution
+			cascade_chunk.res_2
 		);
 
 		entity

@@ -125,7 +125,7 @@ pub fn create_terrain_sdf(config: &TerrainConfig) -> Box<dyn Sdf> {
 #[derive(Resource, Clone)]
 pub struct TerrainConfig {
 	pub seed: u32,
-	pub base_resolution: usize, // Full resolution vertices per chunk side
+	pub base_res_2: u8, // Full resolution vertices per chunk side
 	pub height_scale: f32,
 	pub use_volumetric: bool, // If true, use marching cubes; if false, use heightfield
 }
@@ -134,23 +134,9 @@ impl TerrainConfig {
 	pub fn new(seed: u32) -> Self {
 		Self {
 			seed,
-			base_resolution: 128, // 128x128x128 voxels per chunk at full resolution
+			base_res_2: 7, // 128x128x128 voxels per chunk at full resolution
 			height_scale: 5.0,
 			use_volumetric: true, // Default to volumetric for true 3D terrain
 		}
-	}
-
-	/// Calculate resolution for a chunk based on Manhattan distance from camera
-	/// Distance 0 (camera chunk) and 1 (immediate neighbors) always use full resolution
-	/// Further chunks use decreasing resolution based on a power curve
-	pub fn resolution_for_distance(&self, distance: i32) -> usize {
-		// Camera chunk and immediate neighbors always full resolution
-		if distance <= 2 {
-			return self.base_resolution;
-		}
-
-		// For distance > 2, use exponential decay: resolution = base / 2^(distance-1)
-		// This gives: distance 2 -> base/2, distance 3 -> base/4, distance 4 -> base/8, etc.
-		((self.base_resolution as f32) - (distance as f32 * 30.0)).max(32.0) as usize
 	}
 }
