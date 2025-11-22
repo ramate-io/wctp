@@ -62,7 +62,7 @@ pub fn manage_chunks(
 		number_of_rings: chunk_config.number_of_rings as u8,
 		resolution_map: ConstantResolutionMap { res_2: terrain_config.base_res_2 },
 		grid_radius: 1,
-		grid_multiple: 1,
+		grid_multiple_2: 0,
 	};
 
 	// Get chunks from cascade

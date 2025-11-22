@@ -138,16 +138,17 @@ impl Ord for CascadeChunk {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Cascade<R: ResolutionMap> {
-	// The minimum size of the chunk used in the interior of the cascade
+	/// The minimum size of the chunk used in the interior of the cascade
 	pub min_size: f32,
-	// The number of rings in the cascade
+	/// The number of rings in the cascade
 	pub number_of_rings: u8,
-	// The resolution map for the cascade and grid. For most use cases, this should map to powers of 2.
+	/// The resolution map for the cascade and grid.
 	pub resolution_map: R,
-	// The Manhattan radius of the grid in the cascade
+	/// The Manhattan radius of the grid in the cascade
 	pub grid_radius: usize,
-	// The multiple of the largest ring size used for the size of the grid chunks, must be a power of 2
-	pub grid_multiple: usize,
+	/// The base two power of the multiple of the size of the largest ring in the cascade.
+	/// Base
+	pub grid_multiple_2: u8,
 }
 
 impl<R: ResolutionMap> Cascade<R> {
@@ -437,7 +438,7 @@ mod tests {
 			number_of_rings: 1,
 			resolution_map: ConstantResolutionMap { res_2: 0 },
 			grid_radius: 1,
-			grid_multiple: 1,
+			grid_multiple_2: 0,
 		};
 		let chunks = cascade.chunks(Vec3::new(0.0, 0.0, 0.0))?;
 
@@ -478,7 +479,7 @@ mod tests {
 			number_of_rings: 2,
 			resolution_map: ConstantResolutionMap { res_2: 0 },
 			grid_radius: 1,
-			grid_multiple: 1,
+			grid_multiple_2: 0,
 		};
 		let chunks = cascade.chunks(Vec3::new(0.0, 0.0, 0.0))?;
 
@@ -526,7 +527,7 @@ mod tests {
 			number_of_rings: 1,
 			resolution_map: ConstantResolutionMap { res_2: 1 },
 			grid_radius: 1,
-			grid_multiple: 1,
+			grid_multiple_2: 0,
 		};
 		let chunks = cascade.chunks(Vec3::new(0.0, 0.0, 0.0))?;
 
@@ -566,7 +567,7 @@ mod tests {
 			number_of_rings: 1,
 			resolution_map: ConstantResolutionMap { res_2: 2 },
 			grid_radius: 1,
-			grid_multiple: 1,
+			grid_multiple_2: 0,
 		};
 		let chunks = cascade.chunks(Vec3::new(0.0, 0.0, 0.0))?;
 
