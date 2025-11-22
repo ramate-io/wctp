@@ -150,6 +150,29 @@ pub struct Cascade<R: ResolutionMap> {
 	pub grid_multiple_2: u8,
 }
 
+#[derive(Debug, Clone)]
+pub struct CascadeOutput {
+	pub cascade_chunks: Vec<CascadeChunk>,
+	pub grid_chunks: Vec<CascadeChunk>,
+}
+
+impl CascadeOutput {
+	pub fn all(&self) -> Vec<CascadeChunk> {
+		let mut chunks = Vec::new();
+		chunks.extend(self.cascade_chunks.clone());
+		chunks.extend(self.grid_chunks.clone());
+		chunks
+	}
+
+	pub fn cascade(&self) -> Vec<CascadeChunk> {
+		self.cascade_chunks.clone()
+	}
+
+	pub fn grid(&self) -> Vec<CascadeChunk> {
+		self.grid_chunks.clone()
+	}
+}
+
 impl<R: ResolutionMap> Cascade<R> {
 	pub fn size_for_ring(&self, ring: u8) -> f32 {
 		self.min_size * 3_u32.pow(ring as u32) as f32
@@ -252,11 +275,10 @@ impl<R: ResolutionMap> Cascade<R> {
 		Ok(chunks)
 	}
 
-	pub fn chunks(&self, position: Vec3) -> Result<Vec<CascadeChunk>, String> {
-		let mut cascade_chunks = self.cascade_chunks(position)?;
+	pub fn chunks(&self, position: Vec3) -> Result<CascadeOutput, String> {
+		let cascade_chunks = self.cascade_chunks(position)?;
 		let grid_chunks = self.grid_chunks(position)?;
-		cascade_chunks.extend(grid_chunks);
-		Ok(cascade_chunks)
+		Ok(CascadeOutput { cascade_chunks, grid_chunks })
 	}
 
 	pub fn needs_new_chunks(&self, prev: Vec3, new: Vec3) -> bool {
@@ -513,7 +535,7 @@ mod tests {
 			grid_radius: 1,
 			grid_multiple_2: 0,
 		};
-		let chunks = cascade.chunks(Vec3::new(0.0, 0.0, 0.0))?;
+		let chunks = cascade.chunks(Vec3::new(0.0, 0.0, 0.0))?.cascade();
 
 		// the zero chunk and the 26 chunks in the first ring
 		assert_eq!(chunks.len(), 27);
@@ -554,7 +576,7 @@ mod tests {
 			grid_radius: 1,
 			grid_multiple_2: 0,
 		};
-		let chunks = cascade.chunks(Vec3::new(0.0, 0.0, 0.0))?;
+		let chunks = cascade.chunks(Vec3::new(0.0, 0.0, 0.0))?.cascade();
 
 		// Center chunk + 26 chunks from ring 0 + 26 chunks from ring 1 = 53 chunks
 		assert_eq!(chunks.len(), 53);
@@ -602,7 +624,7 @@ mod tests {
 			grid_radius: 1,
 			grid_multiple_2: 0,
 		};
-		let chunks = cascade.chunks(Vec3::new(0.0, 0.0, 0.0))?;
+		let chunks = cascade.chunks(Vec3::new(0.0, 0.0, 0.0))?.cascade();
 
 		// Center chunk + 26 chunks from ring 0 = 27 chunks
 		assert_eq!(chunks.len(), 27);
@@ -642,7 +664,7 @@ mod tests {
 			grid_radius: 1,
 			grid_multiple_2: 0,
 		};
-		let chunks = cascade.chunks(Vec3::new(0.0, 0.0, 0.0))?;
+		let chunks = cascade.chunks(Vec3::new(0.0, 0.0, 0.0))?.cascade();
 
 		// Center chunk + 26 chunks from ring 0 = 27 chunks
 		assert_eq!(chunks.len(), 27);

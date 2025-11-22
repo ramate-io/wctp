@@ -172,10 +172,10 @@ pub struct ChunkConfig {
 impl Default for ChunkConfig {
 	fn default() -> Self {
 		Self {
-			min_size: 0.1,      // Cascade begins at 100m resolution
+			min_size: 1.0,      // Cascade begins at 100m resolution
 			number_of_rings: 2, // 2 rings: center + 2 rings = 3^2 = 9 chunks = 900m total
 			world_size: 0.0,    // No wrapping by default
-			grid_radius: 8,     // a radius of 8 chunks
+			grid_radius: 4,     // a radius of 8 chunks
 			grid_multiple_2: 6, // 300 * 64 = 19200m = 19.2km per grid chunk
 		}
 	}

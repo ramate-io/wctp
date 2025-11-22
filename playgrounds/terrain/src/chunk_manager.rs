@@ -72,7 +72,8 @@ pub fn manage_chunks(
 			log::error!("Failed to get cascade chunks: {}", e);
 			return;
 		}
-	};
+	}
+	.all();
 
 	// Create set of chunk origins for quick lookup (with wrapping)
 	let chunks_to_load_set: HashSet<Vec3Key> = chunks_to_load
