@@ -1,5 +1,41 @@
+use crate::cascade::CascadeChunk;
 use bevy::prelude::*;
 use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
+
+/// Wrapper for Vec3 that implements Hash and Eq for use in HashSet
+#[derive(Debug, Clone, Copy)]
+pub struct Vec3Key(pub Vec3);
+
+impl PartialEq for Vec3Key {
+	fn eq(&self, other: &Self) -> bool {
+		self.0.x == other.0.x && self.0.y == other.0.y && self.0.z == other.0.z
+	}
+}
+
+impl Eq for Vec3Key {}
+
+impl Hash for Vec3Key {
+	fn hash<H: Hasher>(&self, state: &mut H) {
+		// Hash the float values by converting to a fixed-point representation
+		// This is approximate but should work for our use case
+		self.0.x.to_bits().hash(state);
+		self.0.y.to_bits().hash(state);
+		self.0.z.to_bits().hash(state);
+	}
+}
+
+impl From<Vec3> for Vec3Key {
+	fn from(v: Vec3) -> Self {
+		Vec3Key(v)
+	}
+}
+
+impl From<Vec3Key> for Vec3 {
+	fn from(k: Vec3Key) -> Self {
+		k.0
+	}
+}
 
 /// Chunk coordinate in the world grid
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -93,94 +129,48 @@ impl ChunkCoord {
 /// Component marking a terrain chunk entity
 #[derive(Component, Debug, Clone, Copy)]
 pub struct TerrainChunk {
-	pub coord: ChunkCoord,
-	pub resolution: usize,
+	pub chunk: CascadeChunk,
 }
 
 /// Resource tracking loaded chunks
+/// Uses Vec3 origin as the key for tracking loaded chunks
 #[derive(Resource, Default)]
 pub struct LoadedChunks {
-	pub chunks: HashSet<ChunkCoord>,
+	pub chunks: HashSet<Vec3Key>,
 }
 
 impl LoadedChunks {
-	pub fn is_loaded(&self, coord: &ChunkCoord) -> bool {
-		self.chunks.contains(coord)
+	pub fn is_loaded(&self, origin: &Vec3) -> bool {
+		self.chunks.contains(&Vec3Key(*origin))
 	}
 
-	pub fn mark_loaded(&mut self, coord: ChunkCoord) {
-		self.chunks.insert(coord);
+	pub fn mark_loaded(&mut self, origin: Vec3) {
+		self.chunks.insert(Vec3Key(origin));
 	}
 
-	pub fn mark_unloaded(&mut self, coord: &ChunkCoord) {
-		self.chunks.remove(coord);
+	pub fn mark_unloaded(&mut self, origin: &Vec3) {
+		self.chunks.remove(&Vec3Key(*origin));
 	}
 }
 
-/// Configuration for chunk system
+/// Configuration for chunk system using cascade
 #[derive(Resource)]
 pub struct ChunkConfig {
-	/// Size of each chunk in world units
-	pub chunk_size: f32,
-	/// Number of chunks to load in each direction from camera (square radius)
-	pub load_radius: i32,
-	/// Maximum distance to render chunks (in chunk units)
-	pub max_render_distance: i32,
-	/// World size in chunks (for wrapping/torus topology). If 0, no wrapping.
-	pub world_size_chunks: i32,
+	/// Minimum chunk size (size of center chunk and ring 0)
+	pub min_size: f32,
+	/// Number of rings in the cascade
+	pub number_of_rings: usize,
+	/// World size in world units (for wrapping/torus topology). If 0, no wrapping.
+	/// Should be a multiple of cascade span for proper alignment.
+	pub world_size: f32,
 }
 
 impl Default for ChunkConfig {
 	fn default() -> Self {
 		Self {
-			// 10 km (100 x 100 meters)
-			chunk_size: 100.0,
-			load_radius: 10,         // load out to 100 km
-			max_render_distance: 10, // render out to 100 km
-			world_size_chunks: 512,  // 512x512 chunks = 25600x25600 world units, wraps around, 2560 km
+			min_size: 10.0,     // 10 km chunks
+			number_of_rings: 4, // 2 rings: center + 2 rings = 3^2 = 9x span = 900m total
+			world_size: 0.0,    // No wrapping by default
 		}
 	}
-}
-
-/// Chunk info for loading - contains both wrapped (for indexing) and unwrapped (for display) coordinates
-#[derive(Debug, Clone, Copy)]
-pub struct ChunkLoadInfo {
-	pub wrapped: ChunkCoord,   // For indexing/uniqueness
-	pub unwrapped: ChunkCoord, // For world position
-}
-
-/// Get all chunk coordinates that should be loaded around a position
-/// Uses square approximation of concentric circles
-/// Handles wrapping for spherical/torus topology
-pub fn get_chunks_to_load(camera_pos: Vec3, config: &ChunkConfig) -> Vec<ChunkLoadInfo> {
-	let (center_wrapped, center_unwrapped) =
-		ChunkCoord::from_world_pos(camera_pos, config.chunk_size, config.world_size_chunks);
-	let mut chunks = Vec::new();
-
-	// Square-based loading: load all chunks within radius
-	for dx in -config.load_radius..=config.load_radius {
-		for dz in -config.load_radius..=config.load_radius {
-			let unwrapped_coord = ChunkCoord::new(center_unwrapped.x + dx, center_unwrapped.z + dz);
-
-			// Wrap coordinates if world is finite
-			let wrapped_coord = if config.world_size_chunks > 0 {
-				unwrapped_coord.wrap(config.world_size_chunks)
-			} else {
-				unwrapped_coord
-			};
-
-			// Check if within max render distance (using wrapped distance)
-			let distance = if config.world_size_chunks > 0 {
-				center_wrapped.manhattan_distance(&wrapped_coord, config.world_size_chunks)
-			} else {
-				center_wrapped.manhattan_distance(&wrapped_coord, i32::MAX)
-			};
-
-			if distance <= config.max_render_distance {
-				chunks.push(ChunkLoadInfo { wrapped: wrapped_coord, unwrapped: unwrapped_coord });
-			}
-		}
-	}
-
-	chunks
 }

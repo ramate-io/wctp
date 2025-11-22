@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use std::f32::consts::PI;
 
 mod camera;
+pub mod cascade;
 mod chunk;
 mod chunk_manager;
 mod cpu;
@@ -53,7 +54,7 @@ impl Plugin for TerrainPlugin {
 			);
 
 		// Set up RenderApp systems for GPU pipeline initialization
-		app.sub_app_mut(bevy::render::RenderApp).add_systems(
+		/*app.sub_app_mut(bevy::render::RenderApp).add_systems(
 			bevy::render::Render,
 			pipeline::proc::render_setup::queue_marching_cubes_pipelines
 				.in_set(bevy::render::RenderSystems::Prepare),
@@ -63,7 +64,7 @@ impl Plugin for TerrainPlugin {
 			bevy::render::Render,
 			pipeline::proc::render_setup::init_marching_cubes_pipelines
 				.in_set(bevy::render::RenderSystems::Prepare),
-		);
+		);*/
 
 		// Extract pipelines from RenderApp to MainApp in Extract schedule
 		app.add_systems(

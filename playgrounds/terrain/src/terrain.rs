@@ -134,7 +134,7 @@ impl TerrainConfig {
 	pub fn new(seed: u32) -> Self {
 		Self {
 			seed,
-			base_resolution: 128, // 128x128 vertices per chunk at full resolution
+			base_resolution: 128, // 128x128x128 voxels per chunk at full resolution
 			height_scale: 5.0,
 			use_volumetric: true, // Default to volumetric for true 3D terrain
 		}

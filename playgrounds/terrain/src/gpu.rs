@@ -1,9 +1,6 @@
-use crate::chunk::{ChunkCoord, TerrainChunk};
+use crate::cascade::CascadeChunk;
+use crate::chunk::TerrainChunk;
 use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
-use crate::pipeline::proc::{
-	render_setup::create_layouts_in_main_world, Bounds, GpuMarchingCubesPipeline, Sampling3D,
-	TerrainMeshSpawner,
-};
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
@@ -13,100 +10,53 @@ pub struct GpuMeshGenerator;
 
 impl GpuMeshGenerator {
 	/// Generate a terrain mesh for a specific chunk using GPU-based Marching Cubes
+	/// NOTE: GPU implementation is still being sorted, this is a stub
 	pub fn generate_chunk_mesh(
-		chunk_coord: &ChunkCoord,
-		chunk_size: f32,
-		resolution: usize,
-		config: &TerrainConfig,
-		device: &RenderDevice,
-		queue: &RenderQueue,
-		pipelines: &MarchingCubesPipelines,
+		_cascade_chunk: &CascadeChunk,
+		_config: &TerrainConfig,
+		_device: &RenderDevice,
+		_queue: &RenderQueue,
+		_pipelines: &MarchingCubesPipelines,
 	) -> Mesh {
-		// Create layouts in main world (since BindGroupLayout is not Clone)
-		let layouts = create_layouts_in_main_world(device);
-		let chunk_origin = chunk_coord.to_unwrapped_world_pos(chunk_size);
-
-		// Vertical sampling range in world Y
-		let y_min = -config.height_scale * 2.0;
-		let y_max = config.height_scale * 2.0;
-		let y_range = y_max - y_min;
-
-		// Calculate vertical resolution to match horizontal resolution
-		let cube_size = chunk_size / resolution as f32;
-		let y_cells = (y_range / cube_size).ceil().max(1.0) as usize;
-
-		// Set up GPU pipeline parameters
-		let sampling = Sampling3D {
-			chunk_origin,
-			chunk_size: Vec3::new(chunk_size, y_range, chunk_size),
-			resolution: UVec3::new(resolution as u32, y_cells as u32, resolution as u32),
-		};
-
-		let bounds = Bounds {
-			enabled: 0, // No bounds restriction for now
-			min: Vec2::ZERO,
-			max: Vec2::ZERO,
-		};
-
-		// Create GPU pipeline (pipelines are pre-compiled in RenderApp)
-		let pipeline = GpuMarchingCubesPipeline::new(sampling, config, bounds, config.seed as i32);
-
-		// Compute mesh on GPU using pre-compiled pipelines
-		let gpu_data = pipeline.compute(device, queue, pipelines, &layouts);
-
-		// Convert to Bevy Mesh
-		TerrainMeshSpawner::mesh_from_gpu_data(&gpu_data)
+		// TODO: Implement GPU mesh generation with cascade chunks
+		// For now, return an empty mesh
+		Mesh::new(
+			bevy::mesh::PrimitiveTopology::TriangleList,
+			bevy::asset::RenderAssetUsages::RENDER_WORLD,
+		)
 	}
 
 	/// Spawn a terrain chunk entity using GPU mesh generation
+	/// NOTE: GPU implementation is still being sorted, this is a stub
 	pub fn spawn_chunk(
 		commands: &mut Commands,
 		meshes: &mut ResMut<Assets<Mesh>>,
 		materials: &mut ResMut<Assets<StandardMaterial>>,
-		wrapped_coord: ChunkCoord,
-		unwrapped_coord: ChunkCoord,
-		chunk_size: f32,
-		_world_size_chunks: i32,
-		resolution: usize,
+		cascade_chunk: CascadeChunk,
 		config: &TerrainConfig,
 		device: &RenderDevice,
 		queue: &RenderQueue,
 		pipelines: &MarchingCubesPipelines,
 	) -> Entity {
-		// Use unwrapped coordinate for mesh generation to ensure seamless terrain
-		let mesh = Self::generate_chunk_mesh(
-			&unwrapped_coord,
-			chunk_size,
-			resolution,
-			config,
-			device,
-			queue,
-			pipelines,
-		);
+		// Use cascade chunk for mesh generation
+		let mesh = Self::generate_chunk_mesh(&cascade_chunk, config, device, queue, pipelines);
 		let mesh_handle = meshes.add(mesh);
 
-		// Make the origin chunk (0, 0) reddish for easy verification
-		let is_origin_chunk = wrapped_coord.x == 0 && wrapped_coord.z == 0;
-		let base_color = if is_origin_chunk {
-			Color::hsla(46.0, 0.22, 0.62, 1.0) // brown
-		} else {
-			Color::hsla(46.0, 0.22, 0.62, 1.0) // brown
-		};
+		let base_color = Color::hsla(46.0, 0.22, 0.62, 1.0); // brown
 
 		let material_handle = materials.add(StandardMaterial {
 			base_color,
 			metallic: 0.0,
-			perceptual_roughness: 0.7, // Less rough for more light reflection/bounce
+			perceptual_roughness: 0.7,
 			..default()
 		});
 
-		// Use unwrapped coordinate for world position (spawn at actual location)
-		// Note: mesh vertices are in local space relative to chunk origin
-		let world_pos = unwrapped_coord.to_unwrapped_world_pos(chunk_size);
+		// Use cascade chunk origin for world position
+		let world_pos = cascade_chunk.origin;
 
 		let entity = commands
 			.spawn((
-				TerrainChunk { coord: wrapped_coord, resolution }, // Store wrapped for indexing
+				TerrainChunk { chunk: cascade_chunk },
 				Mesh3d(mesh_handle.clone()),
 				MeshMaterial3d::<StandardMaterial>(material_handle.clone()),
 				Transform::from_translation(world_pos),
@@ -114,13 +64,10 @@ impl GpuMeshGenerator {
 			.id();
 
 		log::debug!(
-			"Spawned chunk (GPU) wrapped=({}, {}) unwrapped=({}, {}) at world position {:?} with resolution {}",
-			wrapped_coord.x,
-			wrapped_coord.z,
-			unwrapped_coord.x,
-			unwrapped_coord.z,
-			world_pos,
-			resolution
+			"Spawned chunk (GPU stub) at origin {:?} with size {} and resolution {}",
+			cascade_chunk.origin,
+			cascade_chunk.size,
+			cascade_chunk.resolution
 		);
 
 		entity

@@ -1,4 +1,4 @@
-use crate::chunk::ChunkCoord;
+use crate::cascade::CascadeChunk;
 use crate::cpu::CpuMeshGenerator;
 use crate::gpu::GpuMeshGenerator;
 use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
@@ -31,11 +31,7 @@ impl MeshGenerator {
 		commands: &mut Commands,
 		meshes: &mut ResMut<Assets<Mesh>>,
 		materials: &mut ResMut<Assets<StandardMaterial>>,
-		wrapped_coord: ChunkCoord,
-		unwrapped_coord: ChunkCoord,
-		chunk_size: f32,
-		world_size_chunks: i32,
-		resolution: usize,
+		cascade_chunk: CascadeChunk,
 		config: &TerrainConfig,
 		// GPU resources (only used if mode is Gpu)
 		device: Option<&RenderDevice>,
@@ -43,17 +39,9 @@ impl MeshGenerator {
 		pipelines: Option<&MarchingCubesPipelines>,
 	) -> Entity {
 		match mode {
-			MeshGenerationMode::Cpu => CpuMeshGenerator::spawn_chunk(
-				commands,
-				meshes,
-				materials,
-				wrapped_coord,
-				unwrapped_coord,
-				chunk_size,
-				world_size_chunks,
-				resolution,
-				config,
-			),
+			MeshGenerationMode::Cpu => {
+				CpuMeshGenerator::spawn_chunk(commands, meshes, materials, cascade_chunk, config)
+			}
 			MeshGenerationMode::Gpu => {
 				let device = device.expect("RenderDevice required for GPU mode");
 				let queue = queue.expect("RenderQueue required for GPU mode");
@@ -63,11 +51,7 @@ impl MeshGenerator {
 					commands,
 					meshes,
 					materials,
-					wrapped_coord,
-					unwrapped_coord,
-					chunk_size,
-					world_size_chunks,
-					resolution,
+					cascade_chunk,
 					config,
 					device,
 					queue,

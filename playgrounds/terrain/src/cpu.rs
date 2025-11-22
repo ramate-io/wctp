@@ -1,4 +1,5 @@
-use crate::chunk::{ChunkCoord, TerrainChunk};
+use crate::cascade::CascadeChunk;
+use crate::chunk::TerrainChunk;
 // use crate::geography::FeatureRegistry;
 use crate::sdf::Sdf;
 use crate::terrain::create_terrain_sdf;
@@ -12,42 +13,35 @@ pub struct CpuMeshGenerator;
 impl CpuMeshGenerator {
 	/// Generate a terrain mesh for a specific chunk by sampling an SDF
 	/// Supports both heightfield (fast, no caves) and volumetric (marching cubes, supports caves)
+	/// Returns None if the chunk is entirely above the terrain surface
 	pub fn generate_chunk_mesh(
-		chunk_coord: &ChunkCoord,
-		chunk_size: f32,
-		resolution: usize,
+		cascade_chunk: &CascadeChunk,
 		config: &TerrainConfig,
 		// feature_registry: Option<&FeatureRegistry>,
-	) -> Mesh {
-		Self::generate_chunk_mesh_volumetric(chunk_coord, chunk_size, resolution, config)
+	) -> Option<Mesh> {
+		Self::generate_chunk_mesh_volumetric(cascade_chunk, config)
 	}
 
 	fn generate_chunk_mesh_volumetric(
-		chunk_coord: &ChunkCoord,
-		chunk_size: f32,
-		res: usize,
+		cascade_chunk: &CascadeChunk,
 		config: &TerrainConfig,
 		// feature_registry: Option<&FeatureRegistry>,
-	) -> Mesh {
-		// Use the same SDF creation logic
+	) -> Option<Mesh> {
+		// ---------- grid setup ---------------------------------------------------
+		let chunk_size = cascade_chunk.size;
+		let res = cascade_chunk.resolution;
+		let cube_size = chunk_size / res as f32;
+		let chunk_origin = cascade_chunk.origin;
+
+		// ---------- early exit optimization: check if chunk is above terrain -------
+		// Create the real SDF (with all modulations/combinators) for height checking
 		let sdf = create_terrain_sdf(config);
 
-		// ---------- grid setup ---------------------------------------------------
-		let cube_size = chunk_size / res as f32;
-		let chunk_origin = chunk_coord.to_unwrapped_world_pos(chunk_size);
-
-		// Vertical sampling range in world Y
-		let y_min = -config.height_scale;
-		let y_max = config.height_scale * 4.0;
-		let y_range = y_max - y_min;
-
-		// Number of cells vertically to roughly match cube_size
-		let y_cells = (y_range / cube_size).ceil().max(1.0) as usize;
-
 		// Grid resolution (sample points); cubes are (n-1) in each axis
+		// Y is now treated the same as X and Z - a voxel cube
 		let nx = res + 1;
+		let ny = res + 1;
 		let nz = res + 1;
-		let ny = y_cells + 1;
 
 		// Helper: linear index with X fastest, then Z, then Y (consistent)
 		let idx = |x: usize, y: usize, z: usize| -> usize { (y * nz + z) * nx + x };
@@ -64,7 +58,8 @@ impl CpuMeshGenerator {
 			.map(|y| {
 				// Create SDF per thread to avoid Send/Sync issues
 				let thread_sdf = create_terrain_sdf(&config_clone);
-				let wy = y_min + y as f32 * cube_size;
+				// Y is now treated the same as X and Z - relative to chunk origin
+				let wy = chunk_origin.y + y as f32 * cube_size;
 				let mut slice = vec![0.0f32; nx * nz];
 				for z in 0..nz {
 					let wz = chunk_origin.z + z as f32 * cube_size;
@@ -125,12 +120,9 @@ impl CpuMeshGenerator {
 					return None; // fully inside or outside
 				}
 
-				// Local-space cube origin (NOTE: local X/Z, absolute Y)
-				let cube_pos_local = Vec3::new(
-					x as f32 * cube_size,
-					y_min + y as f32 * cube_size,
-					z as f32 * cube_size,
-				);
+				// Local-space cube origin (all dimensions relative to chunk origin)
+				let cube_pos_local =
+					Vec3::new(x as f32 * cube_size, y as f32 * cube_size, z as f32 * cube_size);
 
 				// Per-cube edge vertex cache (12 edges)
 				let mut edge_vert: [Option<u32>; 12] = [None; 12];
@@ -194,11 +186,12 @@ impl CpuMeshGenerator {
 
 		// ---------- Normals & UVs (parallelized) ---------------------------------
 		// Normals: sample SDF gradient in WORLD space for shading correctness.
-		// Convert local X/Z back to world by adding chunk_origin; Y is already absolute.
+		// Convert local coordinates back to world by adding chunk_origin.
 		let normals: Vec<[f32; 3]> = vertices
 			.par_iter()
 			.map(|v| {
-				let world = Vec3::new(v[0] + chunk_origin.x, v[1], v[2] + chunk_origin.z);
+				let world =
+					Vec3::new(v[0] + chunk_origin.x, v[1] + chunk_origin.y, v[2] + chunk_origin.z);
 				Self::calculate_sdf_normal(sdf.as_ref(), world).into()
 			})
 			.collect();
@@ -216,7 +209,7 @@ impl CpuMeshGenerator {
 		mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
 		mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
 		mesh.insert_indices(bevy::mesh::Indices::U32(indices));
-		mesh
+		Some(mesh)
 	}
 
 	/// Calculate normal from SDF gradient
@@ -244,20 +237,24 @@ impl CpuMeshGenerator {
 		commands: &mut Commands,
 		meshes: &mut ResMut<Assets<Mesh>>,
 		materials: &mut ResMut<Assets<StandardMaterial>>,
-		wrapped_coord: ChunkCoord,
-		unwrapped_coord: ChunkCoord,
-		chunk_size: f32,
-		_world_size_chunks: i32,
-		resolution: usize,
+		cascade_chunk: CascadeChunk,
 		config: &TerrainConfig,
 		// feature_registry: Option<&FeatureRegistry>,
 	) -> Entity {
-		// Use unwrapped coordinate for mesh generation to ensure seamless terrain
-		let mesh = Self::generate_chunk_mesh(&unwrapped_coord, chunk_size, resolution, config);
+		// Generate mesh using cascade chunk
+		let Some(mesh) = Self::generate_chunk_mesh(&cascade_chunk, config) else {
+			// Chunk is entirely above terrain, don't spawn it
+			log::info!(
+				"Skipping chunk at origin {:?} - entirely above terrain",
+				cascade_chunk.origin
+			);
+			// Return a dummy entity that will be cleaned up
+			return commands.spawn_empty().id();
+		};
 		let mesh_handle = meshes.add(mesh);
 
-		// Make the origin chunk (0, 0) reddish for easy verification
-		let is_origin_chunk = wrapped_coord.x == 0 && wrapped_coord.z == 0;
+		// Make the origin chunk (0, 0, 0) brown for easy verification
+		let is_origin_chunk = cascade_chunk.origin == Vec3::ZERO;
 		let base_color = if is_origin_chunk {
 			Color::hsla(46.0, 0.22, 0.62, 1.0) // brown
 		} else {
@@ -271,13 +268,13 @@ impl CpuMeshGenerator {
 			..default()
 		});
 
-		// Use unwrapped coordinate for world position (spawn at actual location)
+		// Use cascade chunk origin for world position
 		// Note: mesh vertices are in local space relative to chunk origin
-		let world_pos = unwrapped_coord.to_unwrapped_world_pos(chunk_size);
+		let world_pos = cascade_chunk.origin;
 
 		let entity = commands
 			.spawn((
-				TerrainChunk { coord: wrapped_coord, resolution }, // Store wrapped for indexing
+				TerrainChunk { chunk: cascade_chunk },
 				Mesh3d(mesh_handle.clone()),
 				MeshMaterial3d::<StandardMaterial>(material_handle.clone()),
 				Transform::from_translation(world_pos),
@@ -285,13 +282,10 @@ impl CpuMeshGenerator {
 			.id();
 
 		log::debug!(
-			"Spawned chunk (CPU) wrapped=({}, {}) unwrapped=({}, {}) at world position {:?} with resolution {}",
-			wrapped_coord.x,
-			wrapped_coord.z,
-			unwrapped_coord.x,
-			unwrapped_coord.z,
-			world_pos,
-			resolution
+			"Spawned chunk (CPU) at origin {:?} with size {} and resolution {}",
+			cascade_chunk.origin,
+			cascade_chunk.size,
+			cascade_chunk.resolution
 		);
 
 		entity
