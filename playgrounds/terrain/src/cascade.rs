@@ -225,8 +225,9 @@ impl<R: ResolutionMap> Cascade<R> {
 	pub fn grid_chunks(&self, position: Vec3) -> Result<Vec<CascadeChunk>, String> {
 		let omit = Some(self.cascade_aabb(position));
 		let origin_x = (position.x / self.grid_chunk_size()).floor() * self.grid_chunk_size();
+		let origin_y = self.grid_chunk_size() / -2.0;
 		let origin_z = (position.z / self.grid_chunk_size()).floor() * self.grid_chunk_size();
-		let origin = Vec3::new(origin_x, 0.0, origin_z);
+		let origin = Vec3::new(origin_x, origin_y, origin_z);
 		let mut chunks = Vec::new();
 
 		// construct the 2D grid of chunks
@@ -248,11 +249,14 @@ impl<R: ResolutionMap> Cascade<R> {
 			}
 		}
 
-		Ok(vec![])
+		Ok(chunks)
 	}
 
 	pub fn chunks(&self, position: Vec3) -> Result<Vec<CascadeChunk>, String> {
-		self.cascade_chunks(position)
+		let mut cascade_chunks = self.cascade_chunks(position)?;
+		let grid_chunks = self.grid_chunks(position)?;
+		cascade_chunks.extend(grid_chunks);
+		Ok(cascade_chunks)
 	}
 
 	pub fn needs_new_chunks(&self, prev: Vec3, new: Vec3) -> bool {
