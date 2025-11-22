@@ -147,7 +147,6 @@ pub struct Cascade<R: ResolutionMap> {
 	/// The Manhattan radius of the grid in the cascade
 	pub grid_radius: usize,
 	/// The base two power of the multiple of the size of the largest ring in the cascade.
-	/// Base
 	pub grid_multiple_2: u8,
 }
 
@@ -173,7 +172,8 @@ impl<R: ResolutionMap> Cascade<R> {
 		}
 	}
 
-	pub fn chunks(&self, position: Vec3) -> Result<Vec<CascadeChunk>, String> {
+	/// The chunks in the cascade.
+	pub fn cascade_chunks(&self, position: Vec3) -> Result<Vec<CascadeChunk>, String> {
 		// copmute the center chunk
 		let center_chunk = self.center_chunk(position);
 
@@ -207,6 +207,54 @@ impl<R: ResolutionMap> Cascade<R> {
 		Ok(chunks)
 	}
 
+	/// Computes the multiple of the grid.
+	pub fn grid_multiple(&self) -> usize {
+		2_usize.pow(self.grid_multiple_2 as u32)
+	}
+
+	/// Computes the size of the grid chunks.
+	pub fn grid_chunk_size(&self) -> f32 {
+		self.span() * self.grid_multiple() as f32
+	}
+
+	/// The chunks in the grid.
+	///
+	/// The grid is globally defined, and the cascade chunks are carved out of it.
+	/// This allows for low-cost distant features over a tight high-resolution cascade.
+	/// You don't always have to cascade out to the general world resolution that you want.
+	pub fn grid_chunks(&self, position: Vec3) -> Result<Vec<CascadeChunk>, String> {
+		let omit = Some(self.cascade_aabb(position));
+		let origin_x = (position.x / self.grid_chunk_size()).floor() * self.grid_chunk_size();
+		let origin_z = (position.z / self.grid_chunk_size()).floor() * self.grid_chunk_size();
+		let origin = Vec3::new(origin_x, 0.0, origin_z);
+		let mut chunks = Vec::new();
+
+		// construct the 2D grid of chunks
+		for x in -(self.grid_radius as i32)..=(self.grid_radius as i32) {
+			for z in -(self.grid_radius as i32)..=(self.grid_radius as i32) {
+				let chunk_origin = origin
+					+ Vec3::new(
+						x as f32 * self.grid_chunk_size(),
+						0.0,
+						z as f32 * self.grid_chunk_size(),
+					);
+				let chunk = CascadeChunk {
+					origin: chunk_origin,
+					size: self.grid_chunk_size(),
+					res_2: self.resolution_map.ring_to_power_of_2(self.number_of_rings),
+					omit,
+				};
+				chunks.push(chunk);
+			}
+		}
+
+		Ok(vec![])
+	}
+
+	pub fn chunks(&self, position: Vec3) -> Result<Vec<CascadeChunk>, String> {
+		self.cascade_chunks(position)
+	}
+
 	pub fn needs_new_chunks(&self, prev: Vec3, new: Vec3) -> bool {
 		self.position_to_origin(prev) != self.position_to_origin(new)
 	}
@@ -219,6 +267,27 @@ impl<R: ResolutionMap> Cascade<R> {
 	/// s.t. coordinate wrap arounds align nicely with the chunks.
 	pub fn span(&self) -> f32 {
 		self.min_size * 3_u32.pow(self.number_of_rings as u32) as f32
+	}
+
+	/// Computes the lower bottom left for the entire cascade.
+	pub fn cascade_lower_left_bottom(&self, position: Vec3) -> Vec3 {
+		let mut position = self.position_to_origin(position);
+		for ring in 0..self.number_of_rings {
+			position = position
+				- Vec3::new(
+					self.size_for_ring(ring),
+					self.size_for_ring(ring),
+					self.size_for_ring(ring),
+				);
+		}
+		position
+	}
+
+	/// Computes the AaBb for the entire cascade.
+	pub fn cascade_aabb(&self, position: Vec3) -> Aabb3d {
+		let lower_left_bottom = self.cascade_lower_left_bottom(position);
+		let upper_right_top = lower_left_bottom + Vec3::new(self.span(), self.span(), self.span());
+		Aabb3d::new(lower_left_bottom, upper_right_top)
 	}
 }
 
