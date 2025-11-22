@@ -59,8 +59,10 @@ pub fn manage_chunks(
 	// Create cascade instance
 	let cascade = Cascade {
 		min_size: chunk_config.min_size,
-		number_of_rings: chunk_config.number_of_rings,
-		resolution_map: ConstantResolutionMap { resolution: terrain_config.base_resolution },
+		number_of_rings: chunk_config.number_of_rings as u8,
+		resolution_map: ConstantResolutionMap { res_2: terrain_config.base_res_2 },
+		grid_radius: chunk_config.grid_radius,
+		grid_multiple_2: chunk_config.grid_multiple_2,
 	};
 
 	// Get chunks from cascade
@@ -70,7 +72,8 @@ pub fn manage_chunks(
 			log::error!("Failed to get cascade chunks: {}", e);
 			return;
 		}
-	};
+	}
+	.all();
 
 	// Create set of chunk origins for quick lookup (with wrapping)
 	let chunks_to_load_set: HashSet<Vec3Key> = chunks_to_load

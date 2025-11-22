@@ -132,7 +132,7 @@ fn character_mode_movement(
 	controller: &mut CameraController,
 ) {
 	const GRAVITY: f32 = -30.0; // Gravity acceleration
-	const GROUND_STICK_DISTANCE: f32 = 0.0002; // stick 2 cm to ground
+	const GROUND_STICK_DISTANCE: f32 = 0.002; // stick 2 meters to ground
 	const CHARACTER_HEIGHT: f32 = 0.002; // Eye height above ground (2 meters)
 	const CHARACTER_SPEED: f32 = 0.01; // Movement speed in character mode 10m/s
 	const JUMP_FORCE: f32 = 8.0; // Jump velocity
