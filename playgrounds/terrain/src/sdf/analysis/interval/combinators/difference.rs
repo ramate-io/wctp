@@ -13,7 +13,7 @@ impl SignUniformInterval {
 				result.push(before_overlap.clone());
 			}
 
-			// if the sign union is equivalent to the lower bound, just use the lower bound
+			// if the sign difference is equivalent to the lower bound, just use the lower bound
 			// this is a normalization measure
 			let sign_difference = self.left.sign.difference(&other.left.sign);
 			match before_overlap {
@@ -120,7 +120,7 @@ mod tests {
 			vec![
 				SignBoundary { min: 0.0, sign: Sign::Negative },
 				SignBoundary { min: 1.0, sign: Sign::Positive },
-				SignBoundary { min: 2.0, sign: Sign::Positive },
+				SignBoundary { min: 2.0, sign: Sign::Negative },
 			]
 		);
 	}

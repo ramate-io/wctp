@@ -103,4 +103,26 @@ mod tests {
 			]
 		);
 	}
+
+	#[test]
+	fn test_contain_adds_to() {
+		let interval1 = SignUniformInterval {
+			left: SignBoundary { min: 0.0, sign: Sign::Positive },
+			right: SignBoundary { min: 3.0, sign: Sign::Negative },
+		};
+		let interval2 = SignUniformInterval {
+			left: SignBoundary { min: 1.0, sign: Sign::Negative },
+			right: SignBoundary { min: 2.0, sign: Sign::Positive },
+		};
+
+		let result = interval1.union(&interval2);
+		assert_eq!(
+			result,
+			vec![
+				SignBoundary { min: 0.0, sign: Sign::Positive },
+				SignBoundary { min: 1.0, sign: Sign::Negative },
+				SignBoundary { min: 2.0, sign: Sign::Positive },
+			]
+		);
+	}
 }

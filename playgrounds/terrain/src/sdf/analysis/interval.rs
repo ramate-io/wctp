@@ -171,11 +171,11 @@ impl SignUniformInterval {
 		// then this ends up being overloaded in the next step.
 		let mut after_overlap = None;
 		if self.right.min > other.right.min {
-			let mut pre_after_overlap = self.right.clone();
+			let mut pre_after_overlap = self.left.clone();
 			pre_after_overlap.min = other.right.min;
 			after_overlap = Some(pre_after_overlap);
 		} else if other.right.min > self.right.min {
-			let mut pre_after_overlap = other.right.clone();
+			let mut pre_after_overlap = other.left.clone();
 			pre_after_overlap.min = self.right.min;
 			after_overlap = Some(pre_after_overlap);
 		}
