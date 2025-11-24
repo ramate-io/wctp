@@ -23,9 +23,9 @@ impl Sign {
 	/// Returns the union of the two signs.
 	pub fn union(&self, other: &Self) -> Self {
 		match (self, other) {
-			(Sign::Positive, _) => Sign::Positive,
-			(_, Sign::Positive) => Sign::Positive,
-			(Sign::Negative, Sign::Negative) => Sign::Negative,
+			(Sign::Negative, _) => Sign::Negative,
+			(_, Sign::Negative) => Sign::Negative,
+			(Sign::Positive, Sign::Positive) => Sign::Positive,
 			_ => Sign::Top,
 		}
 	}
