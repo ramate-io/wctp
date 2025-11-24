@@ -1,4 +1,4 @@
-use crate::sdf::Sdf;
+use crate::sdf::{Sdf, Sign, SignBoundary, SignUniformInterval, SignUniformIntervals};
 use bevy::prelude::*;
 
 /// Add two SDFs together - adds their heights (for heightfield-like SDFs)
@@ -45,6 +45,19 @@ impl<A: Sdf, B: Sdf> Union<A, B> {
 impl<A: Sdf, B: Sdf> Sdf for Union<A, B> {
 	fn distance(&self, p: Vec3) -> f32 {
 		self.a.distance(p).min(self.b.distance(p))
+	}
+
+	fn sign_uniform_on_y(&self, x: f32, z: f32) -> SignUniformIntervals {
+		// let mut intervals = SignUniformIntervals::default();
+
+		// For any interval over which one sign is not well behaved and the other is well-behaved,
+		// accept the well behaved sign.
+
+		// For any inteval over which both signs are well behaved, but disagree,
+		// take the negative sign.
+
+		// This isn't implemented yet, so for now just cast to the default.
+		SignUniformIntervals::default()
 	}
 }
 
@@ -96,6 +109,18 @@ impl<A: Sdf, B: Sdf> Sdf for Difference<A, B> {
 		// This keeps points that are inside A but outside B
 		self.a.distance(p).max(-self.b.distance(p))
 	}
+
+	fn sign_uniform_on_y(&self, x: f32, z: f32) -> SignUniformIntervals {
+		// For any interval over which one sign is not well behaved and the other is well-behaved,
+		// accept the well behaved sign.
+
+		// For any inteval over which both signs are well behaved, but disagree,
+		// take the positive sign. This is because the difference is positive when the
+		// first sign is positive and the second sign is negative.
+
+		// This isn't implemented yet, so for now just cast to the default.
+		SignUniformIntervals::default()
+	}
 }
 
 /// Smooth difference of two SDFs
@@ -143,6 +168,13 @@ impl<A: Sdf, B: Sdf> Sdf for Intersection<A, B> {
 		// This keeps points that are inside both A and B
 		self.a.distance(p).max(self.b.distance(p))
 	}
+
+	fn sign_uniform_on_y(&self, x: f32, z: f32) -> SignUniformIntervals {
+		// Take the well-behaved intervals where the a and b agree on signs.
+		// Everything else should be Top.
+
+		SignUniformIntervals::default()
+	}
 }
 
 /// Smooth intersection of two SDFs
@@ -181,6 +213,27 @@ impl<A: Sdf> Translate<A> {
 impl<A: Sdf> Sdf for Translate<A> {
 	fn distance(&self, p: Vec3) -> f32 {
 		self.sdf.distance(p - self.offset)
+	}
+
+	fn sign_uniform_on_y(&self, x: f32, z: f32) -> SignUniformIntervals {
+		let mut translated_intervals = SignUniformIntervals::default();
+		let translated_x = x - self.offset.x;
+		let translated_z = z - self.offset.z;
+
+		for interval in self.sdf.sign_uniform_on_y(translated_x, translated_z).into_iter() {
+			translated_intervals.insert_interval(SignUniformInterval {
+				left: SignBoundary {
+					min: interval.left.min - self.offset.y,
+					sign: interval.left.sign,
+				},
+				right: SignBoundary {
+					min: interval.right.min - self.offset.y,
+					sign: interval.right.sign,
+				},
+			});
+		}
+
+		translated_intervals
 	}
 }
 
