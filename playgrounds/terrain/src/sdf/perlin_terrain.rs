@@ -1,4 +1,4 @@
-use crate::sdf::Sdf;
+use crate::sdf::{Sdf, Sign, SignBoundary, SignUniformIntervals};
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
@@ -7,7 +7,14 @@ use std::fmt::Debug;
 /// Trait for elevation modulations that modify terrain height in 2.5D
 /// Returns the height offset at a given (x, z) position (Y is ignored)
 pub trait ElevationModulation: Send + Sync + Debug {
-	fn modify_elevation(&self, perlin_terrain: &PerlinTerrainSdf, elevation: f32, x: f32, z: f32, index: usize) -> f32;
+	fn modify_elevation(
+		&self,
+		perlin_terrain: &PerlinTerrainSdf,
+		elevation: f32,
+		x: f32,
+		z: f32,
+		index: usize,
+	) -> f32;
 }
 
 /// SDF representation of Perlin noise-based terrain
@@ -98,10 +105,10 @@ impl Sdf for PerlinTerrainSdf {
 
 		// This keeps the terrain height within a max.
 		// TODO: make this configurable via the TerrainConfig.
-		// Note, if you were to make the coefficient negative, you end up with ridges, 
+		// Note, if you were to make the coefficient negative, you end up with ridges,
 		// though for the most part they will be very sharp unless the coefficient is very small.
 		// And, with simply the coefficient, and no base addend, you end up with all ridges peaking at the same height.
-		// So, really, the ideal model is to have a coefficient for ridge and plateau effects. 
+		// So, really, the ideal model is to have a coefficient for ridge and plateau effects.
 		if terrain_height > 10.0 {
 			terrain_height = 10.0 + (0.75 * (terrain_height - 10.0));
 		} else if terrain_height < -10.0 {
@@ -120,5 +127,25 @@ impl Sdf for PerlinTerrainSdf {
 		// Take the maximum (intersection of half-spaces)
 		// This keeps the interior solid between surface and bedrock.
 		d_surface.max(d_bedrock)
+	}
+
+	fn sign_uniform_on_y(&self, x: f32, z: f32) -> SignUniformIntervals {
+		let mut intervals = SignUniformIntervals::default();
+
+		// From below bedrock to the surface, we are outside the terrain,
+		// so the sign is positive.
+		intervals.insert_boundary(SignBoundary { min: f32::NEG_INFINITY, sign: Sign::Positive });
+
+		// From bedrock to the surface, we are inside the terrain,
+		// so the sign is negative.
+		let bedrock_level = -self.config.height_scale * 4.0;
+		intervals.insert_boundary(SignBoundary { min: bedrock_level, sign: Sign::Negative });
+
+		// From the surface to infinity, we are outside the terrain,
+		// so the sign is positive.
+		let height = self.height_at(x, z);
+		intervals.insert_boundary(SignBoundary { min: height, sign: Sign::Positive });
+
+		intervals
 	}
 }
