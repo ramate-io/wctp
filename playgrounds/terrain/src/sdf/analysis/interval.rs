@@ -1,4 +1,6 @@
-use std::collections::BTreeSet;
+pub mod combinators;
+
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Sign {
@@ -129,20 +131,34 @@ impl SignUniformIntervals {
 	pub fn overlaps_with(
 		&self,
 		other: &Self,
-	) -> Vec<(SignUniformInterval, Vec<SignUniformInterval>)> {
-		let mut all_overlaps = Vec::new();
+	) -> BTreeMap<Option<SignUniformInterval>, BTreeSet<SignUniformInterval>> {
+		let mut all_overlaps = BTreeMap::new();
 
 		let mut self_iter = self.clone().into_iter();
 		let mut other_iter = other.clone().into_iter();
 
-		while let Some(left_interval) = self_iter.next() {
-			let mut interval_overlaps = Vec::new();
-			while let Some(right_interval) = other_iter.next() {
-				if left_interval.overlaps_with(&right_interval) {
-					interval_overlaps.push(right_interval);
+		while let Some(other_interval) = other_iter.next() {
+			// Mark whether or not we've found an overlap with this other interval
+			let mut overlap_exists = false;
+
+			// Check all of the intervals in the self set for overlaps with the other interval
+			// Note: later we may be able to optimize this with a binary search or other tracking.
+			// But, in most cases, the number of intervals should be small enough that it doesn't really matter.
+			while let Some(self_interval) = self_iter.next() {
+				if self_interval.overlaps_with(&other_interval) {
+					overlap_exists = true;
+					// extend to all_overlaps for Some(self_interval) with other_interval
+					all_overlaps
+						.entry(Some(self_interval))
+						.or_insert(BTreeSet::new())
+						.insert(other_interval.clone());
 				}
 			}
-			all_overlaps.push((left_interval, interval_overlaps));
+
+			// If no overlap exists, map to the none key.
+			if !overlap_exists {
+				all_overlaps.entry(None).or_insert(BTreeSet::new()).insert(other_interval);
+			}
 		}
 
 		all_overlaps
