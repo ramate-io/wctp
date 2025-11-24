@@ -29,7 +29,7 @@ impl CpuMeshGenerator {
 	) -> Option<Mesh> {
 		// ---------- grid setup ---------------------------------------------------
 		let chunk_size = cascade_chunk.size;
-		let res = cascade_chunk.resolution;
+		let res = cascade_chunk.resolution();
 		let cube_size = chunk_size / res as f32;
 		let chunk_origin = cascade_chunk.origin;
 
@@ -285,7 +285,7 @@ impl CpuMeshGenerator {
 			"Spawned chunk (CPU) at origin {:?} with size {} and resolution {}",
 			cascade_chunk.origin,
 			cascade_chunk.size,
-			cascade_chunk.resolution
+			cascade_chunk.resolution()
 		);
 
 		entity

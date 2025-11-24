@@ -35,7 +35,7 @@ impl From<&crate::terrain::TerrainConfig> for TerrainConfigGpu {
 	fn from(c: &crate::terrain::TerrainConfig) -> Self {
 		Self {
 			seed: c.seed,
-			base_resolution: c.base_resolution as u32,
+			base_resolution: c.base_res_2 as u32,
 			height_scale: c.height_scale,
 			use_volumetric: c.use_volumetric as u32,
 		}
@@ -51,4 +51,3 @@ pub struct GpuMeshData {
 	pub normals: Vec<[f32; 3]>,
 	pub uvs: Vec<[f32; 2]>,
 }
-
