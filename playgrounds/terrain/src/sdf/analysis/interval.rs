@@ -86,6 +86,11 @@ impl SignUniformInterval {
 	pub fn is_well_behaved(&self) -> bool {
 		self.left.sign.is_well_behaved()
 	}
+
+	/// Whether the interval overlaps with another interval.
+	pub fn overlaps_with(&self, other: &Self) -> bool {
+		self.left.min < other.right.min && self.right.min > other.left.min
+	}
 }
 
 #[derive(Debug, Clone, Default)]
@@ -118,6 +123,29 @@ impl SignUniformIntervals {
 			}
 		}
 		intervals
+	}
+
+	/// Computes the overlaps of the left interval set with the right interval set.
+	pub fn overlaps_with(
+		&self,
+		other: &Self,
+	) -> Vec<(SignUniformInterval, Vec<SignUniformInterval>)> {
+		let mut all_overlaps = Vec::new();
+
+		let mut self_iter = self.clone().into_iter();
+		let mut other_iter = other.clone().into_iter();
+
+		while let Some(left_interval) = self_iter.next() {
+			let mut interval_overlaps = Vec::new();
+			while let Some(right_interval) = other_iter.next() {
+				if left_interval.overlaps_with(&right_interval) {
+					interval_overlaps.push(right_interval);
+				}
+			}
+			all_overlaps.push((left_interval, interval_overlaps));
+		}
+
+		all_overlaps
 	}
 }
 
