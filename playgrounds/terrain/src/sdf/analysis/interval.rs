@@ -4,12 +4,19 @@ use std::collections::BTreeSet;
 pub enum Sign {
 	/// The sign is unknown.
 	Top,
-	/// The sign is negative
+	/// The sign is negative.
 	Negative,
-	/// The sign is positive
+	/// The sign is positive.
 	Positive,
 	/// The sign is known but undefined.
 	Bottom,
+}
+
+impl Sign {
+	/// Returns true if the sign is well behaved.
+	pub fn is_well_behaved(&self) -> bool {
+		matches!(self, Sign::Negative | Sign::Positive)
+	}
 }
 
 /// The sign is uniform from the min to some next boundary which will be placed in the intervals.
@@ -59,6 +66,28 @@ impl Ord for SignUniform {
 	}
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SignUniformInterval {
+	pub left: SignUniform,
+	pub right: SignUniform,
+}
+
+impl SignUniformInterval {
+	/// Gets the open range of the sign uniform interval.
+	///
+	/// All intervals are on an open range; the naming is to make it clear on each call.
+	pub fn open_range(&self) -> (f32, f32) {
+		(self.left.min, self.right.min)
+	}
+
+	/// Whether the interval is well behaved.
+	///
+	/// If the left of the interval is well behaved, then the interval is well behaved.
+	pub fn is_well_behaved(&self) -> bool {
+		self.left.sign.is_well_behaved()
+	}
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct SignUniformIntervals {
 	pub intervals: BTreeSet<SignUniform>,
@@ -74,12 +103,15 @@ pub struct SignUniformIntervalsIterator {
 
 // Iterates left, right pairs beginning with the top constant, then through the members of the set, then ending with the bottom constant.
 impl Iterator for SignUniformIntervalsIterator {
-	type Item = (SignUniform, SignUniform);
+	type Item = SignUniformInterval;
 	fn next(&mut self) -> Option<Self::Item> {
 		if self.intervals.is_empty() {
 			if !self.emitted_top {
 				self.emitted_top = true;
-				return Some((SignUniform::top(), SignUniform::bottom()));
+				return Some(SignUniformInterval {
+					left: SignUniform::top(),
+					right: SignUniform::bottom(),
+				});
 			}
 			return None;
 		}
@@ -87,7 +119,10 @@ impl Iterator for SignUniformIntervalsIterator {
 		if !self.emitted_top {
 			self.emitted_top = true;
 			// First pair: (top, first_element)
-			return Some((SignUniform::top(), self.intervals[0].clone()));
+			return Some(SignUniformInterval {
+				left: SignUniform::top(),
+				right: self.intervals[0].clone(),
+			});
 		}
 
 		if self.index < self.intervals.len() - 1 {
@@ -95,14 +130,14 @@ impl Iterator for SignUniformIntervalsIterator {
 			let left = self.intervals[self.index].clone();
 			let right = self.intervals[self.index + 1].clone();
 			self.index += 1;
-			return Some((left, right));
+			return Some(SignUniformInterval { left, right });
 		}
 
 		if self.index < self.intervals.len() {
 			// Last pair: (last_element, bottom)
 			let left = self.intervals[self.index].clone();
 			self.index += 1;
-			return Some((left, SignUniform::bottom()));
+			return Some(SignUniformInterval { left, right: SignUniform::bottom() });
 		}
 
 		None
@@ -110,7 +145,7 @@ impl Iterator for SignUniformIntervalsIterator {
 }
 
 impl IntoIterator for SignUniformIntervals {
-	type Item = (SignUniform, SignUniform);
+	type Item = SignUniformInterval;
 	type IntoIter = SignUniformIntervalsIterator;
 
 	fn into_iter(self) -> Self::IntoIter {
@@ -129,10 +164,10 @@ mod tests {
 		let pairs: Vec<_> = intervals.into_iter().collect();
 
 		assert_eq!(pairs.len(), 1);
-		assert_eq!(pairs[0].0.min, f32::NEG_INFINITY);
-		assert_eq!(pairs[0].0.sign, Sign::Top);
-		assert_eq!(pairs[0].1.min, f32::INFINITY);
-		assert_eq!(pairs[0].1.sign, Sign::Bottom);
+		assert_eq!(pairs[0].left.min, f32::NEG_INFINITY);
+		assert_eq!(pairs[0].left.sign, Sign::Top);
+		assert_eq!(pairs[0].right.min, f32::INFINITY);
+		assert_eq!(pairs[0].right.sign, Sign::Bottom);
 	}
 
 	#[test]
@@ -145,16 +180,16 @@ mod tests {
 		assert_eq!(pairs.len(), 2);
 
 		// First pair: (top, first_element)
-		assert_eq!(pairs[0].0.min, f32::NEG_INFINITY);
-		assert_eq!(pairs[0].0.sign, Sign::Top);
-		assert_eq!(pairs[0].1.min, 0.0);
-		assert_eq!(pairs[0].1.sign, Sign::Negative);
+		assert_eq!(pairs[0].left.min, f32::NEG_INFINITY);
+		assert_eq!(pairs[0].left.sign, Sign::Top);
+		assert_eq!(pairs[0].right.min, 0.0);
+		assert_eq!(pairs[0].right.sign, Sign::Negative);
 
 		// Second pair: (first_element, bottom)
-		assert_eq!(pairs[1].0.min, 0.0);
-		assert_eq!(pairs[1].0.sign, Sign::Negative);
-		assert_eq!(pairs[1].1.min, f32::INFINITY);
-		assert_eq!(pairs[1].1.sign, Sign::Bottom);
+		assert_eq!(pairs[1].left.min, 0.0);
+		assert_eq!(pairs[1].left.sign, Sign::Negative);
+		assert_eq!(pairs[1].right.min, f32::INFINITY);
+		assert_eq!(pairs[1].right.sign, Sign::Bottom);
 	}
 
 	#[test]
@@ -169,28 +204,28 @@ mod tests {
 		assert_eq!(pairs.len(), 4);
 
 		// First pair: (top, first_element)
-		assert_eq!(pairs[0].0.min, f32::NEG_INFINITY);
-		assert_eq!(pairs[0].0.sign, Sign::Top);
-		assert_eq!(pairs[0].1.min, 0.0);
-		assert_eq!(pairs[0].1.sign, Sign::Negative);
+		assert_eq!(pairs[0].left.min, f32::NEG_INFINITY);
+		assert_eq!(pairs[0].left.sign, Sign::Top);
+		assert_eq!(pairs[0].right.min, 0.0);
+		assert_eq!(pairs[0].right.sign, Sign::Negative);
 
 		// Second pair: (0.0, 5.0)
-		assert_eq!(pairs[1].0.min, 0.0);
-		assert_eq!(pairs[1].0.sign, Sign::Negative);
-		assert_eq!(pairs[1].1.min, 5.0);
-		assert_eq!(pairs[1].1.sign, Sign::Positive);
+		assert_eq!(pairs[1].left.min, 0.0);
+		assert_eq!(pairs[1].left.sign, Sign::Negative);
+		assert_eq!(pairs[1].right.min, 5.0);
+		assert_eq!(pairs[1].right.sign, Sign::Positive);
 
 		// Third pair: (5.0, 10.0)
-		assert_eq!(pairs[2].0.min, 5.0);
-		assert_eq!(pairs[2].0.sign, Sign::Positive);
-		assert_eq!(pairs[2].1.min, 10.0);
-		assert_eq!(pairs[2].1.sign, Sign::Negative);
+		assert_eq!(pairs[2].left.min, 5.0);
+		assert_eq!(pairs[2].left.sign, Sign::Positive);
+		assert_eq!(pairs[2].right.min, 10.0);
+		assert_eq!(pairs[2].right.sign, Sign::Negative);
 
 		// Last pair: (last_element, bottom)
-		assert_eq!(pairs[3].0.min, 10.0);
-		assert_eq!(pairs[3].0.sign, Sign::Negative);
-		assert_eq!(pairs[3].1.min, f32::INFINITY);
-		assert_eq!(pairs[3].1.sign, Sign::Bottom);
+		assert_eq!(pairs[3].left.min, 10.0);
+		assert_eq!(pairs[3].left.sign, Sign::Negative);
+		assert_eq!(pairs[3].right.min, f32::INFINITY);
+		assert_eq!(pairs[3].right.sign, Sign::Bottom);
 	}
 
 	#[test]
@@ -204,12 +239,12 @@ mod tests {
 
 		// Should be ordered by min value regardless of insertion order
 		assert_eq!(pairs.len(), 4);
-		assert_eq!(pairs[0].1.min, 0.0);
-		assert_eq!(pairs[1].0.min, 0.0);
-		assert_eq!(pairs[1].1.min, 5.0);
-		assert_eq!(pairs[2].0.min, 5.0);
-		assert_eq!(pairs[2].1.min, 10.0);
-		assert_eq!(pairs[3].0.min, 10.0);
+		assert_eq!(pairs[0].right.min, 0.0);
+		assert_eq!(pairs[1].right.min, 5.0);
+		assert_eq!(pairs[2].left.min, 5.0);
+		assert_eq!(pairs[2].right.min, 10.0);
+		assert_eq!(pairs[3].left.min, 10.0);
+		assert_eq!(pairs[3].right.min, f32::INFINITY);
 	}
 
 	#[test]
