@@ -53,7 +53,7 @@ impl<A: Sdf, B: Sdf> Sdf for Union<A, B> {
 		// For any interval over which one sign is not well behaved and the other is well-behaved,
 		// accept the well behaved sign.
 
-		// For any inteval over which both signs are well behaved, but disagree,
+		// For any interval over which both signs are well behaved, but disagree,
 		// take the negative sign.
 
 		// This isn't implemented yet, so for now just cast to the default.

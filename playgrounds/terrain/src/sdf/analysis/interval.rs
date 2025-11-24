@@ -104,6 +104,21 @@ impl SignUniformIntervals {
 		self.boundaries.insert(interval.left);
 		self.boundaries.insert(interval.right);
 	}
+
+	/// Queries a given open range for all of the different sign intervals that exist within it.
+	///
+	/// The current implementation is O(n) where n is the number of boundaries in the intervals.
+	/// In theory, you could optimize with a binary. But, in most cases, the number of boundaries is small.
+	pub fn in_range(&self, range: (f32, f32)) -> Vec<SignUniformInterval> {
+		let mut intervals = Vec::new();
+		for boundary in self.boundaries.iter() {
+			if boundary.min >= range.0 && boundary.min < range.1 {
+				intervals
+					.push(SignUniformInterval { left: boundary.clone(), right: boundary.clone() });
+			}
+		}
+		intervals
+	}
 }
 
 pub struct SignUniformIntervalsIterator {

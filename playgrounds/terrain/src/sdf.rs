@@ -32,7 +32,7 @@ pub trait Sdf: Send + Sync {
 	/// This is useful for voxel grid optimizations as you can skip ahead to the next
 	/// new Y value that need be sampled.
 	///
-	/// You could do this along any axis. But, giving x and z applies nicely to the plain in which
+	/// You could do this over any plane. But, giving x and z applies nicely to the plain in which
 	/// most gameplay is defined.
 	fn sign_uniform_on_y(&self, _x: f32, _z: f32) -> SignUniformIntervals {
 		SignUniformIntervals::default()
