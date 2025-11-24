@@ -1,3 +1,5 @@
+pub mod boundary;
+
 use super::super::{SignBoundary, SignUniformInterval};
 
 impl SignUniformInterval {
