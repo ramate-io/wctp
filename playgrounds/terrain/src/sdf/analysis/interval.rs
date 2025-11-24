@@ -29,6 +29,25 @@ impl Sign {
 			_ => Sign::Top,
 		}
 	}
+
+	/// Flips the sign if negative, otherwise returns the sign.
+	pub fn flip(&self) -> Self {
+		if self == &Sign::Negative {
+			Sign::Positive
+		} else {
+			self.clone()
+		}
+	}
+
+	/// Returns the difference of the two signs.
+	pub fn difference(&self, other: &Self) -> Self {
+		match (self, other) {
+			// whatever the self sign is, if the other is negative, then the result is positive
+			(_, Sign::Negative) => Sign::Positive,
+			// otherwise, the sign stays the same
+			_ => self.clone(),
+		}
+	}
 }
 
 /// The sign is uniform from the min to some next boundary which will be placed in the intervals.
