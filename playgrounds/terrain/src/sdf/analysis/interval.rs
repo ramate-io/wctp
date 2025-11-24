@@ -20,6 +20,16 @@ impl Sign {
 		matches!(self, Sign::Negative | Sign::Positive)
 	}
 
+	/// Returns true if sign is negative
+	pub fn is_negative(&self) -> bool {
+		matches!(self, Sign::Negative)
+	}
+
+	/// Returns true if sign is negative
+	pub fn is_positive(&self) -> bool {
+		matches!(self, Sign::Positive)
+	}
+
 	/// Returns the union of the two signs.
 	pub fn union(&self, other: &Self) -> Self {
 		match (self, other) {
@@ -66,6 +76,11 @@ impl SignBoundary {
 	/// The sign is uniformly undefined from positive infinity.
 	pub const fn bottom() -> Self {
 		Self { min: f32::INFINITY, sign: Sign::Bottom }
+	}
+
+	/// Constructrs a version of the boundary with the sign flipped.
+	pub fn flip(&self) -> Self {
+		Self { min: self.min, sign: self.sign.flip() }
 	}
 }
 
