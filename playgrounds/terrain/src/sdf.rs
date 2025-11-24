@@ -36,6 +36,8 @@ pub trait Sdf: Send + Sync {
 	///
 	/// For example, when unioning two SDFs, you can say everything within the bounds of either SDF
 	/// is Top. Everything outside the intesecting bounds can take the value of which SDF is defined.
+	///
+	/// Often times, you can compute tighter bounds. But, this is useful when doing so is computationally expensive.
 	fn bounds(&self) -> Bounds {
 		Bounds::Unbounded
 	}
