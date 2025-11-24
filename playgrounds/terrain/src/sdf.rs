@@ -27,6 +27,13 @@ use bevy::prelude::*;
 pub trait Sdf: Send + Sync {
 	fn distance(&self, p: Vec3) -> f32;
 
+	/// Computes intervals along Y of sign uniformity for a given (x, z) position.
+	///
+	/// This is useful for voxel grid optimizations as you can skip ahead to the next
+	/// new Y value that need be sampled.
+	///
+	/// You could do this along any axis. But, giving x and z applies nicely to the plain in which
+	/// most gameplay is defined.
 	fn sign_uniform_on_y(&self, _x: f32, _z: f32) -> SignUniformIntervals {
 		SignUniformIntervals::default()
 	}
