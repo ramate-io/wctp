@@ -21,12 +21,12 @@ impl Sign {
 
 /// The sign is uniform from the min to some next boundary which will be placed in the intervals.
 #[derive(Debug, Clone)]
-pub struct SignUniform {
+pub struct SignBoundary {
 	pub min: f32,
 	pub sign: Sign,
 }
 
-impl SignUniform {
+impl SignBoundary {
 	/// The sign is uniformly unknown from negative infinity.
 	pub const fn top() -> Self {
 		Self { min: f32::NEG_INFINITY, sign: Sign::Top }
@@ -38,7 +38,7 @@ impl SignUniform {
 	}
 }
 
-impl PartialOrd for SignUniform {
+impl PartialOrd for SignBoundary {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
 		// compare min then sign
 		Some(
@@ -52,15 +52,15 @@ impl PartialOrd for SignUniform {
 	}
 }
 
-impl PartialEq for SignUniform {
+impl PartialEq for SignBoundary {
 	fn eq(&self, other: &Self) -> bool {
 		self.min == other.min && self.sign == other.sign
 	}
 }
 
-impl Eq for SignUniform {}
+impl Eq for SignBoundary {}
 
-impl Ord for SignUniform {
+impl Ord for SignBoundary {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
 		self.partial_cmp(other).unwrap()
 	}
@@ -68,8 +68,8 @@ impl Ord for SignUniform {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SignUniformInterval {
-	pub left: SignUniform,
-	pub right: SignUniform,
+	pub left: SignBoundary,
+	pub right: SignBoundary,
 }
 
 impl SignUniformInterval {
@@ -90,13 +90,24 @@ impl SignUniformInterval {
 
 #[derive(Debug, Clone, Default)]
 pub struct SignUniformIntervals {
-	pub intervals: BTreeSet<SignUniform>,
+	boundaries: BTreeSet<SignBoundary>,
 }
 
-impl SignUniformIntervals {}
+impl SignUniformIntervals {
+	/// Inserts a boundary into the intervals.
+	pub fn insert_boundary(&mut self, boundary: SignBoundary) {
+		self.boundaries.insert(boundary);
+	}
+
+	/// Inserts an interval into the intervals.
+	pub fn insert_interval(&mut self, interval: SignUniformInterval) {
+		self.boundaries.insert(interval.left);
+		self.boundaries.insert(interval.right);
+	}
+}
 
 pub struct SignUniformIntervalsIterator {
-	intervals: Vec<SignUniform>,
+	intervals: Vec<SignBoundary>,
 	index: usize,
 	emitted_top: bool,
 }
@@ -109,8 +120,8 @@ impl Iterator for SignUniformIntervalsIterator {
 			if !self.emitted_top {
 				self.emitted_top = true;
 				return Some(SignUniformInterval {
-					left: SignUniform::top(),
-					right: SignUniform::bottom(),
+					left: SignBoundary::top(),
+					right: SignBoundary::bottom(),
 				});
 			}
 			return None;
@@ -120,7 +131,7 @@ impl Iterator for SignUniformIntervalsIterator {
 			self.emitted_top = true;
 			// First pair: (top, first_element)
 			return Some(SignUniformInterval {
-				left: SignUniform::top(),
+				left: SignBoundary::top(),
 				right: self.intervals[0].clone(),
 			});
 		}
@@ -137,7 +148,7 @@ impl Iterator for SignUniformIntervalsIterator {
 			// Last pair: (last_element, bottom)
 			let left = self.intervals[self.index].clone();
 			self.index += 1;
-			return Some(SignUniformInterval { left, right: SignUniform::bottom() });
+			return Some(SignUniformInterval { left, right: SignBoundary::bottom() });
 		}
 
 		None
@@ -149,7 +160,7 @@ impl IntoIterator for SignUniformIntervals {
 	type IntoIter = SignUniformIntervalsIterator;
 
 	fn into_iter(self) -> Self::IntoIter {
-		let intervals: Vec<SignUniform> = self.intervals.into_iter().collect();
+		let intervals: Vec<SignBoundary> = self.boundaries.into_iter().collect();
 		SignUniformIntervalsIterator { intervals, index: 0, emitted_top: false }
 	}
 }
@@ -173,7 +184,7 @@ mod tests {
 	#[test]
 	fn test_single_interval() {
 		let mut intervals = SignUniformIntervals::default();
-		intervals.intervals.insert(SignUniform { min: 0.0, sign: Sign::Negative });
+		intervals.insert_boundary(SignBoundary { min: 0.0, sign: Sign::Negative });
 
 		let pairs: Vec<_> = intervals.into_iter().collect();
 
@@ -195,9 +206,9 @@ mod tests {
 	#[test]
 	fn test_multiple_intervals() {
 		let mut intervals = SignUniformIntervals::default();
-		intervals.intervals.insert(SignUniform { min: 0.0, sign: Sign::Negative });
-		intervals.intervals.insert(SignUniform { min: 5.0, sign: Sign::Positive });
-		intervals.intervals.insert(SignUniform { min: 10.0, sign: Sign::Negative });
+		intervals.insert_boundary(SignBoundary { min: 0.0, sign: Sign::Negative });
+		intervals.insert_boundary(SignBoundary { min: 5.0, sign: Sign::Positive });
+		intervals.insert_boundary(SignBoundary { min: 10.0, sign: Sign::Negative });
 
 		let pairs: Vec<_> = intervals.into_iter().collect();
 
@@ -231,9 +242,9 @@ mod tests {
 	#[test]
 	fn test_interval_ordering() {
 		let mut intervals = SignUniformIntervals::default();
-		intervals.intervals.insert(SignUniform { min: 10.0, sign: Sign::Positive });
-		intervals.intervals.insert(SignUniform { min: 0.0, sign: Sign::Negative });
-		intervals.intervals.insert(SignUniform { min: 5.0, sign: Sign::Positive });
+		intervals.insert_boundary(SignBoundary { min: 10.0, sign: Sign::Positive });
+		intervals.insert_boundary(SignBoundary { min: 0.0, sign: Sign::Negative });
+		intervals.insert_boundary(SignBoundary { min: 5.0, sign: Sign::Positive });
 
 		let pairs: Vec<_> = intervals.into_iter().collect();
 
@@ -250,7 +261,7 @@ mod tests {
 	#[test]
 	fn test_iterator_consumes() {
 		let mut intervals = SignUniformIntervals::default();
-		intervals.intervals.insert(SignUniform { min: 0.0, sign: Sign::Negative });
+		intervals.insert_boundary(SignBoundary { min: 0.0, sign: Sign::Negative });
 
 		let mut iter = intervals.into_iter();
 		assert!(iter.next().is_some());
