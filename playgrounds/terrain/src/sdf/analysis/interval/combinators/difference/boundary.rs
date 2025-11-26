@@ -25,4 +25,40 @@ impl SignBoundary {
 			}
 		}
 	}
+
+	pub fn differences_over(&self, others_before_next: &Vec<SignBoundary>) -> Vec<SignBoundary> {
+		others_before_next
+			.into_iter()
+			.map(|other| self.difference(&other))
+			.flatten()
+			.collect()
+	}
+
+	pub fn differences_on(mapping: &Vec<(SignBoundary, Vec<SignBoundary>)>) -> Vec<SignBoundary> {
+		mapping
+			.into_iter()
+			.map(|(boundary, others)| boundary.differences_over(&others))
+			.flatten()
+			.collect()
+	}
+}
+
+#[cfg(test)]
+pub mod test {
+
+	use super::*;
+
+	#[test]
+	fn test_difference_over_rhs_one_negative() {
+		let boundary = SignBoundary { min: 0.0, sign: Sign::Negative };
+		let others = vec![SignBoundary { min: 1.0, sign: Sign::Negative }];
+		let result = boundary.differences_over(&others);
+		assert_eq!(
+			result,
+			vec![
+				SignBoundary { min: 0.0, sign: Sign::Negative },
+				SignBoundary { min: 1.0, sign: Sign::Positive }
+			]
+		);
+	}
 }
