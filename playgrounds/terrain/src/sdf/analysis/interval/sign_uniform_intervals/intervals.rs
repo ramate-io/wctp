@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, Default)]
 pub struct SignUniformIntervals {
-	boundaries: BTreeSet<SignBoundary>,
+	pub(crate) boundaries: BTreeSet<SignBoundary>,
 }
 
 impl SignUniformIntervals {
