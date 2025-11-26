@@ -37,11 +37,11 @@ impl SignBoundary {
 			}
 			(Sign::Negative, Sign::Positive) => {
 				// If other is positive, we know we are positive from where other is positive.
-				vec![SignBoundary { min: other.min, sign: Sign::Positive }]
+				vec![other.clone()]
 			}
 			(Sign::Positive, Sign::Negative) => {
 				// If self is positive, we know we are positive from where self is positive.
-				vec![SignBoundary { min: self.min, sign: Sign::Positive }]
+				vec![self.clone()]
 			}
 		}
 	}
