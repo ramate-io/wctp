@@ -1,3 +1,6 @@
+pub mod boundary_mapping;
+pub mod interval_mapping;
+
 use crate::sdf::analysis::interval::{SignBoundary, SignUniformInterval};
 use std::collections::{BTreeMap, BTreeSet};
 
