@@ -87,7 +87,6 @@ pub mod test {
 			result,
 			vec![
 				SignBoundary { min: 1.0, sign: Sign::Negative },
-				SignBoundary { min: 1.0, sign: Sign::Negative },
 				SignBoundary { min: 2.0, sign: Sign::Positive },
 			]
 		)
