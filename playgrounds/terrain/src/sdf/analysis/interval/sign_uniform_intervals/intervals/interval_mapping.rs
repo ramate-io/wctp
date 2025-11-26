@@ -1,12 +1,24 @@
+pub mod combinators;
+
 use crate::sdf::analysis::interval::{SignUniformInterval, SignUniformIntervals};
 use std::collections::{BTreeMap, BTreeSet};
 
+#[derive(Debug, Clone)]
+pub struct IntervalMapping {
+	mapping: BTreeMap<Option<SignUniformInterval>, BTreeSet<SignUniformInterval>>,
+}
+
+impl IntervalMapping {
+	pub fn into_iter(
+		self,
+	) -> impl Iterator<Item = (Option<SignUniformInterval>, BTreeSet<SignUniformInterval>)> {
+		self.mapping.into_iter()
+	}
+}
+
 impl SignUniformIntervals {
 	/// Computes the overlaps of the left interval set with the right interval set.
-	pub fn interval_mapping(
-		&self,
-		other: &Self,
-	) -> BTreeMap<Option<SignUniformInterval>, BTreeSet<SignUniformInterval>> {
+	pub fn interval_mapping(&self, other: &Self) -> IntervalMapping {
 		let mut all_overlaps = BTreeMap::new();
 
 		let mut self_iter = self.clone().into_iter();
@@ -36,6 +48,6 @@ impl SignUniformIntervals {
 			}
 		}
 
-		all_overlaps
+		IntervalMapping { mapping: all_overlaps }
 	}
 }
