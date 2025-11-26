@@ -4,21 +4,19 @@ impl SignBoundary {
 	pub fn difference(&self, other: &SignBoundary) -> Vec<SignBoundary> {
 		match other.sign {
 			Sign::Negative => {
-				if other.min < self.min {
-					// this negates self entirely as far as this pair is concerned
-					vec![other.flip()]
-				} else {
-					vec![self.clone(), other.flip()]
-				}
+				// this always just clears out from where the other is negative.
+				vec![other.flip()]
+				// Note: you could argue a normalized boundary mapping
+				// should never have two RHS negative boundaries back to back.
+				// In this case, you could add the self.clone() boundary here.
+				// However, we can generally assume that the previous mapping entry
+				// would preserve self.clone() if it was not RHS negative.
+				// Hence, we don't have to make as strong of an assumption
+				// for only returning other.flip() to be correct.
 			}
 			Sign::Positive => {
-				// You can just keep self.
-				// If self is positive, then that positivity is preserved.
-				// If self is negative, then that negativity is preserved--valid union.
-				// If self is top, then topness is preserved. The previous interval would can
-				// take whatever the value up to point.
-				// Bottom is the same logic as top.
-				vec![self.clone()]
+				// This is just self from wherever the other is positive.
+				vec![SignBoundary { min: self.min.max(other.min), sign: self.sign.clone() }]
 			}
 			Sign::Top => {
 				// This is unknown from the lowest point
@@ -58,13 +56,7 @@ pub mod test {
 		let boundary = SignBoundary { min: 0.0, sign: Sign::Negative };
 		let others = vec![SignBoundary { min: 1.0, sign: Sign::Negative }];
 		let result = boundary.differences_over(&others);
-		assert_eq!(
-			result,
-			vec![
-				SignBoundary { min: 0.0, sign: Sign::Negative },
-				SignBoundary { min: 1.0, sign: Sign::Positive }
-			]
-		);
+		assert_eq!(result, vec![SignBoundary { min: 1.0, sign: Sign::Positive }]);
 	}
 
 	#[test]
@@ -76,7 +68,7 @@ pub mod test {
 	}
 
 	#[test]
-	fn test_unions_over_rhs_before_lhs_positive() {
+	fn test_differences_over_rhs_before_lhs_positive() {
 		let boundary = SignBoundary { min: 0.0, sign: Sign::Negative };
 		let others = vec![SignBoundary { min: -1.0, sign: Sign::Positive }];
 		let result = boundary.differences_over(&others);
@@ -94,9 +86,27 @@ pub mod test {
 		assert_eq!(
 			result,
 			vec![
-				SignBoundary { min: 0.0, sign: Sign::Negative },
-				SignBoundary { min: 0.0, sign: Sign::Negative },
+				SignBoundary { min: 1.0, sign: Sign::Negative },
+				SignBoundary { min: 1.0, sign: Sign::Negative },
 				SignBoundary { min: 2.0, sign: Sign::Positive },
+			]
+		)
+	}
+
+	#[test]
+	fn test_differences_over_rhs_many_complex() {
+		let boundary = SignBoundary { min: 2.0, sign: Sign::Negative };
+		let others = vec![
+			SignBoundary { min: 1.0, sign: Sign::Negative },
+			SignBoundary { min: 3.0, sign: Sign::Positive },
+		];
+		let result = boundary.differences_over(&others);
+		assert_eq!(
+			result,
+			vec![
+				// normalization will later combine these two
+				SignBoundary { min: 1.0, sign: Sign::Positive },
+				SignBoundary { min: 3.0, sign: Sign::Negative },
 			]
 		)
 	}
