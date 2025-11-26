@@ -61,4 +61,12 @@ pub mod test {
 			]
 		);
 	}
+
+	#[test]
+	fn test_difference_over_rhs_before_lhs_positive() {
+		let boundary = SignBoundary { min: 0.0, sign: Sign::Negative };
+		let others = vec![SignBoundary { min: -1.0, sign: Sign::Negative }];
+		let result = boundary.differences_over(&others);
+		assert_eq!(result, vec![SignBoundary { min: -1.0, sign: Sign::Positive }]);
+	}
 }
