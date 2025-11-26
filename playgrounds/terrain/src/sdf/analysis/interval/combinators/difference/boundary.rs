@@ -2,8 +2,12 @@ use crate::sdf::analysis::interval::{Sign, SignBoundary};
 
 impl SignBoundary {
 	pub fn difference(&self, other: &SignBoundary) -> Vec<SignBoundary> {
-		match other.sign {
-			Sign::Negative => {
+		match (&self.sign, &other.sign) {
+			(Sign::Positive, _) => {
+				// doesn't matter what the other is, we are positive; there's nothing meaningful to deduct from.
+				vec![self.clone()]
+			}
+			(_, Sign::Negative) => {
 				// this always just clears out from where the other is negative.
 				vec![other.flip()]
 				// Note: you could argue a normalized boundary mapping
@@ -14,17 +18,13 @@ impl SignBoundary {
 				// Hence, we don't have to make as strong of an assumption
 				// for only returning other.flip() to be correct.
 			}
-			Sign::Positive => {
-				// This is just self from wherever the other is positive.
+			(_, Sign::Positive) => {
+				// This is just self from at least wherever the other is positive.
 				vec![SignBoundary { min: self.min.max(other.min), sign: self.sign.clone() }]
 			}
-			Sign::Top => {
-				// This is unknown from the lowest point
-				vec![SignBoundary { min: self.min.min(other.min), sign: Sign::Top }]
-			}
-			Sign::Bottom => {
-				// This is undefined from the lowest point
-				vec![SignBoundary { min: self.min.min(other.min), sign: Sign::Bottom }]
+			_ => {
+				// This is unknown or undefined from the lowest point
+				vec![SignBoundary { min: self.min.min(other.min), sign: self.sign.clone() }]
 			}
 		}
 	}
@@ -106,6 +106,87 @@ pub mod test {
 				// normalization will later combine these two
 				SignBoundary { min: 1.0, sign: Sign::Positive },
 				SignBoundary { min: 3.0, sign: Sign::Negative },
+			]
+		)
+	}
+
+	#[test]
+	fn test_differences_on_simple() {
+		let mapping = vec![
+			(
+				SignBoundary { min: 0.0, sign: Sign::Positive },
+				vec![SignBoundary { min: 1.0, sign: Sign::Negative }],
+			),
+			(
+				SignBoundary { min: 2.0, sign: Sign::Negative },
+				vec![
+					// because the RHS boundary from 1.0 intersects with both,
+					// it should show up in both mappings.
+					SignBoundary { min: 1.0, sign: Sign::Negative },
+					SignBoundary { min: 3.0, sign: Sign::Positive },
+				],
+			),
+		];
+		let result = SignBoundary::differences_on(&mapping);
+		assert_eq!(
+			result,
+			vec![
+				// later normalization will combine...
+				SignBoundary { min: 0.0, sign: Sign::Positive },
+				SignBoundary { min: 1.0, sign: Sign::Positive },
+				SignBoundary { min: 3.0, sign: Sign::Negative },
+				// ...the matching boundaries
+			]
+		)
+	}
+
+	#[test]
+	fn test_unions_on_rhs_intersects_many() {
+		let rhs = SignBoundary { min: -1.0, sign: Sign::Negative };
+
+		let mapping = vec![
+			(SignBoundary { min: 0.0, sign: Sign::Positive }, vec![rhs.clone()]),
+			(SignBoundary { min: 2.0, sign: Sign::Negative }, vec![rhs.clone()]),
+			(SignBoundary { min: 3.0, sign: Sign::Positive }, vec![rhs.clone()]),
+			(SignBoundary { min: 4.0, sign: Sign::Negative }, vec![rhs.clone()]),
+		];
+		let result = SignBoundary::differences_on(&mapping);
+		assert_eq!(
+			result,
+			vec![
+				// this is unnormalized, but negative on the entire interval from -1.0
+				SignBoundary { min: 0.0, sign: Sign::Positive },
+				SignBoundary { min: -1.0, sign: Sign::Positive },
+				SignBoundary { min: 3.0, sign: Sign::Positive },
+				SignBoundary { min: -1.0, sign: Sign::Positive },
+			]
+		)
+	}
+
+	#[test]
+	fn test_unions_on_rhs_intersects_many_then_flips() {
+		let rhs_start = SignBoundary { min: -1.0, sign: Sign::Negative };
+		let rhs_end = SignBoundary { min: 5.0, sign: Sign::Positive };
+		let mapping = vec![
+			(SignBoundary { min: 0.0, sign: Sign::Negative }, vec![rhs_start.clone()]),
+			(SignBoundary { min: 2.0, sign: Sign::Positive }, vec![rhs_start.clone()]),
+			(SignBoundary { min: 3.0, sign: Sign::Negative }, vec![rhs_start.clone()]),
+			(
+				SignBoundary { min: 4.0, sign: Sign::Positive },
+				vec![rhs_start.clone(), rhs_end.clone()],
+			),
+			(SignBoundary { min: 5.0, sign: Sign::Negative }, vec![rhs_end.clone()]),
+		];
+		let result = SignBoundary::differences_on(&mapping);
+		assert_eq!(
+			result,
+			vec![
+				SignBoundary { min: -1.0, sign: Sign::Positive },
+				SignBoundary { min: 2.0, sign: Sign::Positive },
+				SignBoundary { min: -1.0, sign: Sign::Positive },
+				SignBoundary { min: 4.0, sign: Sign::Positive },
+				SignBoundary { min: 4.0, sign: Sign::Positive },
+				SignBoundary { min: 5.0, sign: Sign::Negative },
 			]
 		)
 	}
