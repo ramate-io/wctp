@@ -12,8 +12,13 @@ impl SignBoundary {
 				}
 			}
 			Sign::Positive => {
-				// whatever the sign on self is at the max of it and other
-				vec![SignBoundary { min: self.min.max(other.min), sign: self.sign.clone() }]
+				// You can just keep self.
+				// If self is positive, then that positivity is preserved.
+				// If self is negative, then that negativity is preserved--valid union.
+				// If self is top, then topness is preserved. The previous interval would can
+				// take whatever the value up to point.
+				// Bottom is the same logic as top.
+				vec![self.clone()]
 			}
 			Sign::Top => {
 				// This is unknown from the lowest point
@@ -76,5 +81,23 @@ pub mod test {
 		let others = vec![SignBoundary { min: -1.0, sign: Sign::Positive }];
 		let result = boundary.differences_over(&others);
 		assert_eq!(result, vec![SignBoundary { min: 0.0, sign: Sign::Negative }]);
+	}
+
+	#[test]
+	fn test_differences_over_rhs_many_simple() {
+		let boundary = SignBoundary { min: 0.0, sign: Sign::Negative };
+		let others = vec![
+			SignBoundary { min: 1.0, sign: Sign::Positive },
+			SignBoundary { min: 2.0, sign: Sign::Negative },
+		];
+		let result = boundary.differences_over(&others);
+		assert_eq!(
+			result,
+			vec![
+				SignBoundary { min: 0.0, sign: Sign::Negative },
+				SignBoundary { min: 0.0, sign: Sign::Negative },
+				SignBoundary { min: 2.0, sign: Sign::Positive },
+			]
+		)
 	}
 }
