@@ -3,7 +3,8 @@ use crate::sdf::analysis::interval::{Sign, SignBoundary};
 impl SignBoundary {
 	/// Computes the pairwise union of boundaries.
 	///
-	/// On the whole, unions are just keeping all of the boundaries that are negative.
+	/// On the whole, unions are just keeping all of the boundaries that are negative
+	/// and only keeping positive when both boundaries are positive.
 	pub fn union(&self, other: &SignBoundary) -> Vec<SignBoundary> {
 		match other.sign {
 			Sign::Negative => {
@@ -12,7 +13,15 @@ impl SignBoundary {
 				vec![other.clone()]
 			}
 			Sign::Positive => {
-				vec![self.clone()]
+				// If both values are positive, this is realized here.
+				//
+				// If other is a lower boundary,
+				// it would only be positive if a LHS boundary < n and intersecting with other were positive, w.l.o.g.
+				if self.sign.is_positive() {
+					vec![SignBoundary { min: self.min.max(other.min), sign: self.sign.clone() }]
+				} else {
+					vec![self.clone()]
+				}
 				// |++|-----------|++++|
 				// a  b           c    d
 				// |----|+++|---|++++|---|
@@ -110,7 +119,7 @@ mod tests {
 			vec![
 				// normalization will later combine these two
 				SignBoundary { min: 1.0, sign: Sign::Negative },
-				SignBoundary { min: 3.0, sign: Sign::Negative },
+				SignBoundary { min: 2.0, sign: Sign::Negative },
 			]
 		)
 	}
@@ -139,7 +148,7 @@ mod tests {
 				// later normalization will combine...
 				SignBoundary { min: 1.0, sign: Sign::Negative },
 				SignBoundary { min: 1.0, sign: Sign::Negative },
-				SignBoundary { min: 3.0, sign: Sign::Negative },
+				SignBoundary { min: 2.0, sign: Sign::Negative },
 				// ...the three negative boundaries
 			]
 		)

@@ -101,7 +101,7 @@ mod tests {
 			result,
 			vec![
 				SignBoundary { min: 2.0, sign: Sign::Negative },
-				SignBoundary { min: 3.0, sign: Sign::Top },
+				SignBoundary { min: 3.0, sign: Sign::Positive },
 			]
 		);
 	}

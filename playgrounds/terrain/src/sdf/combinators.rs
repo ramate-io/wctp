@@ -1,4 +1,4 @@
-use crate::sdf::{Sdf, Sign, SignBoundary, SignUniformInterval, SignUniformIntervals};
+use crate::sdf::{Sdf, SignBoundary, SignUniformInterval, SignUniformIntervals};
 use bevy::prelude::*;
 
 /// Add two SDFs together - adds their heights (for heightfield-like SDFs)
@@ -47,7 +47,7 @@ impl<A: Sdf, B: Sdf> Sdf for Union<A, B> {
 		self.a.distance(p).min(self.b.distance(p))
 	}
 
-	fn sign_uniform_on_y(&self, x: f32, z: f32) -> SignUniformIntervals {
+	fn sign_uniform_on_y(&self, _x: f32, _z: f32) -> SignUniformIntervals {
 		// let mut intervals = SignUniformIntervals::default();
 
 		// For any interval over which one sign is not well behaved and the other is well-behaved,
@@ -110,7 +110,7 @@ impl<A: Sdf, B: Sdf> Sdf for Difference<A, B> {
 		self.a.distance(p).max(-self.b.distance(p))
 	}
 
-	fn sign_uniform_on_y(&self, x: f32, z: f32) -> SignUniformIntervals {
+	fn sign_uniform_on_y(&self, _x: f32, _z: f32) -> SignUniformIntervals {
 		// For any interval over which one sign is not well behaved and the other is well-behaved,
 		// accept the well behaved sign.
 
@@ -169,7 +169,7 @@ impl<A: Sdf, B: Sdf> Sdf for Intersection<A, B> {
 		self.a.distance(p).max(self.b.distance(p))
 	}
 
-	fn sign_uniform_on_y(&self, x: f32, z: f32) -> SignUniformIntervals {
+	fn sign_uniform_on_y(&self, _x: f32, _z: f32) -> SignUniformIntervals {
 		// Take the well-behaved intervals where the a and b agree on signs.
 		// Everything else should be Top.
 
