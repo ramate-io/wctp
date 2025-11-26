@@ -1,28 +1,24 @@
 use crate::sdf::analysis::interval::{Sign, SignBoundary};
 
 impl SignBoundary {
+	/// Computes the pairwise union of boundaries.
+	///
+	/// On the whole, unions are just keeping all of the boundaries that are negative.
 	pub fn union(&self, other: &SignBoundary) -> Vec<SignBoundary> {
 		match other.sign {
 			Sign::Negative => {
-				if other.min < self.min {
-					// this negates self entirely as far as this pair is concerned
-					// this should have been included before this point,
-					// so the vector would be empty.
-					// but this is easier to fix in a normalization pass
-					// so, we just keep the lower boundary
-					vec![other.clone()]
-				} else {
-					vec![self.clone(), other.clone()]
-				}
+				// If other is negative, then we can just keep other.
+				// We know this is negative from the other boundary.
+				vec![other.clone()]
 			}
 			Sign::Positive => {
-				// You can just keep self.
-				// If self is positive, then that positivity is preserved.
-				// If self is negative, then that negativity is preserved--valid union.
-				// If self is top, then topness is preserved. The previous interval would can
-				// take whatever the value up to point.
-				// Bottom is the same logic as top.
 				vec![self.clone()]
+				// |++|-----------|++++|
+				// a  b           c    d
+				// |----|+++|---|++++|---|
+				// 1    2   3   4    5   6
+				// |--|-----|-----|++|---|
+				// 1  b     3     c  5   6
 			}
 			Sign::Top => {
 				// This is unknown from the lowest point
@@ -65,13 +61,7 @@ mod tests {
 		let boundary = SignBoundary { min: 0.0, sign: Sign::Positive };
 		let others = vec![SignBoundary { min: 1.0, sign: Sign::Negative }];
 		let result = boundary.unions_over(&others);
-		assert_eq!(
-			result,
-			vec![
-				SignBoundary { min: 0.0, sign: Sign::Positive },
-				SignBoundary { min: 1.0, sign: Sign::Negative }
-			]
-		);
+		assert_eq!(result, vec![SignBoundary { min: 1.0, sign: Sign::Negative }]);
 	}
 
 	#[test]
@@ -101,7 +91,6 @@ mod tests {
 		assert_eq!(
 			result,
 			vec![
-				SignBoundary { min: 0.0, sign: Sign::Positive },
 				SignBoundary { min: 1.0, sign: Sign::Negative },
 				SignBoundary { min: 2.0, sign: Sign::Positive },
 			]
@@ -121,7 +110,7 @@ mod tests {
 			vec![
 				// normalization will later combine these two
 				SignBoundary { min: 1.0, sign: Sign::Negative },
-				SignBoundary { min: 2.0, sign: Sign::Negative },
+				SignBoundary { min: 3.0, sign: Sign::Negative },
 			]
 		)
 	}
@@ -147,11 +136,10 @@ mod tests {
 		assert_eq!(
 			result,
 			vec![
-				SignBoundary { min: 0.0, sign: Sign::Positive },
 				// later normalization will combine...
 				SignBoundary { min: 1.0, sign: Sign::Negative },
 				SignBoundary { min: 1.0, sign: Sign::Negative },
-				SignBoundary { min: 2.0, sign: Sign::Negative },
+				SignBoundary { min: 3.0, sign: Sign::Negative },
 				// ...the three negative boundaries
 			]
 		)
