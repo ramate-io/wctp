@@ -1,3 +1,5 @@
+pub mod sparse_cubes;
+
 use crate::cascade::CascadeChunk;
 use crate::chunk::TerrainChunk;
 // use crate::geography::FeatureRegistry;

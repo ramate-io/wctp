@@ -47,17 +47,10 @@ impl<A: Sdf, B: Sdf> Sdf for Union<A, B> {
 		self.a.distance(p).min(self.b.distance(p))
 	}
 
-	fn sign_uniform_on_y(&self, _x: f32, _z: f32) -> SignUniformIntervals {
-		// let mut intervals = SignUniformIntervals::default();
-
-		// For any interval over which one sign is not well behaved and the other is well-behaved,
-		// accept the well behaved sign.
-
-		// For any interval over which both signs are well behaved, but disagree,
-		// take the negative sign.
-
-		// This isn't implemented yet, so for now just cast to the default.
-		SignUniformIntervals::default()
+	fn sign_uniform_on_y(&self, x: f32, z: f32) -> SignUniformIntervals {
+		let a_intervals = self.a.sign_uniform_on_y(x, z);
+		let b_intervals = self.b.sign_uniform_on_y(x, z);
+		a_intervals.interval_mapping(&b_intervals).union().normalize()
 	}
 }
 
@@ -110,16 +103,10 @@ impl<A: Sdf, B: Sdf> Sdf for Difference<A, B> {
 		self.a.distance(p).max(-self.b.distance(p))
 	}
 
-	fn sign_uniform_on_y(&self, _x: f32, _z: f32) -> SignUniformIntervals {
-		// For any interval over which one sign is not well behaved and the other is well-behaved,
-		// accept the well behaved sign.
-
-		// For any inteval over which both signs are well behaved, but disagree,
-		// take the positive sign. This is because the difference is positive when the
-		// first sign is positive and the second sign is negative.
-
-		// This isn't implemented yet, so for now just cast to the default.
-		SignUniformIntervals::default()
+	fn sign_uniform_on_y(&self, x: f32, z: f32) -> SignUniformIntervals {
+		let a_intervals = self.a.sign_uniform_on_y(x, z);
+		let b_intervals = self.b.sign_uniform_on_y(x, z);
+		a_intervals.interval_mapping(&b_intervals).difference().normalize()
 	}
 }
 
