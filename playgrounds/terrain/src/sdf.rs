@@ -7,9 +7,7 @@ pub mod trapezoidal_prism;
 pub mod tube;
 
 pub use analysis::bounds::Bounds;
-pub use analysis::interval::{
-	Sign, SignBoundary, SignUniformInterval, SignUniformIntervals, SignUniformIntervalsIterator,
-};
+pub use analysis::interval::{Sign, SignBoundary, SignUniformInterval, SignUniformIntervals};
 pub use combinators::{
 	AddY, Difference, Elongate, Intersection, RotateY, Round, Scale, SmoothDifference,
 	SmoothIntersection, SmoothUnion, Translate, Union,
