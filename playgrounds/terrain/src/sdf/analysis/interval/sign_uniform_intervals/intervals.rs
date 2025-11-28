@@ -4,7 +4,7 @@ pub mod interval_mapping;
 use crate::sdf::analysis::interval::{SignBoundary, SignUniformInterval};
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SignUniformIntervals {
 	pub(crate) boundaries: BTreeSet<SignBoundary>,
 }

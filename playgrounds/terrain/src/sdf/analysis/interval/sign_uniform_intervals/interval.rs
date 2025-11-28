@@ -1,3 +1,5 @@
+pub mod combinators;
+
 use crate::sdf::analysis::interval::{Sign, SignBoundary};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

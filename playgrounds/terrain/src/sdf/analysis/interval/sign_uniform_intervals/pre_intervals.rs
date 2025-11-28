@@ -35,6 +35,8 @@ impl PreSignUniformIntervals {
 				} else {
 					normalized_boundaries.insert(boundary.clone());
 				}
+			} else {
+				normalized_boundaries.insert(boundary.clone());
 			}
 			previous_boundary = Some(boundary.clone());
 		}
