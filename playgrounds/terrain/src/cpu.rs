@@ -19,15 +19,6 @@ impl CpuMeshGenerator {
 	pub fn generate_chunk_mesh(
 		cascade_chunk: &CascadeChunk,
 		config: &TerrainConfig,
-		// feature_registry: Option<&FeatureRegistry>,
-	) -> Option<Mesh> {
-		Self::generate_chunk_mesh_volumetric(cascade_chunk, config)
-	}
-
-	fn generate_chunk_mesh_volumetric(
-		cascade_chunk: &CascadeChunk,
-		config: &TerrainConfig,
-		// feature_registry: Option<&FeatureRegistry>,
 	) -> Option<Mesh> {
 		// ---------- grid setup ---------------------------------------------------
 		let chunk_size = cascade_chunk.size;
