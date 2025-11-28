@@ -32,14 +32,16 @@ impl PreSignUniformIntervals {
 			if let Some(previous_boundary) = previous_boundary {
 				if previous_boundary.sign != boundary.sign {
 					normalized_boundaries.insert(boundary.clone());
-				} else {
-					normalized_boundaries.insert(boundary.clone());
 				}
 			} else {
 				normalized_boundaries.insert(boundary.clone());
 			}
 			previous_boundary = Some(boundary.clone());
 		}
+
+		// Top and Bottom are canonical boundaries that are always present.
+		normalized_boundaries.insert(SignBoundary::top());
+		normalized_boundaries.insert(SignBoundary::bottom());
 
 		SignUniformIntervals { boundaries: normalized_boundaries }
 	}

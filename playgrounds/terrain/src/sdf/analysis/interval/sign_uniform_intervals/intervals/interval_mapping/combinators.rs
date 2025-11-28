@@ -8,7 +8,7 @@ impl IntervalMapping {
 		for (left_interval, right_intervals) in self.into_iter() {
 			if let Some(left_interval) = left_interval {
 				if right_intervals.is_empty() {
-					intervals.insert_boundary(left_interval.left);
+					intervals.insert_interval(left_interval);
 				} else {
 					for right_interval in right_intervals {
 						let interval = left_interval.union(&right_interval);
@@ -30,7 +30,7 @@ impl IntervalMapping {
 		for (left_interval, right_intervals) in self.into_iter() {
 			if let Some(left_interval) = left_interval {
 				if right_intervals.is_empty() {
-					intervals.insert_boundary(left_interval.left);
+					intervals.insert_interval(left_interval);
 				} else {
 					for right_interval in right_intervals {
 						let interval = left_interval.difference(&right_interval);
