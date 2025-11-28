@@ -3,46 +3,8 @@ pub mod boundary;
 use super::super::{SignBoundary, SignUniformInterval};
 
 impl SignUniformInterval {
-	pub fn union(&self, other: &Self) -> Vec<SignBoundary> {
-		let mut result = Vec::new();
-
-		// Decompose the intervals
-		let (before_overlap, overlap, after_overlap) = self.decompose(other);
-
-		if let Some(start_undecided) = overlap {
-			// Whatever comes before the intersection.
-			if let Some(before_overlap) = &before_overlap {
-				result.push(before_overlap.clone());
-			}
-
-			// if the sign union is equivalent to the lower bound, just use the lower bound
-			// this is a normalization measure
-			let sign_union = self.left.sign.union(&other.left.sign);
-			match before_overlap {
-				Some(before_overlap) => {
-					if sign_union != before_overlap.sign {
-						result.push(SignBoundary { min: start_undecided, sign: sign_union });
-					}
-				}
-				None => {
-					result.push(SignBoundary { min: start_undecided, sign: sign_union });
-				}
-			}
-
-			// Whatever comes after the intersection.
-			if let Some(after_overlap) = after_overlap {
-				result.push(after_overlap);
-			}
-
-			result
-		} else {
-			// If there is not overlap, return all of the original boundaries.
-			result.push(self.left.clone());
-			result.push(self.right.clone());
-			result.push(other.left.clone());
-			result.push(other.right.clone());
-			result
-		}
+	pub fn union(&self, other: &Self) -> SignBoundary {
+		self.undecided_interval(other).union()
 	}
 }
 
@@ -50,6 +12,7 @@ impl SignUniformInterval {
 mod tests {
 	use super::*;
 	use crate::sdf::analysis::interval::Sign;
+	use crate::sdf::analysis::interval::SignBoundary;
 
 	#[test]
 	fn test_lower_left_negative_union() {
@@ -62,7 +25,7 @@ mod tests {
 			right: SignBoundary { min: 2.0, sign: Sign::Positive },
 		};
 		let result = interval1.union(&interval2);
-		assert_eq!(result, vec![SignBoundary { min: 0.0, sign: Sign::Negative },]);
+		assert_eq!(result, SignBoundary { min: 1.0, sign: Sign::Negative });
 	}
 
 	#[test]
@@ -77,13 +40,7 @@ mod tests {
 		};
 
 		let result = interval1.union(&interval2);
-		assert_eq!(
-			result,
-			vec![
-				SignBoundary { min: 0.0, sign: Sign::Positive },
-				SignBoundary { min: 1.0, sign: Sign::Top },
-			]
-		);
+		assert_eq!(result, SignBoundary { min: 1.0, sign: Sign::Top });
 	}
 
 	#[test]
@@ -97,13 +54,7 @@ mod tests {
 			right: SignBoundary { min: 4.0, sign: Sign::Top },
 		};
 		let result = interval1.union(&interval2);
-		assert_eq!(
-			result,
-			vec![
-				SignBoundary { min: 2.0, sign: Sign::Negative },
-				SignBoundary { min: 3.0, sign: Sign::Positive },
-			]
-		);
+		assert_eq!(result, SignBoundary { min: 2.0, sign: Sign::Negative });
 	}
 
 	#[test]
@@ -118,13 +69,6 @@ mod tests {
 		};
 
 		let result = interval1.union(&interval2);
-		assert_eq!(
-			result,
-			vec![
-				SignBoundary { min: 0.0, sign: Sign::Positive },
-				SignBoundary { min: 1.0, sign: Sign::Negative },
-				SignBoundary { min: 2.0, sign: Sign::Positive },
-			]
-		);
+		assert_eq!(result, SignBoundary { min: 1.0, sign: Sign::Negative });
 	}
 }

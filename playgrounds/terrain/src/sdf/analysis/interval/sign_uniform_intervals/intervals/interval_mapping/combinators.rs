@@ -1,7 +1,5 @@
 use super::IntervalMapping;
-use crate::sdf::analysis::interval::{
-	PreSignUniformIntervals, SignUniformInterval, SignUniformIntervals,
-};
+use crate::sdf::analysis::interval::PreSignUniformIntervals;
 
 impl IntervalMapping {
 	pub fn union(self) -> PreSignUniformIntervals {
@@ -10,7 +8,7 @@ impl IntervalMapping {
 			if let Some(left_interval) = left_interval {
 				for right_interval in right_intervals {
 					let interval = left_interval.union(&right_interval);
-					intervals.insert_interval(interval);
+					intervals.insert_boundary(interval);
 				}
 			} else {
 				for right_interval in right_intervals {
