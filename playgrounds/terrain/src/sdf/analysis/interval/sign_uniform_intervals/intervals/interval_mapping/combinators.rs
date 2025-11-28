@@ -47,7 +47,6 @@ impl IntervalMapping {
 
 #[cfg(test)]
 mod tests {
-	use super::*;
 	use crate::sdf::analysis::interval::{PreSignUniformIntervals, Sign, SignBoundary};
 
 	#[test]
