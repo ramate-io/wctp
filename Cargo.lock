@@ -4324,6 +4324,7 @@ dependencies = [
  "log",
  "noise",
  "rayon",
+ "sdf",
  "serde",
  "thiserror 1.0.69",
 ]
