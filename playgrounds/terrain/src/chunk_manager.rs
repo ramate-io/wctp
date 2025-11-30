@@ -1,4 +1,4 @@
-use crate::cascade::{Cascade, ConstantResolutionMap};
+use crate::cascade::{Cascade, CascadeChunk, ConstantResolutionMap};
 use crate::chunk::{ChunkConfig, LoadedChunks, TerrainChunk, Vec3Key};
 use crate::cpu::CpuMeshGenerator;
 use crate::mesh_generator::{MeshGenerationMode, MeshGenerator};
@@ -67,18 +67,23 @@ pub fn manage_chunks(
 		grid_multiple_2: chunk_config.grid_multiple_2,
 	};
 
-	// Get chunks from cascade
-	let chunks_to_load = match cascade.chunks(camera_pos) {
+	// Get chunks from cascade (separate cascade and grid)
+	let cascade_output = match cascade.chunks(camera_pos) {
 		Ok(chunks) => chunks,
 		Err(e) => {
 			log::error!("Failed to get cascade chunks: {}", e);
 			return;
 		}
-	}
-	.all();
+	};
+
+	let cascade_chunks = cascade_output.cascade();
+	let grid_chunks = cascade_output.grid();
+
+	// Combine for lookup set
+	let all_chunks: Vec<_> = cascade_chunks.iter().chain(grid_chunks.iter()).collect();
 
 	// Create set of chunk origins for quick lookup (with wrapping)
-	let chunks_to_load_set: HashSet<Vec3Key> = chunks_to_load
+	let chunks_to_load_set: HashSet<Vec3Key> = all_chunks
 		.iter()
 		.map(|chunk| {
 			let wrapped_origin = if chunk_config.world_size > 0.0 {
@@ -115,46 +120,50 @@ pub fn manage_chunks(
 		log::debug!("Unloaded chunk at {:?}", origin);
 	}
 
-	// Load new chunks from cascade
-	// First, collect chunks that need to be loaded
-	let chunks_to_generate: Vec<_> = chunks_to_load
-		.iter()
-		.filter_map(|cascade_chunk| {
-			let wrapped_origin = wrap_chunk_origin(cascade_chunk.origin);
-			if !loaded_chunks.is_loaded(&wrapped_origin) {
-				// if the cascde chunk origin is greater than max height or less than min height, skip
-				/*if cascade_chunk.origin.y > 20.0 || cascade_chunk.origin.y < -100.0 {
-					log::info!(
-						"Skipping chunk at origin {:?} - y is greater than 20 or less than -100",
-						cascade_chunk.origin
-					);
-					return None;
-				}*/
-				Some((*cascade_chunk, wrapped_origin))
-			} else {
-				None
-			}
-		})
-		.collect();
+	// Load new chunks from cascade - process cascade and grid separately
+	// Helper to collect chunks that need to be loaded
+	let collect_chunks_to_load = |chunks: &[CascadeChunk]| -> Vec<(CascadeChunk, Vec3)> {
+		chunks
+			.iter()
+			.filter_map(|cascade_chunk| {
+				let wrapped_origin = wrap_chunk_origin(cascade_chunk.origin);
+				if !loaded_chunks.is_loaded(&wrapped_origin) {
+					Some((*cascade_chunk, wrapped_origin))
+				} else {
+					None
+				}
+			})
+			.collect()
+	};
+
+	let cascade_chunks_to_generate = collect_chunks_to_load(&cascade_chunks);
+	let grid_chunks_to_generate = collect_chunks_to_load(&grid_chunks);
 
 	// Generate meshes in parallel (only for CPU mode)
-	if *mesh_mode == MeshGenerationMode::Cpu && !chunks_to_generate.is_empty() {
+	if *mesh_mode == MeshGenerationMode::Cpu {
 		let start_time = std::time::Instant::now();
 		let config_clone = terrain_config.clone();
-		let mesh_results: Vec<_> = chunks_to_generate
+
+		// Process cascade chunks
+		let cascade_mesh_results: Vec<_> = cascade_chunks_to_generate
 			.par_iter()
 			.map(|(cascade_chunk, _)| {
-				let start_time = std::time::Instant::now();
 				let mesh = CpuMeshGenerator::generate_chunk_mesh(cascade_chunk, &config_clone);
-				let end_time = std::time::Instant::now();
-				let duration = end_time.duration_since(start_time);
-				log::info!("Mesh time: {:?}", duration);
-				(*cascade_chunk, mesh)
+				(*cascade_chunk, mesh, true) // true = is_cascade
 			})
 			.collect();
 
-		// Spawn entities sequentially with the generated meshes
-		for (cascade_chunk, mesh_opt) in mesh_results {
+		// Process grid chunks
+		let grid_mesh_results: Vec<_> = grid_chunks_to_generate
+			.par_iter()
+			.map(|(cascade_chunk, _)| {
+				let mesh = CpuMeshGenerator::generate_chunk_mesh(cascade_chunk, &config_clone);
+				(*cascade_chunk, mesh, false) // false = is_grid
+			})
+			.collect();
+
+		// Spawn cascade chunks (red)
+		for (cascade_chunk, mesh_opt, _) in cascade_mesh_results {
 			let wrapped_origin = wrap_chunk_origin(cascade_chunk.origin);
 			if let Some(mesh) = mesh_opt {
 				CpuMeshGenerator::spawn_chunk_with_mesh(
@@ -163,23 +172,60 @@ pub fn manage_chunks(
 					&mut materials,
 					cascade_chunk,
 					mesh,
+					true, // is_cascade = true
 				);
 				loaded_chunks.mark_loaded(wrapped_origin);
 			} else {
 				log::debug!(
-					"Skipping chunk at origin {:?} - entirely above terrain",
+					"Skipping cascade chunk at origin {:?} - entirely above terrain",
 					cascade_chunk.origin
 				);
-				// Still mark as loaded to avoid retrying
 				loaded_chunks.mark_loaded(wrapped_origin);
 			}
 		}
+
+		// Spawn grid chunks (brown)
+		for (cascade_chunk, mesh_opt, _) in grid_mesh_results {
+			let wrapped_origin = wrap_chunk_origin(cascade_chunk.origin);
+			if let Some(mesh) = mesh_opt {
+				CpuMeshGenerator::spawn_chunk_with_mesh(
+					&mut commands,
+					&mut meshes,
+					&mut materials,
+					cascade_chunk,
+					mesh,
+					false, // is_cascade = false (is grid)
+				);
+				loaded_chunks.mark_loaded(wrapped_origin);
+			} else {
+				log::debug!(
+					"Skipping grid chunk at origin {:?} - entirely above terrain",
+					cascade_chunk.origin
+				);
+				loaded_chunks.mark_loaded(wrapped_origin);
+			}
+		}
+
 		let end_time = std::time::Instant::now();
 		let duration = end_time.duration_since(start_time);
 		log::info!("Chunk management time: {:?}", duration);
 	} else {
-		// For GPU mode or when no chunks to generate, use the original sequential approach
-		for (cascade_chunk, wrapped_origin) in chunks_to_generate {
+		// For GPU mode, use the original sequential approach
+		for (cascade_chunk, wrapped_origin) in cascade_chunks_to_generate {
+			MeshGenerator::spawn_chunk(
+				*mesh_mode,
+				&mut commands,
+				&mut meshes,
+				&mut materials,
+				cascade_chunk,
+				&terrain_config,
+				render_device.as_deref(),
+				render_queue.as_deref(),
+				pipelines.as_deref(),
+			);
+			loaded_chunks.mark_loaded(wrapped_origin);
+		}
+		for (cascade_chunk, wrapped_origin) in grid_chunks_to_generate {
 			MeshGenerator::spawn_chunk(
 				*mesh_mode,
 				&mut commands,

@@ -428,15 +428,15 @@ impl CpuMeshGenerator {
 		materials: &mut ResMut<Assets<StandardMaterial>>,
 		cascade_chunk: CascadeChunk,
 		mesh: Mesh,
+		is_cascade: bool,
 	) -> Entity {
 		let mesh_handle = meshes.add(mesh);
 
-		// Make the origin chunk (0, 0, 0) brown for easy verification
-		let is_origin_chunk = cascade_chunk.origin == Vec3::ZERO;
-		let base_color = if is_origin_chunk {
-			Color::hsla(46.0, 0.22, 0.62, 1.0) // brown
+		// Use different colors for cascade (red) and grid (brown) chunks
+		let base_color = if is_cascade {
+			Color::hsla(0.0, 0.8, 0.5, 1.0) // red
 		} else {
-			Color::hsla(46.0, 0.22, 0.62, 1.0) // brown
+			Color::hsla(46.0, 0.22, 0.62, 1.0) // light brown
 		};
 
 		let material_handle = materials.add(StandardMaterial {
@@ -493,6 +493,7 @@ impl CpuMeshGenerator {
 		let duration = end_time.duration_since(start_time);
 		log::info!("Mesh time: {:?}", duration);
 
-		Self::spawn_chunk_with_mesh(commands, meshes, materials, cascade_chunk, mesh)
+		// Default to grid (brown) for backward compatibility when called directly
+		Self::spawn_chunk_with_mesh(commands, meshes, materials, cascade_chunk, mesh, false)
 	}
 }
