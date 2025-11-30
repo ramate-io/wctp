@@ -61,6 +61,11 @@ impl CpuMeshGenerator {
 					let intervals = thread_sdf.as_ref().sign_uniform_on_y(wx, wz);
 
 					// Iterate over intervals and sample/fill accordingly
+					// CRITICAL: Sample near interval START boundaries (where sign changes = surface)
+					// to avoid terraced artifacts. Use voxel-based transition zone.
+					// Only sample at START, not END (end of one interval = start of next, so redundant)
+					const TRANSITION_VOXELS: usize = 3; // Sample 3 voxels at start of each interval
+					
 					let mut y_current = 0;
 					for interval in intervals.into_iter() {
 						let start_time = std::time::Instant::now();
@@ -99,20 +104,51 @@ impl CpuMeshGenerator {
 										slice[yi * nx + x] = distance;
 									}
 								}
-								Sign::Negative => {
-									log::debug!("Negative sign for x: {:?}, z: {:?}", x, z);
-									// Negative sign - fill with large negative value
-									let fill_value = -1000.0;
-									for yi in y_begin..y_finish {
-										slice[yi * nx + x] = fill_value;
-									}
-								}
-								Sign::Positive => {
-									log::debug!("Positive sign for x: {:?}, z: {:?}", x, z);
-									// Positive sign - fill with large positive value
-									let fill_value = 1000.0;
-									for yi in y_begin..y_finish {
-										slice[yi * nx + x] = fill_value;
+								Sign::Negative | Sign::Positive => {
+									// For known signs: sample near BOTH boundaries (start and end)
+									// where sign changes occur (surface transitions)
+									// Then fill the middle with constants for performance
+									let interval_size = y_finish - y_begin;
+									
+									// If interval is small, just sample everything
+									if interval_size <= TRANSITION_VOXELS * 2 {
+										for yi in y_begin..y_finish {
+											let wy = chunk_origin.y + yi as f32 * cube_size;
+											let distance =
+												thread_sdf.as_ref().distance(Vec3::new(wx, wy, wz));
+											slice[yi * nx + x] = distance;
+										}
+									} else {
+										// Sample at START boundary (where surface transition might be)
+										let start_sample_end = (y_begin + TRANSITION_VOXELS).min(y_finish);
+										for yi in y_begin..start_sample_end {
+											let wy = chunk_origin.y + yi as f32 * cube_size;
+											let distance =
+												thread_sdf.as_ref().distance(Vec3::new(wx, wy, wz));
+											slice[yi * nx + x] = distance;
+										}
+										
+										// Fill the middle with constant value (fast sparse skip)
+										let fill_start = start_sample_end;
+										let fill_end = y_finish.saturating_sub(TRANSITION_VOXELS);
+										if fill_start < fill_end {
+											let fill_value = match sign {
+												Sign::Negative => -1000.0,
+												Sign::Positive => 1000.0,
+												_ => unreachable!(),
+											};
+											for yi in fill_start..fill_end {
+												slice[yi * nx + x] = fill_value;
+											}
+										}
+										
+										// Sample at END boundary (where next interval starts = surface transition)
+										for yi in fill_end.max(fill_start)..y_finish {
+											let wy = chunk_origin.y + yi as f32 * cube_size;
+											let distance =
+												thread_sdf.as_ref().distance(Vec3::new(wx, wy, wz));
+											slice[yi * nx + x] = distance;
+										}
 									}
 								}
 							}
@@ -385,30 +421,15 @@ impl CpuMeshGenerator {
 		Some(mesh)
 	}
 
-	/// Spawn a terrain chunk entity using CPU mesh generation
-	pub fn spawn_chunk(
+	/// Spawn a terrain chunk entity from a pre-generated mesh
+	pub fn spawn_chunk_with_mesh(
 		commands: &mut Commands,
 		meshes: &mut ResMut<Assets<Mesh>>,
 		materials: &mut ResMut<Assets<StandardMaterial>>,
 		cascade_chunk: CascadeChunk,
-		config: &TerrainConfig,
-		// feature_registry: Option<&FeatureRegistry>,
+		mesh: Mesh,
 	) -> Entity {
-		// Generate mesh using cascade chunk
-		let start_time = std::time::Instant::now();
-		let Some(mesh) = Self::generate_chunk_mesh(&cascade_chunk, config) else {
-			// Chunk is entirely above terrain, don't spawn it
-			log::debug!(
-				"Skipping chunk at origin {:?} - entirely above terrain",
-				cascade_chunk.origin
-			);
-			// Return a dummy entity that will be cleaned up
-			return commands.spawn_empty().id();
-		};
 		let mesh_handle = meshes.add(mesh);
-		let end_time = std::time::Instant::now();
-		let duration = end_time.duration_since(start_time);
-		log::info!("Mesh time: {:?}", duration);
 
 		// Make the origin chunk (0, 0, 0) brown for easy verification
 		let is_origin_chunk = cascade_chunk.origin == Vec3::ZERO;
@@ -446,5 +467,32 @@ impl CpuMeshGenerator {
 		);
 
 		entity
+	}
+
+	/// Spawn a terrain chunk entity using CPU mesh generation
+	pub fn spawn_chunk(
+		commands: &mut Commands,
+		meshes: &mut ResMut<Assets<Mesh>>,
+		materials: &mut ResMut<Assets<StandardMaterial>>,
+		cascade_chunk: CascadeChunk,
+		config: &TerrainConfig,
+		// feature_registry: Option<&FeatureRegistry>,
+	) -> Entity {
+		// Generate mesh using cascade chunk
+		let start_time = std::time::Instant::now();
+		let Some(mesh) = Self::generate_chunk_mesh(&cascade_chunk, config) else {
+			// Chunk is entirely above terrain, don't spawn it
+			log::debug!(
+				"Skipping chunk at origin {:?} - entirely above terrain",
+				cascade_chunk.origin
+			);
+			// Return a dummy entity that will be cleaned up
+			return commands.spawn_empty().id();
+		};
+		let end_time = std::time::Instant::now();
+		let duration = end_time.duration_since(start_time);
+		log::info!("Mesh time: {:?}", duration);
+
+		Self::spawn_chunk_with_mesh(commands, meshes, materials, cascade_chunk, mesh)
 	}
 }

@@ -1,10 +1,12 @@
 use crate::cascade::{Cascade, ConstantResolutionMap};
 use crate::chunk::{ChunkConfig, LoadedChunks, TerrainChunk, Vec3Key};
+use crate::cpu::CpuMeshGenerator;
 use crate::mesh_generator::{MeshGenerationMode, MeshGenerator};
 use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
+use rayon::prelude::*;
 use std::collections::HashSet;
 
 /// Helper function to wrap a Vec3 coordinate within world bounds
@@ -114,18 +116,70 @@ pub fn manage_chunks(
 	}
 
 	// Load new chunks from cascade
-	for cascade_chunk in chunks_to_load {
-		let wrapped_origin = wrap_chunk_origin(cascade_chunk.origin);
-		if !loaded_chunks.is_loaded(&wrapped_origin) {
-			// if the cascde chunk origin is greater than max height or less than min height, skip
-			/*if cascade_chunk.origin.y > 20.0 || cascade_chunk.origin.y < -100.0 {
-				log::info!(
-					"Skipping chunk at origin {:?} - y is greater than 20 or less than -100",
+	// First, collect chunks that need to be loaded
+	let chunks_to_generate: Vec<_> = chunks_to_load
+		.iter()
+		.filter_map(|cascade_chunk| {
+			let wrapped_origin = wrap_chunk_origin(cascade_chunk.origin);
+			if !loaded_chunks.is_loaded(&wrapped_origin) {
+				// if the cascde chunk origin is greater than max height or less than min height, skip
+				/*if cascade_chunk.origin.y > 20.0 || cascade_chunk.origin.y < -100.0 {
+					log::info!(
+						"Skipping chunk at origin {:?} - y is greater than 20 or less than -100",
+						cascade_chunk.origin
+					);
+					return None;
+				}*/
+				Some((*cascade_chunk, wrapped_origin))
+			} else {
+				None
+			}
+		})
+		.collect();
+
+	// Generate meshes in parallel (only for CPU mode)
+	if *mesh_mode == MeshGenerationMode::Cpu && !chunks_to_generate.is_empty() {
+		let start_time = std::time::Instant::now();
+		let config_clone = terrain_config.clone();
+		let mesh_results: Vec<_> = chunks_to_generate
+			.par_iter()
+			.map(|(cascade_chunk, _)| {
+				let start_time = std::time::Instant::now();
+				let mesh = CpuMeshGenerator::generate_chunk_mesh(cascade_chunk, &config_clone);
+				let end_time = std::time::Instant::now();
+				let duration = end_time.duration_since(start_time);
+				log::info!("Mesh time: {:?}", duration);
+				(*cascade_chunk, mesh)
+			})
+			.collect();
+
+		// Spawn entities sequentially with the generated meshes
+		for (cascade_chunk, mesh_opt) in mesh_results {
+			let wrapped_origin = wrap_chunk_origin(cascade_chunk.origin);
+			if let Some(mesh) = mesh_opt {
+				CpuMeshGenerator::spawn_chunk_with_mesh(
+					&mut commands,
+					&mut meshes,
+					&mut materials,
+					cascade_chunk,
+					mesh,
+				);
+				loaded_chunks.mark_loaded(wrapped_origin);
+			} else {
+				log::debug!(
+					"Skipping chunk at origin {:?} - entirely above terrain",
 					cascade_chunk.origin
 				);
-				continue;
-			}*/
-
+				// Still mark as loaded to avoid retrying
+				loaded_chunks.mark_loaded(wrapped_origin);
+			}
+		}
+		let end_time = std::time::Instant::now();
+		let duration = end_time.duration_since(start_time);
+		log::info!("Chunk management time: {:?}", duration);
+	} else {
+		// For GPU mode or when no chunks to generate, use the original sequential approach
+		for (cascade_chunk, wrapped_origin) in chunks_to_generate {
 			MeshGenerator::spawn_chunk(
 				*mesh_mode,
 				&mut commands,

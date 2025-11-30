@@ -1,4 +1,3 @@
-use crate::sdf::Sdf;
 use crate::terrain::TerrainSdf;
 use bevy::prelude::*;
 use std::f32::consts::PI;
@@ -197,8 +196,9 @@ fn character_mode_movement(
 
 	// If we're going to be below ground, stick to surface
 	if new_terrain_distance < CHARACTER_HEIGHT {
-		// Use binary search to find surface height
-		let surface_height = find_surface_height(&terrain_sdf.sdf, new_pos.x, new_pos.z);
+		// Use SDF distance directly: if distance is d at position (x, y, z),
+		// the surface is at y - d. This is exact for vertical movement.
+		let surface_height = new_pos.y - new_terrain_distance;
 		let target_y = surface_height + CHARACTER_HEIGHT;
 
 		// Smoothly move to target height
@@ -217,38 +217,4 @@ fn character_mode_movement(
 	} else {
 		transform.translation = new_pos;
 	}
-}
-
-/// Find the surface height by sampling the SDF
-/// Uses binary search along Y axis to find where distance crosses zero
-fn find_surface_height(sdf: &Box<dyn Sdf>, world_x: f32, world_z: f32) -> f32 {
-	// Search range: from well below ground to well above max terrain height
-	let y_min = -20.0;
-	let y_max = 20.0;
-	let epsilon = 0.01; // Precision threshold
-
-	// Binary search for zero crossing
-	let mut low = y_min;
-	let mut high = y_max;
-
-	for _ in 0..32 {
-		// Limit iterations to prevent infinite loops
-		let mid = (low + high) * 0.5;
-		let distance = sdf.distance(Vec3::new(world_x, mid, world_z));
-
-		if distance.abs() < epsilon {
-			return mid;
-		}
-
-		if distance > 0.0 {
-			// Above surface, search lower
-			high = mid;
-		} else {
-			// Below surface, search higher
-			low = mid;
-		}
-	}
-
-	// Fallback: if binary search didn't converge, use the midpoint
-	(low + high) * 0.5
 }
