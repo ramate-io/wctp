@@ -3,7 +3,7 @@ pub mod sparse_cubes;
 use crate::cascade::CascadeChunk;
 use crate::chunk::TerrainChunk;
 // use crate::geography::FeatureRegistry;
-use crate::sdf::Sdf;
+use crate::sdf::Sign;
 use crate::terrain::create_terrain_sdf;
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
@@ -26,10 +26,7 @@ impl CpuMeshGenerator {
 		let cube_size = chunk_size / res as f32;
 		let chunk_origin = cascade_chunk.origin;
 
-		// ---------- early exit optimization: check if chunk is above terrain -------
-		// Create the real SDF (with all modulations/combinators) for height checking
-		let sdf = create_terrain_sdf(config);
-
+		// ---------- grid setup ---------------------------------------------------
 		// Grid resolution (sample points); cubes are (n-1) in each axis
 		// Y is now treated the same as X and Z - a voxel cube
 		let nx = res + 1;
@@ -42,37 +39,131 @@ impl CpuMeshGenerator {
 		// Scalar field samples
 		let mut grid = vec![0.0f32; nx * ny * nz];
 
+		// time the sampling
+		let start_time = std::time::Instant::now();
+
 		// ---------- sample SDF in world space (parallelized) --------------------
-		// Parallelize over Y slices for better cache locality
-		// Collect results per Y slice and merge sequentially
+		// Parallelize over Z slices for sparse sampling using sign_uniform_on_y
+		// Collect results per Z slice and merge sequentially
 		let config_clone = config.clone();
-		let y_slices: Vec<_> = (0..ny)
+		let z_slices: Vec<_> = (0..nz)
 			.into_par_iter()
-			.map(|y| {
+			.map(|z| {
 				// Create SDF per thread to avoid Send/Sync issues
 				let thread_sdf = create_terrain_sdf(&config_clone);
-				// Y is now treated the same as X and Z - relative to chunk origin
-				let wy = chunk_origin.y + y as f32 * cube_size;
-				let mut slice = vec![0.0f32; nx * nz];
-				for z in 0..nz {
-					let wz = chunk_origin.z + z as f32 * cube_size;
-					for x in 0..nx {
-						let wx = chunk_origin.x + x as f32 * cube_size;
-						slice[z * nx + x] = thread_sdf.as_ref().distance(Vec3::new(wx, wy, wz));
+				let wz = chunk_origin.z + z as f32 * cube_size;
+				let mut slice = vec![0.0f32; nx * ny];
+
+				// For each x position, compute intervals and sample sparsely
+				for x in 0..nx {
+					let wx = chunk_origin.x + x as f32 * cube_size;
+					// Get intervals for this (x, z) position
+					let intervals = thread_sdf.as_ref().sign_uniform_on_y(wx, wz);
+
+					// Iterate over intervals and sample/fill accordingly
+					let mut y_current = 0;
+					for interval in intervals.into_iter() {
+						let start_time = std::time::Instant::now();
+						let (y_min_world, y_max_world) = interval.open_range();
+						let sign = interval.left.sign;
+
+						// Convert world Y coordinates to grid indices
+						// Clamp to chunk bounds
+						let y_start_world = y_min_world.max(chunk_origin.y);
+						let y_end_world = y_max_world.min(chunk_origin.y + chunk_size);
+
+						let y_start =
+							((y_start_world - chunk_origin.y) / cube_size).floor() as usize;
+						let y_end = ((y_end_world - chunk_origin.y) / cube_size)
+							.ceil()
+							.min(ny as f32) as usize;
+
+						// Only process if this interval overlaps with remaining Y values
+						if y_start >= ny || y_current >= ny {
+							break;
+						}
+
+						// Start from the current Y position or the interval start, whichever is later
+						let y_begin = y_start.max(y_current);
+						let y_finish = y_end.min(ny);
+
+						if y_begin < y_finish {
+							// Fill or sample based on sign
+							match sign {
+								Sign::Top | Sign::Bottom => {
+									// Unknown/undefined sign - need to sample normally
+									for yi in y_begin..y_finish {
+										let wy = chunk_origin.y + yi as f32 * cube_size;
+										let distance =
+											thread_sdf.as_ref().distance(Vec3::new(wx, wy, wz));
+										slice[yi * nx + x] = distance;
+									}
+								}
+								Sign::Negative => {
+									log::debug!("Negative sign for x: {:?}, z: {:?}", x, z);
+									// Negative sign - fill with large negative value
+									let fill_value = -1000.0;
+									for yi in y_begin..y_finish {
+										slice[yi * nx + x] = fill_value;
+									}
+								}
+								Sign::Positive => {
+									log::debug!("Positive sign for x: {:?}, z: {:?}", x, z);
+									// Positive sign - fill with large positive value
+									let fill_value = 1000.0;
+									for yi in y_begin..y_finish {
+										slice[yi * nx + x] = fill_value;
+									}
+								}
+							}
+						}
+
+						let end_time = std::time::Instant::now();
+						let duration = end_time.duration_since(start_time);
+						log::debug!("Sparse sampling time for x: {:?}, z: {:?}: {:?}, covered y values: {:?}", x, z, duration, y_current);
+						if y_current < ny {
+							log::debug!("Covered y_start: {:?}, y_finish: {:?}", y_start, y_finish);
+						}
+
+						// Update current Y position to skip ahead
+						y_current = y_finish;
+						if y_current >= ny {
+							break;
+						}
+					}
+
+					// Fill any remaining Y values that weren't covered by intervals
+					// This shouldn't happen with proper intervals, but handle it safely
+					if y_current < ny {
+						// Treat remaining as Top (unknown) and sample
+						for yi in y_current..ny {
+							let wy = chunk_origin.y + yi as f32 * cube_size;
+							let distance = thread_sdf.as_ref().distance(Vec3::new(wx, wy, wz));
+							slice[yi * nx + x] = distance;
+						}
 					}
 				}
-				(y, slice)
+
+				(z, slice)
 			})
 			.collect();
+		let end_time = std::time::Instant::now();
+		let duration = end_time.duration_since(start_time);
+		log::debug!("Sparse sampling time: {:?}", duration);
 
+		// time the merging
+		let start_time = std::time::Instant::now();
 		// Merge slices into grid
-		for (y, slice) in y_slices {
-			for z in 0..nz {
+		for (z, slice) in z_slices {
+			for y in 0..ny {
 				for x in 0..nx {
-					grid[idx(x, y, z)] = slice[z * nx + x];
+					grid[idx(x, y, z)] = slice[y * nx + x];
 				}
 			}
 		}
+		let end_time = std::time::Instant::now();
+		let duration = end_time.duration_since(start_time);
+		log::debug!("Merging time: {:?}", duration);
 
 		// ---------- Marching Cubes (parallelized) --------------------------------
 		use crate::marching_cubes::{get_cube_index, interpolate_vertex, TRIANGULATIONS};
@@ -86,11 +177,16 @@ impl CpuMeshGenerator {
 		// We'll merge them with proper index offsets afterward
 		// SAFETY: We're only reading from grid, and each thread reads different indices
 		// Flatten cube coordinates into a single iterator
+		let start_time = std::time::Instant::now();
 		let cube_coords: Vec<_> = (0..cy)
 			.flat_map(|y| (0..cz).flat_map(move |z| (0..cx).map(move |x| (x, y, z))))
 			.collect();
+		let end_time = std::time::Instant::now();
+		let duration = end_time.duration_since(start_time);
+		log::debug!("Cube coords time: {:?}", duration);
 
 		// Capture grid as a slice for parallel access (read-only)
+		let start_time = std::time::Instant::now();
 		let grid_slice: &[f32] = &grid;
 		let cube_results: Vec<_> = cube_coords
 			.into_par_iter()
@@ -166,8 +262,12 @@ impl CpuMeshGenerator {
 				}
 			})
 			.collect();
+		let end_time = std::time::Instant::now();
+		let duration = end_time.duration_since(start_time);
+		log::debug!("Cube results time: {:?}", duration);
 
 		// Merge all cube results with proper index offsets
+		let start_time = std::time::Instant::now();
 		let mut vertices: Vec<[f32; 3]> = Vec::new();
 		let mut indices: Vec<u32> = Vec::new();
 
@@ -176,22 +276,102 @@ impl CpuMeshGenerator {
 			vertices.extend(cube_vertices);
 			indices.extend(cube_indices.iter().map(|&idx| idx + vertex_offset));
 		}
+		let end_time = std::time::Instant::now();
+		let duration = end_time.duration_since(start_time);
+		log::debug!("Merging cube results time: {:?}", duration);
 
+		// time the normals
+		let start_time = std::time::Instant::now();
 		// ---------- Normals & UVs (parallelized) ---------------------------------
-		// Normals: sample SDF gradient in WORLD space for shading correctness.
-		// Convert local coordinates back to world by adding chunk_origin.
+		// Normals: compute from voxel grid using finite differences
+		// Vertices are in local space (relative to chunk_origin)
+		let grid_slice: &[f32] = &grid;
 		let normals: Vec<[f32; 3]> = vertices
 			.par_iter()
 			.map(|v| {
-				let world =
-					Vec3::new(v[0] + chunk_origin.x, v[1] + chunk_origin.y, v[2] + chunk_origin.z);
-				Self::calculate_sdf_normal(sdf.as_ref(), world).into()
+				// Convert vertex local position to grid coordinates
+				let gx = (v[0] / cube_size).clamp(0.0, (nx - 1) as f32);
+				let gy = (v[1] / cube_size).clamp(0.0, (ny - 1) as f32);
+				let gz = (v[2] / cube_size).clamp(0.0, (nz - 1) as f32);
+
+				// Get integer grid indices (truncate for now, could interpolate)
+				let ix = gx as usize;
+				let iy = gy as usize;
+				let iz = gz as usize;
+
+				// Compute finite differences using central differences where possible
+				// ∂f/∂x = (f(x+1) - f(x-1)) / (2 * cube_size)
+				let dx = if ix > 0 && ix < nx - 1 {
+					let f_xp1 = grid_slice[idx(ix + 1, iy, iz)];
+					let f_xm1 = grid_slice[idx(ix - 1, iy, iz)];
+					(f_xp1 - f_xm1) / (2.0 * cube_size)
+				} else if ix < nx - 1 {
+					// Forward difference at left boundary
+					let f_xp1 = grid_slice[idx(ix + 1, iy, iz)];
+					let f_x = grid_slice[idx(ix, iy, iz)];
+					(f_xp1 - f_x) / cube_size
+				} else {
+					// Backward difference at right boundary
+					let f_x = grid_slice[idx(ix, iy, iz)];
+					let f_xm1 = grid_slice[idx(ix - 1, iy, iz)];
+					(f_x - f_xm1) / cube_size
+				};
+
+				// ∂f/∂y = (f(y+1) - f(y-1)) / (2 * cube_size)
+				let dy = if iy > 0 && iy < ny - 1 {
+					let f_yp1 = grid_slice[idx(ix, iy + 1, iz)];
+					let f_ym1 = grid_slice[idx(ix, iy - 1, iz)];
+					(f_yp1 - f_ym1) / (2.0 * cube_size)
+				} else if iy < ny - 1 {
+					// Forward difference at bottom boundary
+					let f_yp1 = grid_slice[idx(ix, iy + 1, iz)];
+					let f_y = grid_slice[idx(ix, iy, iz)];
+					(f_yp1 - f_y) / cube_size
+				} else {
+					// Backward difference at top boundary
+					let f_y = grid_slice[idx(ix, iy, iz)];
+					let f_ym1 = grid_slice[idx(ix, iy - 1, iz)];
+					(f_y - f_ym1) / cube_size
+				};
+
+				// ∂f/∂z = (f(z+1) - f(z-1)) / (2 * cube_size)
+				let dz = if iz > 0 && iz < nz - 1 {
+					let f_zp1 = grid_slice[idx(ix, iy, iz + 1)];
+					let f_zm1 = grid_slice[idx(ix, iy, iz - 1)];
+					(f_zp1 - f_zm1) / (2.0 * cube_size)
+				} else if iz < nz - 1 {
+					// Forward difference at front boundary
+					let f_zp1 = grid_slice[idx(ix, iy, iz + 1)];
+					let f_z = grid_slice[idx(ix, iy, iz)];
+					(f_zp1 - f_z) / cube_size
+				} else {
+					// Backward difference at back boundary
+					let f_z = grid_slice[idx(ix, iy, iz)];
+					let f_zm1 = grid_slice[idx(ix, iy, iz - 1)];
+					(f_z - f_zm1) / cube_size
+				};
+
+				// Normalize the gradient to get the normal
+				let grad = Vec3::new(dx, dy, dz);
+				let len = grad.length();
+				if len > 0.0001 {
+					(grad / len).into()
+				} else {
+					Vec3::Y.into() // Fallback to up if gradient is too small
+				}
 			})
 			.collect();
+		let end_time = std::time::Instant::now();
+		let duration = end_time.duration_since(start_time);
+		log::debug!("Normals time: {:?}", duration);
 
 		// Simple tiled UVs (local X/Z across the chunk)
+		let start_time = std::time::Instant::now();
 		let uvs: Vec<[f32; 2]> =
 			vertices.par_iter().map(|v| [v[0] / chunk_size, v[2] / chunk_size]).collect();
+		let end_time = std::time::Instant::now();
+		let duration = end_time.duration_since(start_time);
+		log::debug!("UVs time: {:?}", duration);
 
 		// ---------- Mesh ---------------------------------------------------------
 		let mut mesh = Mesh::new(
@@ -205,26 +385,6 @@ impl CpuMeshGenerator {
 		Some(mesh)
 	}
 
-	/// Calculate normal from SDF gradient
-	fn calculate_sdf_normal(sdf: &dyn Sdf, p: Vec3) -> Vec3 {
-		// Use smaller epsilon to avoid exaggerating streaks
-		let epsilon = 0.0005;
-		let dx = sdf.distance(Vec3::new(p.x + epsilon, p.y, p.z))
-			- sdf.distance(Vec3::new(p.x - epsilon, p.y, p.z));
-		let dy = sdf.distance(Vec3::new(p.x, p.y + epsilon, p.z))
-			- sdf.distance(Vec3::new(p.x, p.y - epsilon, p.z));
-		let dz = sdf.distance(Vec3::new(p.x, p.y, p.z + epsilon))
-			- sdf.distance(Vec3::new(p.x, p.y, p.z - epsilon));
-
-		let grad = Vec3::new(dx, dy, dz);
-		let len = grad.length();
-		if len > 0.0001 {
-			grad / len
-		} else {
-			Vec3::Y // Fallback to up if gradient is too small
-		}
-	}
-
 	/// Spawn a terrain chunk entity using CPU mesh generation
 	pub fn spawn_chunk(
 		commands: &mut Commands,
@@ -235,9 +395,10 @@ impl CpuMeshGenerator {
 		// feature_registry: Option<&FeatureRegistry>,
 	) -> Entity {
 		// Generate mesh using cascade chunk
+		let start_time = std::time::Instant::now();
 		let Some(mesh) = Self::generate_chunk_mesh(&cascade_chunk, config) else {
 			// Chunk is entirely above terrain, don't spawn it
-			log::info!(
+			log::debug!(
 				"Skipping chunk at origin {:?} - entirely above terrain",
 				cascade_chunk.origin
 			);
@@ -245,6 +406,9 @@ impl CpuMeshGenerator {
 			return commands.spawn_empty().id();
 		};
 		let mesh_handle = meshes.add(mesh);
+		let end_time = std::time::Instant::now();
+		let duration = end_time.duration_since(start_time);
+		log::info!("Mesh time: {:?}", duration);
 
 		// Make the origin chunk (0, 0, 0) brown for easy verification
 		let is_origin_chunk = cascade_chunk.origin == Vec3::ZERO;

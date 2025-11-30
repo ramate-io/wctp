@@ -147,7 +147,7 @@ impl Sdf for PerlinTerrainSdf {
 
 		// From the surface to infinity, we are outside the terrain,
 		// so the sign is positive.
-		let height = self.height_at(x, z);
+		let height = self.height_at_with_all_modulations(x, z);
 		intervals.insert_boundary(SignBoundary { min: height, sign: Sign::Positive });
 
 		intervals
