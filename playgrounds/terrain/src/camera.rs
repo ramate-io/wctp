@@ -1,4 +1,3 @@
-use crate::sdf::Sdf;
 use crate::terrain::TerrainSdf;
 use bevy::prelude::*;
 use std::f32::consts::PI;
@@ -131,11 +130,11 @@ fn character_mode_movement(
 	transform: &mut Transform,
 	controller: &mut CameraController,
 ) {
-	const GRAVITY: f32 = -30.0; // Gravity acceleration
-	const GROUND_STICK_DISTANCE: f32 = 0.002; // stick 2 meters to ground
+	const GRAVITY: f32 = -30.0; // Gravity acceleration (km/s²)
+	const GROUND_STICK_DISTANCE: f32 = 0.0001; // Threshold for considering on ground (10cm)
 	const CHARACTER_HEIGHT: f32 = 0.002; // Eye height above ground (2 meters)
-	const CHARACTER_SPEED: f32 = 0.01; // Movement speed in character mode 10m/s
-	const JUMP_FORCE: f32 = 8.0; // Jump velocity
+	const CHARACTER_SPEED: f32 = 0.01; // Movement speed in character mode (10 m/s = 0.01 km/s)
+	const JUMP_FORCE: f32 = 0.008; // Jump velocity (8 m/s = 0.008 km/s)
 	const GROUND_FRICTION: f32 = 0.9; // Friction when on ground
 
 	let dt = time.delta_secs();
@@ -195,15 +194,18 @@ fn character_mode_movement(
 	// Find terrain height at new position
 	let new_terrain_distance = terrain_sdf.sdf.distance(new_pos);
 
-	// If we're going to be below ground, stick to surface
+	// If we're going to be below ground or too close to it, stick to surface
+	// Check if we're below surface (negative distance) or within character height
 	if new_terrain_distance < CHARACTER_HEIGHT {
-		// Use binary search to find surface height
-		let surface_height = find_surface_height(&terrain_sdf.sdf, new_pos.x, new_pos.z);
+		// Use SDF distance directly: if distance is d at position (x, y, z),
+		// the surface is at y - d. This is exact for vertical movement.
+		let surface_height = new_pos.y - new_terrain_distance;
 		let target_y = surface_height + CHARACTER_HEIGHT;
 
-		// Smoothly move to target height
+		// Smoothly move to target height (limit drop speed)
 		let current_y = new_pos.y;
-		let target_y = target_y.max(current_y - 5.0 * dt); // Don't drop too fast
+		let max_drop_per_frame = 0.005 * dt; // Don't drop faster than 5 m/s
+		let target_y = target_y.max(current_y - max_drop_per_frame);
 
 		// Update position: keep X and Z from movement, adjust Y to terrain
 		transform.translation.x = new_pos.x;
@@ -217,38 +219,4 @@ fn character_mode_movement(
 	} else {
 		transform.translation = new_pos;
 	}
-}
-
-/// Find the surface height by sampling the SDF
-/// Uses binary search along Y axis to find where distance crosses zero
-fn find_surface_height(sdf: &Box<dyn Sdf>, world_x: f32, world_z: f32) -> f32 {
-	// Search range: from well below ground to well above max terrain height
-	let y_min = -20.0;
-	let y_max = 20.0;
-	let epsilon = 0.01; // Precision threshold
-
-	// Binary search for zero crossing
-	let mut low = y_min;
-	let mut high = y_max;
-
-	for _ in 0..32 {
-		// Limit iterations to prevent infinite loops
-		let mid = (low + high) * 0.5;
-		let distance = sdf.distance(Vec3::new(world_x, mid, world_z));
-
-		if distance.abs() < epsilon {
-			return mid;
-		}
-
-		if distance > 0.0 {
-			// Above surface, search lower
-			high = mid;
-		} else {
-			// Below surface, search higher
-			low = mid;
-		}
-	}
-
-	// Fallback: if binary search didn't converge, use the midpoint
-	(low + high) * 0.5
 }

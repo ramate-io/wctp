@@ -6,21 +6,19 @@ pub mod cascade;
 mod chunk;
 mod chunk_manager;
 mod cpu;
-mod geography;
 mod gpu;
 mod marching_cubes;
 mod mesh_generator;
 pub mod pipeline;
-pub mod sdf;
 pub mod shaders;
 mod terrain;
 mod ui;
 
-pub use geography::FeatureRegistry;
-
 pub use camera::CameraController;
 pub use chunk::{ChunkConfig, ChunkCoord, LoadedChunks};
 pub use terrain::TerrainConfig;
+
+pub use sdf;
 
 pub struct TerrainPlugin {
 	pub seed: u32,
@@ -29,10 +27,6 @@ pub struct TerrainPlugin {
 impl Plugin for TerrainPlugin {
 	fn build(&self, app: &mut App) {
 		// Set up geographic features
-		let mut feature_registry = geography::FeatureRegistry::new();
-		feature_registry
-			.add_feature(Box::new(geography::canyons::CanyonFeature::new(self.seed, 1000)));
-
 		let terrain_config = TerrainConfig::new(self.seed);
 		let terrain_sdf = terrain::TerrainSdf { sdf: terrain::create_terrain_sdf(&terrain_config) };
 
@@ -41,7 +35,6 @@ impl Plugin for TerrainPlugin {
 			.insert_resource(ClearColor(Color::hsla(201.0, 0.69, 0.62, 1.0)))
 			.insert_resource(ChunkConfig::default())
 			.insert_resource(LoadedChunks::default())
-			.insert_resource(feature_registry)
 			.insert_resource(mesh_generator::MeshGenerationMode::Cpu) // Default to GPU mode
 			.add_systems(Startup, (camera::setup_camera, setup_lighting, ui::setup_debug_ui))
 			.add_systems(

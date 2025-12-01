@@ -1,5 +1,5 @@
 [package]
-name = "terrain-playground"
+name = "sdf"
 version = { workspace = true }
 edition  = { workspace = true }
 license  = { workspace = true }
@@ -23,9 +23,6 @@ bevy = { workspace = true }
 # Procedural generation
 noise = "0.9"
 bytemuck = { version = "1.14", features = ["derive"] }
-
-# sdf
-sdf = { workspace = true }
 
 [lints]
 workspace = true

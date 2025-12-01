@@ -4045,6 +4045,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sdf"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "bytemuck",
+ "chrono",
+ "log",
+ "noise",
+ "rayon",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "self_cell"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4309,6 +4324,7 @@ dependencies = [
  "log",
  "noise",
  "rayon",
+ "sdf",
  "serde",
  "thiserror 1.0.69",
 ]

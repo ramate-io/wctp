@@ -18,7 +18,7 @@ pub struct TerrainSdf {
 /// Create the terrain SDF with all modulations
 pub fn create_terrain_sdf(config: &TerrainConfig) -> Box<dyn Sdf> {
 	// Create base terrain SDF
-	let mut sdf = PerlinTerrainSdf::new(config.seed, config.clone());
+	let mut sdf = PerlinTerrainSdf::new(config.seed, config.height_scale);
 
 	let big_valley_sdf = RegionAffineModulation::new(
 		Region2D::Rect(RectRegion {
