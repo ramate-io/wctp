@@ -3,6 +3,7 @@ pub mod sparse_cubes;
 use crate::cascade::CascadeChunk;
 use crate::chunk::TerrainChunk;
 // use crate::geography::FeatureRegistry;
+use crate::shaders::outline::EdgeMaterial;
 use crate::sdf::Sign;
 use crate::terrain::create_terrain_sdf;
 use crate::terrain::TerrainConfig;
@@ -445,26 +446,15 @@ impl CpuMeshGenerator {
 	pub fn spawn_chunk_with_mesh(
 		commands: &mut Commands,
 		meshes: &mut ResMut<Assets<Mesh>>,
-		materials: &mut ResMut<Assets<StandardMaterial>>,
+		materials: &mut ResMut<Assets<EdgeMaterial>>,
 		cascade_chunk: CascadeChunk,
 		mesh: Mesh,
-		is_cascade: bool,
+		_is_cascade: bool,
 	) -> Entity {
 		let mesh_handle = meshes.add(mesh);
 
-		// Use different colors for cascade (red) and grid (brown) chunks
-		let base_color = if is_cascade {
-			Color::hsla(0.0, 0.8, 0.5, 1.0) // red
-		} else {
-			Color::hsla(46.0, 0.22, 0.62, 1.0) // light brown
-		};
-
-		let material_handle = materials.add(StandardMaterial {
-			base_color,
-			metallic: 0.0,
-			perceptual_roughness: 0.7, // Less rough for more light reflection/bounce
-			..default()
-		});
+		// Create edge material (shader handles the rendering)
+		let material_handle = materials.add(EdgeMaterial {});
 
 		// Use cascade chunk origin for world position
 		// Note: mesh vertices are in local space relative to chunk origin
@@ -474,7 +464,7 @@ impl CpuMeshGenerator {
 			.spawn((
 				TerrainChunk { chunk: cascade_chunk },
 				Mesh3d(mesh_handle.clone()),
-				MeshMaterial3d::<StandardMaterial>(material_handle.clone()),
+				MeshMaterial3d::<EdgeMaterial>(material_handle.clone()),
 				Transform::from_translation(world_pos),
 			))
 			.id();
@@ -493,7 +483,7 @@ impl CpuMeshGenerator {
 	pub fn spawn_chunk(
 		commands: &mut Commands,
 		meshes: &mut ResMut<Assets<Mesh>>,
-		materials: &mut ResMut<Assets<StandardMaterial>>,
+		materials: &mut ResMut<Assets<EdgeMaterial>>,
 		cascade_chunk: CascadeChunk,
 		config: &TerrainConfig,
 		// feature_registry: Option<&FeatureRegistry>,

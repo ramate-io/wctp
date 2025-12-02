@@ -26,6 +26,9 @@ pub struct TerrainPlugin {
 
 impl Plugin for TerrainPlugin {
 	fn build(&self, app: &mut App) {
+		// Register EdgeMaterial plugin
+		app.add_plugins(bevy::pbr::MaterialPlugin::<shaders::outline::EdgeMaterial>::default());
+
 		// Set up geographic features
 		let terrain_config = TerrainConfig::new(self.seed);
 		let terrain_sdf = terrain::TerrainSdf { sdf: terrain::create_terrain_sdf(&terrain_config) };

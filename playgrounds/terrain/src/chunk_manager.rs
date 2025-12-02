@@ -3,6 +3,7 @@ use crate::chunk::{ChunkConfig, LoadedChunks, TerrainChunk, Vec3Key};
 use crate::cpu::CpuMeshGenerator;
 use crate::mesh_generator::{MeshGenerationMode, MeshGenerator};
 use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
+use crate::shaders::outline::EdgeMaterial;
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
@@ -28,7 +29,7 @@ pub fn manage_chunks(
 	camera_query: Query<&Transform, With<Camera3d>>,
 	chunk_query: Query<(Entity, &TerrainChunk)>,
 	mut meshes: ResMut<Assets<Mesh>>,
-	mut materials: ResMut<Assets<StandardMaterial>>,
+	mut materials: ResMut<Assets<EdgeMaterial>>,
 	chunk_config: Res<ChunkConfig>,
 	terrain_config: Res<TerrainConfig>,
 	mut loaded_chunks: ResMut<LoadedChunks>,
@@ -208,7 +209,6 @@ pub fn manage_chunks(
 
 		let end_time = std::time::Instant::now();
 		let duration = end_time.duration_since(start_time);
-		log::info!("Chunk management time: {:?}", duration);
 	} else {
 		// For GPU mode, use the original sequential approach
 		for (cascade_chunk, wrapped_origin) in cascade_chunks_to_generate {
