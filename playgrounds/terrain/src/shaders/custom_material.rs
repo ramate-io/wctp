@@ -6,11 +6,11 @@ use bevy::{
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct CustomMaterial {
 	#[uniform(0)]
-	color: LinearRgba,
+	pub color: LinearRgba,
 	#[texture(1)]
 	#[sampler(2)]
-	color_texture: Option<Handle<Image>>,
-	alpha_mode: AlphaMode,
+	pub color_texture: Option<Handle<Image>>,
+	pub alpha_mode: AlphaMode,
 }
 
 /// The Material trait is very configurable, but comes with sensible defaults for all methods.

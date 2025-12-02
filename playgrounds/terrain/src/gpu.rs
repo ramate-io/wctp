@@ -1,7 +1,7 @@
 use crate::cascade::CascadeChunk;
 use crate::chunk::TerrainChunk;
 use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
-use crate::shaders::outline::EdgeMaterial;
+use crate::shaders::custom_material::CustomMaterial;
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
@@ -32,7 +32,7 @@ impl GpuMeshGenerator {
 	pub fn spawn_chunk(
 		commands: &mut Commands,
 		meshes: &mut ResMut<Assets<Mesh>>,
-		materials: &mut ResMut<Assets<EdgeMaterial>>,
+		materials: &mut ResMut<Assets<CustomMaterial>>,
 		cascade_chunk: CascadeChunk,
 		config: &TerrainConfig,
 		device: &RenderDevice,
@@ -43,8 +43,12 @@ impl GpuMeshGenerator {
 		let mesh = Self::generate_chunk_mesh(&cascade_chunk, config, device, queue, pipelines);
 		let mesh_handle = meshes.add(mesh);
 
-		// Create edge material (shader handles the rendering)
-		let material_handle = materials.add(EdgeMaterial {});
+		// Create custom material for debugging
+		let material_handle = materials.add(CustomMaterial {
+			color: LinearRgba::WHITE,
+			color_texture: None,
+			alpha_mode: AlphaMode::Opaque,
+		});
 
 		// Use cascade chunk origin for world position
 		let world_pos = cascade_chunk.origin;
@@ -53,7 +57,7 @@ impl GpuMeshGenerator {
 			.spawn((
 				TerrainChunk { chunk: cascade_chunk },
 				Mesh3d(mesh_handle.clone()),
-				MeshMaterial3d::<EdgeMaterial>(material_handle.clone()),
+				MeshMaterial3d::<CustomMaterial>(material_handle.clone()),
 				Transform::from_translation(world_pos),
 			))
 			.id();
