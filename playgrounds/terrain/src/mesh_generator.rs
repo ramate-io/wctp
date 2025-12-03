@@ -2,6 +2,7 @@ use crate::cascade::CascadeChunk;
 use crate::cpu::CpuMeshGenerator;
 use crate::gpu::GpuMeshGenerator;
 use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
+use crate::shaders::outline::EdgeMaterial;
 use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
 use bevy::render::renderer::{RenderDevice, RenderQueue};
@@ -30,7 +31,7 @@ impl MeshGenerator {
 		mode: MeshGenerationMode,
 		commands: &mut Commands,
 		meshes: &mut ResMut<Assets<Mesh>>,
-		materials: &mut ResMut<Assets<StandardMaterial>>,
+		materials: &mut ResMut<Assets<EdgeMaterial>>,
 		cascade_chunk: CascadeChunk,
 		config: &TerrainConfig,
 		// GPU resources (only used if mode is Gpu)

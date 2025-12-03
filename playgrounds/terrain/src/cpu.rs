@@ -3,6 +3,7 @@ pub mod sparse_cubes;
 use crate::cascade::CascadeChunk;
 use crate::chunk::TerrainChunk;
 // use crate::geography::FeatureRegistry;
+use crate::shaders::outline::EdgeMaterial;
 use crate::sdf::Sign;
 use crate::terrain::create_terrain_sdf;
 use crate::terrain::TerrainConfig;
@@ -224,7 +225,6 @@ impl CpuMeshGenerator {
 		// Capture grid as a slice for parallel access (read-only)
 		let start_time = std::time::Instant::now();
 		let grid_slice: &[f32] = &grid;
-		let omit_aabb = cascade_chunk.omit;
 		let cube_results: Vec<_> = cube_coords
 			.into_par_iter()
 			.filter_map(|(x, y, z)| {
@@ -232,24 +232,6 @@ impl CpuMeshGenerator {
 				let cube_pos_local =
 					Vec3::new(x as f32 * cube_size, y as f32 * cube_size, z as f32 * cube_size);
 				
-				// Check if this cube should be omitted
-				if let Some(omit) = omit_aabb {
-					// Calculate cube's world-space bounding box
-					let cube_min_world = chunk_origin + cube_pos_local;
-					let cube_max_world = cube_min_world + Vec3::splat(cube_size);
-					
-					// Convert to Vec3A for comparison with Aabb3d (which uses Vec3A)
-					let cube_min = bevy::math::Vec3A::from(cube_min_world);
-					let cube_max = bevy::math::Vec3A::from(cube_max_world);
-					
-					// Check if cube is entirely within the omit AABB
-					// We skip cubes that are completely inside the omit region
-					if omit.min.x <= cube_min.x && cube_max.x <= omit.max.x &&
-					   omit.min.y <= cube_min.y && cube_max.y <= omit.max.y &&
-					   omit.min.z <= cube_min.z && cube_max.z <= omit.max.z {
-						return None; // Skip this cube - it's entirely within the omit region
-					}
-				}
 				
 				// Corner scalar values (standard MC corner ordering assumed by your helpers)
 				// Inline index calculation: (y * nz + z) * nx + x
@@ -445,25 +427,17 @@ impl CpuMeshGenerator {
 	pub fn spawn_chunk_with_mesh(
 		commands: &mut Commands,
 		meshes: &mut ResMut<Assets<Mesh>>,
-		materials: &mut ResMut<Assets<StandardMaterial>>,
+		materials: &mut ResMut<Assets<EdgeMaterial>>,
 		cascade_chunk: CascadeChunk,
 		mesh: Mesh,
 		is_cascade: bool,
 	) -> Entity {
 		let mesh_handle = meshes.add(mesh);
 
-		// Use different colors for cascade (red) and grid (brown) chunks
-		let base_color = if is_cascade {
-			Color::hsla(0.0, 0.8, 0.5, 1.0) // red
-		} else {
-			Color::hsla(46.0, 0.22, 0.62, 1.0) // light brown
-		};
-
-		let material_handle = materials.add(StandardMaterial {
-			base_color,
-			metallic: 0.0,
-			perceptual_roughness: 0.7, // Less rough for more light reflection/bounce
-			..default()
+		// Create edge material (shader handles the rendering)
+		let material_handle = materials.add(EdgeMaterial {
+			// brownish color
+			base_color: if is_cascade {  Vec4::new(0.89, 0.886, 0.604, 1.0) } else { Vec4::new(0.89, 0.886, 0.604, 1.0) },
 		});
 
 		// Use cascade chunk origin for world position
@@ -474,7 +448,7 @@ impl CpuMeshGenerator {
 			.spawn((
 				TerrainChunk { chunk: cascade_chunk },
 				Mesh3d(mesh_handle.clone()),
-				MeshMaterial3d::<StandardMaterial>(material_handle.clone()),
+				MeshMaterial3d::<EdgeMaterial>(material_handle.clone()),
 				Transform::from_translation(world_pos),
 			))
 			.id();
@@ -493,7 +467,7 @@ impl CpuMeshGenerator {
 	pub fn spawn_chunk(
 		commands: &mut Commands,
 		meshes: &mut ResMut<Assets<Mesh>>,
-		materials: &mut ResMut<Assets<StandardMaterial>>,
+		materials: &mut ResMut<Assets<EdgeMaterial>>,
 		cascade_chunk: CascadeChunk,
 		config: &TerrainConfig,
 		// feature_registry: Option<&FeatureRegistry>,
