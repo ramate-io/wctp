@@ -225,7 +225,6 @@ impl CpuMeshGenerator {
 		// Capture grid as a slice for parallel access (read-only)
 		let start_time = std::time::Instant::now();
 		let grid_slice: &[f32] = &grid;
-		let omit_aabb = cascade_chunk.omit;
 		let cube_results: Vec<_> = cube_coords
 			.into_par_iter()
 			.filter_map(|(x, y, z)| {
@@ -233,24 +232,6 @@ impl CpuMeshGenerator {
 				let cube_pos_local =
 					Vec3::new(x as f32 * cube_size, y as f32 * cube_size, z as f32 * cube_size);
 				
-				// Check if this cube should be omitted
-				if let Some(omit) = omit_aabb {
-					// Calculate cube's world-space bounding box
-					let cube_min_world = chunk_origin + cube_pos_local;
-					let cube_max_world = cube_min_world + Vec3::splat(cube_size);
-					
-					// Convert to Vec3A for comparison with Aabb3d (which uses Vec3A)
-					let cube_min = bevy::math::Vec3A::from(cube_min_world);
-					let cube_max = bevy::math::Vec3A::from(cube_max_world);
-					
-					// Check if cube is entirely within the omit AABB
-					// We skip cubes that are completely inside the omit region
-					if omit.min.x <= cube_min.x && cube_max.x <= omit.max.x &&
-					   omit.min.y <= cube_min.y && cube_max.y <= omit.max.y &&
-					   omit.min.z <= cube_min.z && cube_max.z <= omit.max.z {
-						return None; // Skip this cube - it's entirely within the omit region
-					}
-				}
 				
 				// Corner scalar values (standard MC corner ordering assumed by your helpers)
 				// Inline index calculation: (y * nz + z) * nx + x
@@ -456,7 +437,7 @@ impl CpuMeshGenerator {
 		// Create edge material (shader handles the rendering)
 		let material_handle = materials.add(EdgeMaterial {
 			// brownish color
-			base_color: if is_cascade { Vec4::new(0.5, 0.25, 0.0, 1.0) } else { Vec4::new(46.0, 0.22, 0.62, 1.0) },
+			base_color: if is_cascade {  Vec4::new(0.89, 0.886, 0.604, 1.0) } else { Vec4::new(0.89, 0.886, 0.604, 1.0) },
 		});
 
 		// Use cascade chunk origin for world position
