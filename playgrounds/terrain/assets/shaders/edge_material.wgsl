@@ -72,7 +72,7 @@ fn fragment(
     let edge_val = length(dN);
 
     // strong edges
-    let edge = smoothstep(0.005, 0.05, edge_val);
+    let edge = smoothstep(0.0001, 0.05, edge_val);
 
     // invert: 1 → interior, 0 → edge
     let intensity = 1.0 - edge;
