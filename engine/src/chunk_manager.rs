@@ -6,18 +6,21 @@ use bevy::prelude::*;
 use rayon::prelude::*;
 use sdf::Sdf;
 use std::collections::HashSet;
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 /// Configuration for chunk resolution
 #[derive(Resource, Clone, Copy)]
-pub struct ChunkResolutionConfig {
+pub struct ChunkResolutionConfig<S: Sdf + Send + Sync> {
 	/// Full resolution vertices per chunk side (as power of 2)
 	pub base_res_2: u8,
+	/// Marker for the SDF that defines the chunk boundaries
+	pub sdf: PhantomData<S>,
 }
 
-impl Default for ChunkResolutionConfig {
+impl<S: Sdf + Send + Sync> Default for ChunkResolutionConfig<S> {
 	fn default() -> Self {
-		Self { base_res_2: 7 } // 128x128x128 voxels per chunk at full resolution
+		Self { base_res_2: 7, sdf: PhantomData } // 128x128x128 voxels per chunk at full resolution
 	}
 }
 
@@ -61,8 +64,8 @@ pub fn manage_chunks<S: Sdf + Send + Sync + 'static>(
 	chunk_query: Query<(Entity, &TerrainChunk)>,
 	mut meshes: ResMut<Assets<Mesh>>,
 	mut materials: ResMut<Assets<EdgeMaterial>>,
-	chunk_config: Res<ChunkConfig>,
-	resolution_config: Res<ChunkResolutionConfig>,
+	chunk_config: Res<ChunkConfig<S>>,
+	resolution_config: Res<ChunkResolutionConfig<S>>,
 	sdf_resource: Res<SdfResource<S>>,
 	mut loaded_chunks: ResMut<LoadedChunks>,
 ) {

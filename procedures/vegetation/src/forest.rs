@@ -1,3 +1,4 @@
+use bevy::math::bounding::Aabb3d;
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
 use sdf::Sdf;
@@ -87,6 +88,7 @@ impl Sdf for TreeSdf {
 
 /// A forest SDF - multiple trees placed using Perlin noise
 pub struct ForestSdf {
+	bounding_box: Aabb3d,
 	trees: Vec<TreeSdf>,
 }
 
@@ -145,7 +147,34 @@ impl ForestSdf {
 			x += config.grid_spacing;
 		}
 
-		Self { trees }
+		// Calculate bounding box
+		// X and Z from config.bounds (min_x, max_x, min_z, max_z)
+		let center_x = (config.bounds.0 + config.bounds.1) / 2.0;
+		let center_z = (config.bounds.2 + config.bounds.3) / 2.0;
+		let half_size_x = (config.bounds.1 - config.bounds.0) / 2.0;
+		let half_size_z = (config.bounds.3 - config.bounds.2) / 2.0;
+
+		// Y bounds: from base_height to top of tallest tree
+		// Tree structure: base -> trunk (height) -> canopy center (at trunk_top + 0.3 * canopy_height)
+		// Canopy extends canopy_height above and below its center
+		let max_trunk_height = config.trunk_height.1;
+		let max_canopy_radius = config.canopy_radius.1;
+		let max_canopy_height = max_canopy_radius * config.canopy_height_ratio;
+		// Top of canopy: base_height + trunk_height + 0.3 * canopy_height + canopy_height
+		let max_y = config.base_height + max_trunk_height + max_canopy_height * 1.3;
+		let min_y = config.base_height; // Trees start at base_height
+		let center_y = (min_y + max_y) / 2.0;
+		let half_size_y = (max_y - min_y) / 2.0;
+
+		let center = Vec3::new(center_x, center_y, center_z);
+		let half_size = Vec3::new(half_size_x, half_size_y, half_size_z);
+		let bounding_box = Aabb3d::new(center, half_size);
+
+		Self { bounding_box, trees }
+	}
+
+	fn forest_bounding_box(&self) -> Aabb3d {
+		self.bounding_box
 	}
 }
 
@@ -163,5 +192,26 @@ impl Sdf for ForestSdf {
 		}
 
 		min_dist
+	}
+
+	fn sign_uniform_on_y(&self, x: f32, z: f32) -> sdf::SignUniformIntervals {
+		// uniformly positive outside the forest bounds
+		// if in bounds
+		if x > self.bounds().0 && x < self.bounds().1 && z > self.bounds().2 && z < self.bounds().3
+		{
+			// uniformly positive inside the forest bounds
+			let mut intervals = sdf::SignUniformIntervals::default();
+			intervals.insert_boundary(sdf::SignBoundary {
+				min: f32::NEG_INFINITY,
+				sign: sdf::Sign::Positive,
+			});
+			intervals.insert_boundary(sdf::SignBoundary {
+				min: f32::INFINITY,
+				sign: sdf::Sign::Positive,
+			});
+			intervals
+		} else {
+			sdf::SignUniformIntervals::default()
+		}
 	}
 }

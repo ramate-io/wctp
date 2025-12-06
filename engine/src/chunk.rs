@@ -1,7 +1,9 @@
 use crate::cascade::CascadeChunk;
 use bevy::prelude::*;
+use sdf::Sdf;
 use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
+use std::marker::PhantomData;
 
 /// Wrapper for Vec3 that implements Hash and Eq for use in HashSet
 #[derive(Debug, Clone, Copy)]
@@ -155,7 +157,7 @@ impl LoadedChunks {
 
 /// Configuration for chunk system using cascade
 #[derive(Resource)]
-pub struct ChunkConfig {
+pub struct ChunkConfig<S: Sdf + Send + Sync> {
 	/// Minimum chunk size (size of center chunk and ring 0)
 	pub min_size: f32,
 	/// Number of rings in the cascade
@@ -167,9 +169,11 @@ pub struct ChunkConfig {
 	pub grid_radius: usize,
 	/// Grid multiple in base two power
 	pub grid_multiple_2: u8,
+	/// Marker for the SDF that defines the chunk boundaries
+	pub sdf: PhantomData<S>,
 }
 
-impl Default for ChunkConfig {
+impl<S: Sdf + Send + Sync> Default for ChunkConfig<S> {
 	fn default() -> Self {
 		Self {
 			min_size: 0.1,      // Cascade begins at 100m resolution
@@ -177,6 +181,7 @@ impl Default for ChunkConfig {
 			world_size: 0.0,    // No wrapping by default
 			grid_radius: 8,     // a radius of 8 chunks
 			grid_multiple_2: 7, // 300 * 64 = 19200m = 19.2km per grid chunk
+			sdf: PhantomData,
 		}
 	}
 }
