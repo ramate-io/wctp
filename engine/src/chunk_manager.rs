@@ -1,14 +1,44 @@
 use crate::cascade::{Cascade, CascadeChunk, ConstantResolutionMap};
 use crate::chunk::{ChunkConfig, LoadedChunks, TerrainChunk, Vec3Key};
 use crate::cpu::CpuMeshGenerator;
-use crate::mesh_generator::{MeshGenerationMode, MeshGenerator};
-use crate::pipeline::proc::pipelines_resource::MarchingCubesPipelines;
 use crate::shaders::outline::EdgeMaterial;
-use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
-use bevy::render::renderer::{RenderDevice, RenderQueue};
 use rayon::prelude::*;
+use sdf::Sdf;
 use std::collections::HashSet;
+use std::sync::Arc;
+
+/// Configuration for chunk resolution
+#[derive(Resource, Clone, Copy)]
+pub struct ChunkResolutionConfig {
+	/// Full resolution vertices per chunk side (as power of 2)
+	pub base_res_2: u8,
+}
+
+impl Default for ChunkResolutionConfig {
+	fn default() -> Self {
+		Self { base_res_2: 7 } // 128x128x128 voxels per chunk at full resolution
+	}
+}
+
+/// Resource wrapper for SDF that can be shared across threads
+/// Generic over SDF type to allow different layers at render time
+#[derive(Resource)]
+pub struct SdfResource<S: Sdf + Send + Sync> {
+	pub sdf: Arc<S>,
+}
+
+impl<S: Sdf + Send + Sync> SdfResource<S> {
+	/// Create from a concrete SDF type
+	pub fn new(sdf: S) -> Self {
+		Self { sdf: Arc::new(sdf) }
+	}
+
+	/// Create from an Arc of a concrete SDF type
+	pub fn from_arc(sdf: Arc<S>) -> Self {
+		Self { sdf }
+	}
+}
 
 /// Helper function to wrap a Vec3 coordinate within world bounds
 /// If world_size is 0, returns the coordinate unchanged (no wrapping)
@@ -24,35 +54,18 @@ fn wrap_coordinate(pos: Vec3, world_size: f32) -> Vec3 {
 }
 
 /// System that manages chunk loading and unloading based on camera position
-pub fn manage_chunks(
+/// Generic over SDF type to allow different layers at render time
+pub fn manage_chunks<S: Sdf + Send + Sync + 'static>(
 	mut commands: Commands,
 	camera_query: Query<&Transform, With<Camera3d>>,
 	chunk_query: Query<(Entity, &TerrainChunk)>,
 	mut meshes: ResMut<Assets<Mesh>>,
 	mut materials: ResMut<Assets<EdgeMaterial>>,
 	chunk_config: Res<ChunkConfig>,
-	terrain_config: Res<TerrainConfig>,
+	resolution_config: Res<ChunkResolutionConfig>,
+	sdf_resource: Res<SdfResource<S>>,
 	mut loaded_chunks: ResMut<LoadedChunks>,
-	mesh_mode: Res<MeshGenerationMode>,
-	// GPU resources (required for GPU mode, optional for CPU mode)
-	render_device: Option<Res<RenderDevice>>,
-	render_queue: Option<Res<RenderQueue>>,
-	pipelines: Option<Res<MarchingCubesPipelines>>,
-	// feature_registry: Option<Res<crate::geography::FeatureRegistry>>,
 ) {
-	// Early return if GPU mode is requested but resources aren't available yet
-	if *mesh_mode == MeshGenerationMode::Gpu {
-		log::info!(
-			"GPU mode requested, checking resources: {:?} {:?} {:?}",
-			render_device.is_some(),
-			render_queue.is_some(),
-			pipelines.is_some(),
-		);
-		if render_device.is_none() || render_queue.is_none() || pipelines.is_none() {
-			warn!("GPU mode requested but resources aren't available");
-			return;
-		}
-	}
 	let Ok(camera_transform) = camera_query.single() else {
 		return;
 	};
@@ -63,7 +76,7 @@ pub fn manage_chunks(
 	let cascade = Cascade {
 		min_size: chunk_config.min_size,
 		number_of_rings: chunk_config.number_of_rings as u8,
-		resolution_map: ConstantResolutionMap { res_2: terrain_config.base_res_2 },
+		resolution_map: ConstantResolutionMap { res_2: resolution_config.base_res_2 },
 		grid_radius: chunk_config.grid_radius,
 		grid_multiple_2: chunk_config.grid_multiple_2,
 	};
@@ -140,104 +153,72 @@ pub fn manage_chunks(
 	let cascade_chunks_to_generate = collect_chunks_to_load(&cascade_chunks);
 	let grid_chunks_to_generate = collect_chunks_to_load(&grid_chunks);
 
-	// Generate meshes in parallel (only for CPU mode)
-	if *mesh_mode == MeshGenerationMode::Cpu {
-		let start_time = std::time::Instant::now();
-		let config_clone = terrain_config.clone();
+	// Generate meshes in parallel using CPU
+	let start_time = std::time::Instant::now();
+	let sdf_clone = Arc::clone(&sdf_resource.sdf);
 
-		// Process cascade chunks
-		let cascade_mesh_results: Vec<_> = cascade_chunks_to_generate
-			.par_iter()
-			.map(|(cascade_chunk, _)| {
-				let mesh = CpuMeshGenerator::generate_chunk_mesh(cascade_chunk, &config_clone);
-				(*cascade_chunk, mesh, true) // true = is_cascade
-			})
-			.collect();
+	// Process cascade chunks
+	let cascade_mesh_results: Vec<_> = cascade_chunks_to_generate
+		.par_iter()
+		.map(|(cascade_chunk, _)| {
+			let mesh = CpuMeshGenerator::generate_chunk_mesh(cascade_chunk, Arc::clone(&sdf_clone));
+			(*cascade_chunk, mesh, true) // true = is_cascade
+		})
+		.collect();
 
-		// Process grid chunks
-		let grid_mesh_results: Vec<_> = grid_chunks_to_generate
-			.par_iter()
-			.map(|(cascade_chunk, _)| {
-				let mesh = CpuMeshGenerator::generate_chunk_mesh(cascade_chunk, &config_clone);
-				(*cascade_chunk, mesh, false) // false = is_grid
-			})
-			.collect();
+	// Process grid chunks
+	let grid_mesh_results: Vec<_> = grid_chunks_to_generate
+		.par_iter()
+		.map(|(cascade_chunk, _)| {
+			let mesh = CpuMeshGenerator::generate_chunk_mesh(cascade_chunk, Arc::clone(&sdf_clone));
+			(*cascade_chunk, mesh, false) // false = is_grid
+		})
+		.collect();
 
-		// Spawn cascade chunks (red)
-		for (cascade_chunk, mesh_opt, _) in cascade_mesh_results {
-			let wrapped_origin = wrap_chunk_origin(cascade_chunk.origin);
-			if let Some(mesh) = mesh_opt {
-				CpuMeshGenerator::spawn_chunk_with_mesh(
-					&mut commands,
-					&mut meshes,
-					&mut materials,
-					cascade_chunk,
-					mesh,
-					true, // is_cascade = true
-				);
-				loaded_chunks.mark_loaded(wrapped_origin);
-			} else {
-				log::debug!(
-					"Skipping cascade chunk at origin {:?} - entirely above terrain",
-					cascade_chunk.origin
-				);
-				loaded_chunks.mark_loaded(wrapped_origin);
-			}
-		}
-
-		// Spawn grid chunks (brown)
-		for (cascade_chunk, mesh_opt, _) in grid_mesh_results {
-			let wrapped_origin = wrap_chunk_origin(cascade_chunk.origin);
-			if let Some(mesh) = mesh_opt {
-				CpuMeshGenerator::spawn_chunk_with_mesh(
-					&mut commands,
-					&mut meshes,
-					&mut materials,
-					cascade_chunk,
-					mesh,
-					false, // is_cascade = false (is grid)
-				);
-				loaded_chunks.mark_loaded(wrapped_origin);
-			} else {
-				log::debug!(
-					"Skipping grid chunk at origin {:?} - entirely above terrain",
-					cascade_chunk.origin
-				);
-				loaded_chunks.mark_loaded(wrapped_origin);
-			}
-		}
-
-		let end_time = std::time::Instant::now();
-		let _duration = end_time.duration_since(start_time);
-	} else {
-		// For GPU mode, use the original sequential approach
-		for (cascade_chunk, wrapped_origin) in cascade_chunks_to_generate {
-			MeshGenerator::spawn_chunk(
-				*mesh_mode,
+	// Spawn cascade chunks
+	for (cascade_chunk, mesh_opt, _) in cascade_mesh_results {
+		let wrapped_origin = wrap_chunk_origin(cascade_chunk.origin);
+		if let Some(mesh) = mesh_opt {
+			CpuMeshGenerator::spawn_chunk_with_mesh(
 				&mut commands,
 				&mut meshes,
 				&mut materials,
 				cascade_chunk,
-				&terrain_config,
-				render_device.as_deref(),
-				render_queue.as_deref(),
-				pipelines.as_deref(),
+				mesh,
+				true, // is_cascade = true
 			);
 			loaded_chunks.mark_loaded(wrapped_origin);
-		}
-		for (cascade_chunk, wrapped_origin) in grid_chunks_to_generate {
-			MeshGenerator::spawn_chunk(
-				*mesh_mode,
-				&mut commands,
-				&mut meshes,
-				&mut materials,
-				cascade_chunk,
-				&terrain_config,
-				render_device.as_deref(),
-				render_queue.as_deref(),
-				pipelines.as_deref(),
+		} else {
+			log::debug!(
+				"Skipping cascade chunk at origin {:?} - entirely above terrain",
+				cascade_chunk.origin
 			);
 			loaded_chunks.mark_loaded(wrapped_origin);
 		}
 	}
+
+	// Spawn grid chunks
+	for (cascade_chunk, mesh_opt, _) in grid_mesh_results {
+		let wrapped_origin = wrap_chunk_origin(cascade_chunk.origin);
+		if let Some(mesh) = mesh_opt {
+			CpuMeshGenerator::spawn_chunk_with_mesh(
+				&mut commands,
+				&mut meshes,
+				&mut materials,
+				cascade_chunk,
+				mesh,
+				false, // is_cascade = false (is grid)
+			);
+			loaded_chunks.mark_loaded(wrapped_origin);
+		} else {
+			log::debug!(
+				"Skipping grid chunk at origin {:?} - entirely above terrain",
+				cascade_chunk.origin
+			);
+			loaded_chunks.mark_loaded(wrapped_origin);
+		}
+	}
+
+	let end_time = std::time::Instant::now();
+	let _duration = end_time.duration_since(start_time);
 }

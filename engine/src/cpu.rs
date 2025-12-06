@@ -2,13 +2,11 @@ pub mod sparse_cubes;
 
 use crate::cascade::CascadeChunk;
 use crate::chunk::TerrainChunk;
-// use crate::geography::FeatureRegistry;
 use crate::shaders::outline::EdgeMaterial;
-use crate::sdf::Sign;
-use crate::terrain::create_terrain_sdf;
-use crate::terrain::TerrainConfig;
 use bevy::prelude::*;
 use rayon::prelude::*;
+use sdf::{Sign, Sdf};
+use std::sync::Arc;
 
 /// CPU-based terrain mesh generator
 pub struct CpuMeshGenerator;
@@ -17,9 +15,9 @@ impl CpuMeshGenerator {
 	/// Generate a terrain mesh for a specific chunk by sampling an SDF
 	/// Supports both heightfield (fast, no caves) and volumetric (marching cubes, supports caves)
 	/// Returns None if the chunk is entirely above the terrain surface
-	pub fn generate_chunk_mesh(
+	pub fn generate_chunk_mesh<S: Sdf + Send + Sync>(
 		cascade_chunk: &CascadeChunk,
-		config: &TerrainConfig,
+		sdf: Arc<S>,
 	) -> Option<Mesh> {
 		// ---------- grid setup ---------------------------------------------------
 		let chunk_size = cascade_chunk.size;
@@ -46,12 +44,10 @@ impl CpuMeshGenerator {
 		// ---------- sample SDF in world space (parallelized) --------------------
 		// Parallelize over Z slices for sparse sampling using sign_uniform_on_y
 		// Collect results per Z slice and merge sequentially
-		let config_clone = config.clone();
+		let sdf_clone = Arc::clone(&sdf);
 		let z_slices: Vec<_> = (0..nz)
 			.into_par_iter()
 			.map(|z| {
-				// Create SDF per thread to avoid Send/Sync issues
-				let thread_sdf = create_terrain_sdf(&config_clone);
 				let wz = chunk_origin.z + z as f32 * cube_size;
 				let mut slice = vec![0.0f32; nx * ny];
 
@@ -59,7 +55,7 @@ impl CpuMeshGenerator {
 				for x in 0..nx {
 					let wx = chunk_origin.x + x as f32 * cube_size;
 					// Get intervals for this (x, z) position
-					let intervals = thread_sdf.as_ref().sign_uniform_on_y(wx, wz);
+					let intervals = sdf_clone.sign_uniform_on_y(wx, wz);
 
 					// Iterate over intervals and sample/fill accordingly
 					// CRITICAL: Sample near interval START boundaries (where sign changes = surface)
@@ -100,8 +96,7 @@ impl CpuMeshGenerator {
 									// Unknown/undefined sign - need to sample normally
 									for yi in y_begin..y_finish {
 										let wy = chunk_origin.y + yi as f32 * cube_size;
-										let distance =
-											thread_sdf.as_ref().distance(Vec3::new(wx, wy, wz));
+										let distance = sdf_clone.distance(Vec3::new(wx, wy, wz));
 										slice[yi * nx + x] = distance;
 									}
 								}
@@ -115,8 +110,7 @@ impl CpuMeshGenerator {
 									if interval_size <= TRANSITION_VOXELS * 2 {
 										for yi in y_begin..y_finish {
 											let wy = chunk_origin.y + yi as f32 * cube_size;
-											let distance =
-												thread_sdf.as_ref().distance(Vec3::new(wx, wy, wz));
+											let distance = sdf_clone.distance(Vec3::new(wx, wy, wz));
 											slice[yi * nx + x] = distance;
 										}
 									} else {
@@ -124,8 +118,7 @@ impl CpuMeshGenerator {
 										let start_sample_end = (y_begin + TRANSITION_VOXELS).min(y_finish);
 										for yi in y_begin..start_sample_end {
 											let wy = chunk_origin.y + yi as f32 * cube_size;
-											let distance =
-												thread_sdf.as_ref().distance(Vec3::new(wx, wy, wz));
+											let distance = sdf_clone.distance(Vec3::new(wx, wy, wz));
 											slice[yi * nx + x] = distance;
 										}
 										
@@ -146,8 +139,7 @@ impl CpuMeshGenerator {
 										// Sample at END boundary (where next interval starts = surface transition)
 										for yi in fill_end.max(fill_start)..y_finish {
 											let wy = chunk_origin.y + yi as f32 * cube_size;
-											let distance =
-												thread_sdf.as_ref().distance(Vec3::new(wx, wy, wz));
+											let distance = sdf_clone.distance(Vec3::new(wx, wy, wz));
 											slice[yi * nx + x] = distance;
 										}
 									}
@@ -175,7 +167,7 @@ impl CpuMeshGenerator {
 						// Treat remaining as Top (unknown) and sample
 						for yi in y_current..ny {
 							let wy = chunk_origin.y + yi as f32 * cube_size;
-							let distance = thread_sdf.as_ref().distance(Vec3::new(wx, wy, wz));
+							let distance = sdf_clone.distance(Vec3::new(wx, wy, wz));
 							slice[yi * nx + x] = distance;
 						}
 					}
@@ -464,17 +456,16 @@ impl CpuMeshGenerator {
 	}
 
 	/// Spawn a terrain chunk entity using CPU mesh generation
-	pub fn spawn_chunk(
+	pub fn spawn_chunk<S: Sdf + Send + Sync>(
 		commands: &mut Commands,
 		meshes: &mut ResMut<Assets<Mesh>>,
 		materials: &mut ResMut<Assets<EdgeMaterial>>,
 		cascade_chunk: CascadeChunk,
-		config: &TerrainConfig,
-		// feature_registry: Option<&FeatureRegistry>,
+		sdf: Arc<S>,
 	) -> Entity {
 		// Generate mesh using cascade chunk
 		let start_time = std::time::Instant::now();
-		let Some(mesh) = Self::generate_chunk_mesh(&cascade_chunk, config) else {
+		let Some(mesh) = Self::generate_chunk_mesh(&cascade_chunk, sdf) else {
 			// Chunk is entirely above terrain, don't spawn it
 			log::debug!(
 				"Skipping chunk at origin {:?} - entirely above terrain",

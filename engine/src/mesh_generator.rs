@@ -41,7 +41,9 @@ impl MeshGenerator {
 	) -> Entity {
 		match mode {
 			MeshGenerationMode::Cpu => {
-				CpuMeshGenerator::spawn_chunk(commands, meshes, materials, cascade_chunk, config)
+				// Note: This API is deprecated. Use chunk_manager::manage_chunks instead.
+				// This requires an SdfResource, not TerrainConfig.
+				unimplemented!("CPU mode in MeshGenerator is deprecated. Use chunk_manager::manage_chunks with SdfResource instead.")
 			}
 			MeshGenerationMode::Gpu => {
 				let device = device.expect("RenderDevice required for GPU mode");
