@@ -1,15 +1,21 @@
 pub mod analysis;
+pub mod capsule;
 pub mod combinators;
+pub mod ellipsoid;
+pub mod sphere;
 pub mod tetradhedron;
 pub mod trapezoidal_prism;
 pub mod tube;
 
 pub use analysis::bounds::Bounds;
 pub use analysis::interval::{Sign, SignBoundary, SignUniformInterval, SignUniformIntervals};
+pub use capsule::CapsuleSdf;
 pub use combinators::{
 	AddY, Difference, Elongate, Intersection, RotateY, Round, Scale, SmoothDifference,
 	SmoothIntersection, SmoothUnion, Translate, Union,
 };
+pub use ellipsoid::EllipsoidSdf;
+pub use sphere::SphereSdf;
 pub use tube::{Ellipse3d, TubeSdf};
 
 use bevy::prelude::*;
