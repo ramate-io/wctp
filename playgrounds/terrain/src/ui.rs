@@ -1,5 +1,5 @@
-use crate::chunk::LoadedChunks;
 use bevy::prelude::*;
+use engine::LoadedChunks;
 
 #[derive(Component)]
 pub struct CoordinateDisplay;

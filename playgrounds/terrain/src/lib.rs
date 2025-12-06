@@ -2,20 +2,15 @@ use bevy::prelude::*;
 use std::f32::consts::PI;
 
 mod camera;
-pub mod cascade;
-mod chunk;
-mod chunk_manager;
-mod cpu;
-mod gpu;
-mod marching_cubes;
-mod mesh_generator;
-pub mod pipeline;
-pub mod shaders;
 mod terrain;
 mod ui;
 
+use engine::{
+	manage_chunks, shaders::outline::EdgeMaterial, ChunkConfig, ChunkResolutionConfig,
+	LoadedChunks, SdfResource,
+};
+
 pub use camera::CameraController;
-pub use chunk::{ChunkConfig, ChunkCoord, LoadedChunks};
 pub use terrain::TerrainConfig;
 
 pub use sdf;
@@ -27,46 +22,28 @@ pub struct TerrainPlugin {
 impl Plugin for TerrainPlugin {
 	fn build(&self, app: &mut App) {
 		// Register EdgeMaterial plugin
-		app.add_plugins(bevy::pbr::MaterialPlugin::<shaders::outline::EdgeMaterial>::default());
+		app.add_plugins(bevy::pbr::MaterialPlugin::<EdgeMaterial>::default());
 
 		// Set up geographic features
 		let terrain_config = TerrainConfig::new(self.seed);
 		let terrain_sdf = terrain::TerrainSdf { sdf: terrain::create_terrain_sdf(&terrain_config) };
+		let terrain_sdf_resource = SdfResource::new(terrain_sdf);
 
 		app.insert_resource(terrain_config)
-			.insert_resource(terrain_sdf)
 			.insert_resource(ClearColor(Color::hsla(201.0, 0.69, 0.62, 1.0)))
 			.insert_resource(ChunkConfig::default())
+			.insert_resource(ChunkResolutionConfig::default())
 			.insert_resource(LoadedChunks::default())
-			.insert_resource(mesh_generator::MeshGenerationMode::Cpu) // Default to GPU mode
+			.insert_resource(terrain_sdf_resource)
 			.add_systems(Startup, (camera::setup_camera, setup_lighting, ui::setup_debug_ui))
 			.add_systems(
 				Update,
 				(
 					camera::camera_controller,
-					chunk_manager::manage_chunks,
+					manage_chunks::<terrain::TerrainSdf>,
 					ui::update_coordinate_display,
 				),
 			);
-
-		// Set up RenderApp systems for GPU pipeline initialization
-		/*app.sub_app_mut(bevy::render::RenderApp).add_systems(
-			bevy::render::Render,
-			pipeline::proc::render_setup::queue_marching_cubes_pipelines
-				.in_set(bevy::render::RenderSystems::Prepare),
-		);
-
-		app.sub_app_mut(bevy::render::RenderApp).add_systems(
-			bevy::render::Render,
-			pipeline::proc::render_setup::init_marching_cubes_pipelines
-				.in_set(bevy::render::RenderSystems::Prepare),
-		);*/
-
-		// Extract pipelines from RenderApp to MainApp in Extract schedule
-		app.add_systems(
-			bevy::render::ExtractSchedule,
-			pipeline::proc::render_setup::extract_pipelines_to_main_world,
-		);
 	}
 }
 

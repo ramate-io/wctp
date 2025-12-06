@@ -1,5 +1,5 @@
 // use crate::geography::FeatureRegistry;
-use crate::sdf::{Difference, Ellipse3d, Sdf, TubeSdf};
+use crate::sdf::{Bounds, Difference, Ellipse3d, Sdf, SignUniformIntervals, TubeSdf};
 use bevy::prelude::*;
 use noise::Perlin;
 use terrain_sdf::{
@@ -15,6 +15,20 @@ use terrain_sdf::{
 #[derive(Resource)]
 pub struct TerrainSdf {
 	pub sdf: Box<dyn Sdf>,
+}
+
+impl Sdf for TerrainSdf {
+	fn distance(&self, p: Vec3) -> f32 {
+		self.sdf.distance(p)
+	}
+
+	fn sign_uniform_on_y(&self, x: f32, z: f32) -> SignUniformIntervals {
+		self.sdf.sign_uniform_on_y(x, z)
+	}
+
+	fn bounds(&self) -> Bounds {
+		self.sdf.bounds()
+	}
 }
 
 /// Create the terrain SDF with all modulations
