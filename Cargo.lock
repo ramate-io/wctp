@@ -2150,6 +2150,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "engine"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "bytemuck",
+ "chrono",
+ "log",
+ "noise",
+ "rayon",
+ "sdf",
+ "serde",
+ "terrain-sdf",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

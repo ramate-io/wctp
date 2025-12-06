@@ -4,6 +4,9 @@ resolver = "2"
 
 members = [
 
+  # engine
+  "engine",
+
   # playgrounds
   "playgrounds/terrain",
 
@@ -99,6 +102,7 @@ sdf = { path = "util/sdf" }
 
 terrain-sdf = { path = "procedures/terrain" }
 vegetation-sdf = { path = "procedures/vegetation" }
+engine = { path = "engine" }
 
 [workspace.lints.clippy]
 debug_assert_with_mut_call = "deny"
