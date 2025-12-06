@@ -26,20 +26,37 @@ impl Plugin for TerrainPlugin {
 		app.add_plugins(bevy::pbr::MaterialPlugin::<EdgeMaterial>::default());
 
 		// Set up geographic features
+		let terrain_chunk_config = ChunkConfig::<terrain::TerrainSdf>::default();
+		let terrain_resolution_config = ChunkResolutionConfig::<terrain::TerrainSdf>::default();
 		let terrain_config = TerrainConfig::new(self.seed);
 		let terrain_sdf = terrain::TerrainSdf { sdf: terrain::create_terrain_sdf(&terrain_config) };
 		let terrain_sdf_resource = SdfResource::new(terrain_sdf);
 
 		// Set up forest SDF (floating at 5km)
+		let forest_chunk_config = ChunkConfig::<forest::ForestSdfWrapper> {
+			min_size: 0.1,
+			number_of_rings: 0,
+			grid_radius: 2,
+			grid_multiple_2: 4,
+			..Default::default()
+		};
+		let forest_resolution_config = ChunkResolutionConfig::<forest::ForestSdfWrapper> {
+			base_res_2: 2,
+			..Default::default()
+		};
 		let forest_sdf = forest::create_forest_sdf(self.seed);
 		let forest_sdf_resource = SdfResource::new(forest_sdf);
 
 		app.insert_resource(terrain_config)
 			.insert_resource(ClearColor(Color::hsla(201.0, 0.69, 0.62, 1.0)))
-			.insert_resource(ChunkConfig::default())
-			.insert_resource(ChunkResolutionConfig::default())
 			.insert_resource(LoadedChunks::default())
+			// terrain
+			.insert_resource(terrain_chunk_config)
+			.insert_resource(terrain_resolution_config)
 			.insert_resource(terrain_sdf_resource)
+			// forest
+			.insert_resource(forest_chunk_config)
+			.insert_resource(forest_resolution_config)
 			.insert_resource(forest_sdf_resource)
 			.add_systems(Startup, (camera::setup_camera, setup_lighting, ui::setup_debug_ui))
 			.add_systems(
