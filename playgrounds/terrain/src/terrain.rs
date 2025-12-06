@@ -1,13 +1,15 @@
 // use crate::geography::FeatureRegistry;
-use crate::sdf::{
-	region::{
-		affine::RegionAffineModulation, branching::BranchingPlan, grading::RegionGradingModulation,
-		rounding::RegionRoundingModulation, CircleRegion, RectRegion, Region2D, RegionNoise,
-	},
-	Difference, Ellipse3d, PerlinTerrainSdf, Sdf, TubeSdf,
-};
+use crate::sdf::{Difference, Ellipse3d, Sdf, TubeSdf};
 use bevy::prelude::*;
 use noise::Perlin;
+use terrain_sdf::{
+	region::affine::RegionAffineModulation,
+	region::branching::BranchingPlan,
+	region::grading::RegionGradingModulation,
+	region::rounding::RegionRoundingModulation,
+	region::{CircleRegion, RectRegion, Region2D, RegionNoise},
+	PerlinTerrainSdf,
+};
 
 /// Resource containing the terrain SDF for runtime queries
 #[derive(Resource)]

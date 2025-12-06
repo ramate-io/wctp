@@ -1,6 +1,8 @@
-use crate::{Sdf, Sign, SignBoundary, SignUniformIntervals};
+pub mod region;
+
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
+use sdf::{Sdf, Sign, SignBoundary, SignUniformIntervals};
 use std::fmt::Debug;
 
 /// Trait for elevation modulations that modify terrain height in 2.5D

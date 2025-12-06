@@ -1,7 +1,5 @@
 pub mod analysis;
 pub mod combinators;
-pub mod perlin_terrain;
-pub mod region;
 pub mod tetradhedron;
 pub mod trapezoidal_prism;
 pub mod tube;
@@ -12,7 +10,6 @@ pub use combinators::{
 	AddY, Difference, Elongate, Intersection, RotateY, Round, Scale, SmoothDifference,
 	SmoothIntersection, SmoothUnion, Translate, Union,
 };
-pub use perlin_terrain::{ElevationModulation, PerlinTerrainSdf};
 pub use tube::{Ellipse3d, TubeSdf};
 
 use bevy::prelude::*;

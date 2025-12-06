@@ -1,5 +1,5 @@
-use crate::perlin_terrain::{ElevationModulation, PerlinTerrainSdf};
 use crate::region::{Region2D, RegionNoise};
+use crate::{ElevationModulation, PerlinTerrainSdf};
 use bevy::prelude::*;
 
 /// Rounds the terrain height to the nearest unit amount.

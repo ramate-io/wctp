@@ -4326,6 +4326,22 @@ dependencies = [
  "rayon",
  "sdf",
  "serde",
+ "terrain-sdf",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "terrain-sdf"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "chrono",
+ "log",
+ "noise",
+ "rayon",
+ "sdf",
+ "serde",
  "thiserror 1.0.69",
 ]
 
