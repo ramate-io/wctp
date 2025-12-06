@@ -1,5 +1,5 @@
-use sdf::{Sdf, EllipsoidSdf};
 use bevy::prelude::*;
+use sdf::{EllipsoidSdf, Sdf};
 
 /// A tree canopy SDF - the foliage volume above the trunk
 /// Can be represented as an ellipsoid, sphere, or union of multiple volumes
@@ -30,4 +30,3 @@ impl Sdf for CanopySdf {
 		ellipsoid.distance(p)
 	}
 }
-

@@ -1,5 +1,5 @@
-use sdf::{Sdf, CapsuleSdf};
 use bevy::prelude::*;
+use sdf::{CapsuleSdf, Sdf};
 
 /// A root system SDF - composed of multiple root segments
 /// Roots typically branch downward and outward from the trunk base
@@ -32,14 +32,13 @@ impl Sdf for RootSdf {
 		// For simplicity, we'll compute the minimum distance across all segments
 		// A more sophisticated implementation could use a proper union structure
 		let mut min_dist = f32::MAX;
-		
+
 		for (start, end, radius) in &self.segments {
 			let capsule = CapsuleSdf::new(*start, *end, *radius);
 			let dist = capsule.distance(p);
 			min_dist = min_dist.min(dist);
 		}
-		
+
 		min_dist
 	}
 }
-

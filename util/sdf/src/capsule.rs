@@ -23,4 +23,3 @@ impl Sdf for CapsuleSdf {
 		(p - closest_point).length() - self.radius
 	}
 }
-

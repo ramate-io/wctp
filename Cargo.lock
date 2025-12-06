@@ -4704,6 +4704,7 @@ dependencies = [
  "bevy",
  "chrono",
  "log",
+ "noise",
  "rayon",
  "sdf",
  "serde",

@@ -1,5 +1,5 @@
-use sdf::{Sdf, CapsuleSdf};
 use bevy::prelude::*;
+use sdf::{CapsuleSdf, Sdf};
 
 /// A single branch segment SDF - a cylindrical segment
 pub struct BranchSdf {
@@ -24,4 +24,3 @@ impl Sdf for BranchSdf {
 		capsule.distance(p)
 	}
 }
-
