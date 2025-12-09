@@ -3452,6 +3452,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "objects-playground"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "bytemuck",
+ "chrono",
+ "engine",
+ "log",
+ "noise",
+ "rayon",
+ "sdf",
+ "serde",
+ "terrain-sdf",
+ "thiserror 1.0.69",
+ "vegetation-sdf",
+]
+
+[[package]]
 name = "oboe"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

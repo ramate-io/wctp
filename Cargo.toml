@@ -9,6 +9,7 @@ members = [
 
   # playgrounds
   "playgrounds/terrain",
+  "playgrounds/objects",
 
   # proceudres
   "procedures/terrain",
