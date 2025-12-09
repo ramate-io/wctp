@@ -2,6 +2,8 @@ use bevy::prelude::*;
 use std::f32::consts::PI;
 
 mod camera;
+mod checkerboard_material;
+mod ground;
 mod tree;
 mod ui;
 
@@ -22,6 +24,8 @@ impl Plugin for ObjectsPlugin {
 	fn build(&self, app: &mut App) {
 		// Register EdgeMaterial plugin
 		app.add_plugins(bevy::pbr::MaterialPlugin::<EdgeMaterial>::default());
+		// Register CheckerboardMaterial plugin
+		app.add_plugins(bevy::pbr::MaterialPlugin::<checkerboard_material::CheckerboardMaterial>::default());
 
 		// Set up single tree SDF
 		let tree_chunk_config = ChunkConfig::<tree::TreeSdf> {
@@ -38,14 +42,16 @@ impl Plugin for ObjectsPlugin {
 
 		app.insert_resource(ClearColor(Color::hsla(201.0, 0.69, 0.62, 1.0)))
 			.insert_resource(LoadedChunks::default())
+			.insert_resource(ground::CheckerSize::default())
 			.insert_resource(tree_chunk_config)
 			.insert_resource(tree_resolution_config)
 			.insert_resource(tree_sdf_resource)
-			.add_systems(Startup, (camera::setup_camera, setup_lighting, ui::setup_debug_ui))
+			.add_systems(Startup, (camera::setup_camera, setup_lighting, ground::setup_ground, ui::setup_debug_ui))
 			.add_systems(
 				Update,
 				(
 					camera::camera_controller,
+					ground::update_checker_size,
 					manage_chunks::<tree::TreeSdf>,
 					ui::update_coordinate_display,
 				),

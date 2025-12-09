@@ -10,10 +10,10 @@ pub struct CameraController {
 }
 
 pub fn setup_camera(mut commands: Commands) {
-	// Position camera to look at the tree at origin
+	// Position camera to look at the origin (0, 0, 0) where the tree is
 	// Tree is about 0.005km (5m) tall, so position camera at a good viewing distance
 	let camera_pos = Vec3::new(0.0, 0.01, 0.02); // 10m up, 20m back
-	let look_at = Vec3::new(0.0, 0.005, 0.0); // Look at middle of tree
+	let look_at = Vec3::ZERO; // Look at origin
 
 	log::info!("Setting up camera at position: {:?}, looking at: {:?}", camera_pos, look_at);
 
