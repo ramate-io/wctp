@@ -32,7 +32,12 @@ impl SimpleTrunkSegment {
 }
 
 impl Sdf for SimpleTrunkSegment {
-	/// TODO: there is a bug that gives this some slightly weird sharp facets.
+	/// NOTE: early on there appeared to be a  bug that gives this some slightly weird sharp facets.
+	/// By playing with chunk settings, it was possible to make facets disappear,
+	/// suggesting this was actually an LOD issue.
+	///
+	/// If such a bug reappears, we should investigate further.
+	///
 	/// For now, we're going to keep moving because it's a small aesthetic issue, but it should be fixed at some point.
 	fn distance(&self, p: Vec3) -> f32 {
 		// Clamp y to [0, 1] for the segment
