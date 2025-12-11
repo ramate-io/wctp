@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
+use sdf::Sdf;
 use super::{join_point::{JoinPoint, JoinType}, SegmentConfig};
 
 /// Simple trunk segment: noisy cylinder with trunk join points on top and bottom
@@ -29,11 +30,10 @@ impl SimpleTrunkSegment {
 			},
 		]
 	}
+}
 
-	/// Sample the unit SDF at a point in unit space (0-1 range)
-	/// p.y should be in [0, 1] (bottom to top)
-	/// p.x and p.z should be in [-1, 1] range (centered at origin)
-	pub fn unit_distance(&self, p: Vec3) -> f32 {
+impl Sdf for SimpleTrunkSegment {
+	fn distance(&self, p: Vec3) -> f32 {
 		// Clamp y to [0, 1] for the segment
 		let y = p.y.clamp(0.0, 1.0);
 		let normalized_y = y;

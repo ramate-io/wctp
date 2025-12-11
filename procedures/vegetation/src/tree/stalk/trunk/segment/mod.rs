@@ -3,13 +3,14 @@ pub mod radial_branches;
 pub mod simple;
 pub mod trunk_split;
 
-pub use join_point::{JoinPoint, JoinType};
+pub use join_point::{JoinPoint, JoinPointSdf, JoinType};
 pub use radial_branches::RadialBranchesSegment;
 pub use simple::SimpleTrunkSegment;
 pub use trunk_split::TrunkSplitSegment;
 
 /// Base configuration for a trunk segment
 /// All segments work in unit space (0-1) and are transformed later
+#[derive(Clone)]
 pub struct SegmentConfig {
 	/// Seed for noise generation
 	pub seed: u32,
