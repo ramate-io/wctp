@@ -4,7 +4,7 @@ use std::f32::consts::PI;
 mod camera;
 mod checkerboard_material;
 mod ground;
-mod tree;
+pub mod tree;
 mod ui;
 
 use engine::{
@@ -25,34 +25,52 @@ impl Plugin for ObjectsPlugin {
 		// Register EdgeMaterial plugin
 		app.add_plugins(bevy::pbr::MaterialPlugin::<EdgeMaterial>::default());
 		// Register CheckerboardMaterial plugin
-		app.add_plugins(bevy::pbr::MaterialPlugin::<checkerboard_material::CheckerboardMaterial>::default());
+		app.add_plugins(
+			bevy::pbr::MaterialPlugin::<checkerboard_material::CheckerboardMaterial>::default(),
+		);
 
 		// Set up single tree SDF
-		let tree_chunk_config = ChunkConfig::<tree::TreeSdf> {
+		// let tree_chunk_config = ChunkConfig::<tree::TreeSdf> {
+		// 	min_size: 0.01,
+		// 	number_of_rings: 2,
+		// 	grid_radius: 1,
+		// 	grid_multiple_2: 4,
+		// 	..Default::default()
+		// };
+		// let tree_resolution_config =
+		// 	ChunkResolutionConfig::<tree::TreeSdf> { base_res_2: 7, ..Default::default() };
+		// let tree_sdf = tree::create_tree_sdf();
+		// let tree_sdf_resource = SdfResource::new(tree_sdf);
+
+		// Set up simple segment SDF at origin
+		let segment_chunk_config = ChunkConfig::<tree::SegmentSdf> {
 			min_size: 0.01,
 			number_of_rings: 2,
 			grid_radius: 1,
-			grid_multiple_2: 4,
+			grid_multiple_2: 2,
 			..Default::default()
 		};
-		let tree_resolution_config =
-			ChunkResolutionConfig::<tree::TreeSdf> { base_res_2: 7, ..Default::default() };
-		let tree_sdf = tree::create_tree_sdf();
-		let tree_sdf_resource = SdfResource::new(tree_sdf);
+		let segment_resolution_config =
+			ChunkResolutionConfig::<tree::SegmentSdf> { base_res_2: 7, ..Default::default() };
+		let segment_sdf = tree::create_segment_sdf();
+		let segment_sdf_resource = SdfResource::new(segment_sdf);
 
 		app.insert_resource(ClearColor(Color::hsla(201.0, 0.69, 0.62, 1.0)))
 			.insert_resource(LoadedChunks::default())
 			.insert_resource(ground::CheckerSize::default())
-			.insert_resource(tree_chunk_config)
-			.insert_resource(tree_resolution_config)
-			.insert_resource(tree_sdf_resource)
-			.add_systems(Startup, (camera::setup_camera, setup_lighting, ground::setup_ground, ui::setup_debug_ui))
+			.insert_resource(segment_chunk_config)
+			.insert_resource(segment_resolution_config)
+			.insert_resource(segment_sdf_resource)
+			.add_systems(
+				Startup,
+				(camera::setup_camera, setup_lighting, ground::setup_ground, ui::setup_debug_ui),
+			)
 			.add_systems(
 				Update,
 				(
 					camera::camera_controller,
 					ground::update_checker_size,
-					manage_chunks::<tree::TreeSdf>,
+					manage_chunks::<tree::SegmentSdf>,
 					ui::update_coordinate_display,
 				),
 			);

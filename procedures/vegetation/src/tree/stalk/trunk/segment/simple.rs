@@ -1,7 +1,10 @@
+use super::{
+	join_point::{JoinPoint, JoinType},
+	SegmentConfig,
+};
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
 use sdf::Sdf;
-use super::{join_point::{JoinPoint, JoinType}, SegmentConfig};
 
 /// Simple trunk segment: noisy cylinder with trunk join points on top and bottom
 pub struct SimpleTrunkSegment {
@@ -23,11 +26,7 @@ impl SimpleTrunkSegment {
 				angle: 0.0, // Angle doesn't matter for single trunk join
 				join_type: JoinType::Trunk,
 			},
-			JoinPoint {
-				unit_position: 1.0,
-				angle: 0.0,
-				join_type: JoinType::Trunk,
-			},
+			JoinPoint { unit_position: 1.0, angle: 0.0, join_type: JoinType::Trunk },
 		]
 	}
 }
@@ -36,11 +35,12 @@ impl Sdf for SimpleTrunkSegment {
 	fn distance(&self, p: Vec3) -> f32 {
 		// Clamp y to [0, 1] for the segment
 		let y = p.y.clamp(0.0, 1.0);
+		let y = p.y;
 		let normalized_y = y;
 
 		// Interpolate radius along the segment
-		let radius = self.config.base_radius * (1.0 - normalized_y)
-			+ self.config.top_radius * normalized_y;
+		let radius =
+			self.config.base_radius * (1.0 - normalized_y) + self.config.top_radius * normalized_y;
 
 		// Distance from center in XZ plane
 		let xz_dist = (p.x * p.x + p.z * p.z).sqrt();
