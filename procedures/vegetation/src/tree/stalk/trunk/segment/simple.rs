@@ -32,11 +32,12 @@ impl SimpleTrunkSegment {
 }
 
 impl Sdf for SimpleTrunkSegment {
+	/// TODO: there is a bug that gives this some slightly weird sharp facets.
+	/// For now, we're going to keep moving because it's a small aesthetic issue, but it should be fixed at some point.
 	fn distance(&self, p: Vec3) -> f32 {
 		// Clamp y to [0, 1] for the segment
-		let y = p.y.clamp(0.0, 1.0);
 		let y = p.y;
-		let normalized_y = y;
+		let normalized_y = y.clamp(0.0, 1.0);
 
 		// Interpolate radius along the segment
 		let radius =
