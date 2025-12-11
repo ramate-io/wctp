@@ -1,3 +1,5 @@
+pub mod segment;
+
 use bevy::prelude::*;
 use sdf::{Ellipse3d, Sdf};
 
