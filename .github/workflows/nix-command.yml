@@ -38,40 +38,11 @@ jobs:
           mkdir -p ~/.config/nix
           echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
 
-      - name: Clean up disk space
-        run: |
-          # Show initial disk space
-          echo "=== Initial disk space ==="
-          df -h
-          
-          # Clean up Nix store garbage (aggressive)
-          nix-collect-garbage -d || true
-          
-          # Remove cargo target directories if they exist
-          find . -type d -name "target" -exec rm -rf {} + 2>/dev/null || true
-          
-          # Clean up temporary files
-          rm -rf /tmp/* /var/tmp/* 2>/dev/null || true
-          
-          # Clean up system caches
-          sudo rm -rf /var/cache/* /var/log/* 2>/dev/null || true
-          
-          # Clean up apt cache if on Ubuntu
-          sudo apt-get clean || true
-          
-          # Show final disk space
-          echo "=== Final disk space ==="
-          df -h
-
       - name: Run Command in Nix Shell
         run: |
           # Write the command to a temporary script file to handle multiline commands
           cat > /tmp/nix_command.sh << 'EOF'
           export GH_TOKEN="${{ env.GITHUB_TOKEN }}"
-          # Set cargo target dir to a location we can clean up
-          export CARGO_TARGET_DIR="${HOME}/.cargo-target"
-          # Clean cargo target before building to save space
-          cargo clean --target-dir "${CARGO_TARGET_DIR}" 2>/dev/null || true
           ${{ inputs.command }}
           EOF
           chmod +x /tmp/nix_command.sh
