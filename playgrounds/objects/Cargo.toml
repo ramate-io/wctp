@@ -1,5 +1,5 @@
 [package]
-name = "terrain-playground"
+name = "objects-playground"
 version = { workspace = true }
 edition  = { workspace = true }
 license  = { workspace = true }

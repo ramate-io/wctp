@@ -4,8 +4,16 @@ resolver = "2"
 
 members = [
 
+  # engine
+  "engine",
+
   # playgrounds
   "playgrounds/terrain",
+  "playgrounds/objects",
+
+  # proceudres
+  "procedures/terrain",
+  "procedures/vegetation",
 
   # util
   ## sdf
@@ -92,6 +100,10 @@ rayon = { version = "1.11.0" }
 clap-markdown-ext = { git = "https://github.com/movementlabsxyz/clap-markdown-ext.git", rev = "8f54fe424504bf37fb01dc69aaed8166e429fe6a"}
 
 sdf = { path = "util/sdf" }
+
+terrain-sdf = { path = "procedures/terrain" }
+vegetation-sdf = { path = "procedures/vegetation" }
+engine = { path = "engine" }
 
 [workspace.lints.clippy]
 debug_assert_with_mut_call = "deny"

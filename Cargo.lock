@@ -2150,6 +2150,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "engine"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "bytemuck",
+ "chrono",
+ "log",
+ "noise",
+ "rayon",
+ "sdf",
+ "serde",
+ "terrain-sdf",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3435,6 +3452,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "objects-playground"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "bytemuck",
+ "chrono",
+ "engine",
+ "log",
+ "noise",
+ "rayon",
+ "sdf",
+ "serde",
+ "terrain-sdf",
+ "thiserror 1.0.69",
+ "vegetation-sdf",
+]
+
+[[package]]
 name = "oboe"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4321,6 +4357,24 @@ dependencies = [
  "bevy",
  "bytemuck",
  "chrono",
+ "engine",
+ "log",
+ "noise",
+ "rayon",
+ "sdf",
+ "serde",
+ "terrain-sdf",
+ "thiserror 1.0.69",
+ "vegetation-sdf",
+]
+
+[[package]]
+name = "terrain-sdf"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "chrono",
  "log",
  "noise",
  "rayon",
@@ -4679,6 +4733,21 @@ name = "vec_map"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1bddf1187be692e79c5ffeab891132dfb0f236ed36a43c7ed39f1165ee20191"
+
+[[package]]
+name = "vegetation-sdf"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "chrono",
+ "log",
+ "noise",
+ "rayon",
+ "sdf",
+ "serde",
+ "thiserror 1.0.69",
+]
 
 [[package]]
 name = "version_check"

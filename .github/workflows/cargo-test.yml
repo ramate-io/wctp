@@ -10,6 +10,6 @@ jobs:
   cargo-test:
     uses: ./.github/workflows/nix-command.yml
     with:
-      command: cargo test
+      command: cargo test --release
       nix_flake_path: '.'
       runner: 'ubuntu-latest'

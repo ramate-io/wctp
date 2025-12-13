@@ -24,17 +24,11 @@
 
         # An LLVM build environment
         dependencies = with pkgs; [
-          trunk
-          wasm-bindgen-cli
-          dioxus-cli
           protobuf
           grpcurl
           grpcui
-          yarn
-          nodejs
           ltex-ls-plus
           lychee
-          chafa
           perl
           llvmPackages.bintools
           openssl
@@ -52,55 +46,6 @@
           rust
           wayland
           python311
-           (texlive.withPackages (ps: with ps; [
-            chktex
-            collection-latex
-            collection-latexrecommended
-            collection-mathscience
-            collection-plaingeneric
-            collection-bibtexextra
-            collection-langother
-            collection-pictures
-            collection-pstricks
-            collection-metapost
-            collection-xetex
-            collection-luatex
-            collection-context
-            collection-formatsextra
-            collection-publishers
-            collection-texworks
-            # Additional packages for section markers and document structure
-            amsmath
-            geometry
-            hyperref
-            xcolor
-            enumitem
-            mdframed
-            pgf
-            pgfplots
-            float
-            caption
-            babel
-            microtype
-            fontspec
-            unicode-math
-            polyglossia
-            biblatex
-            csquotes
-            cleveref
-            etoolbox
-            xifthen
-            xstring
-            # Special symbols
-            bbding
-            marvosym
-            wasysym
-            # Text formatting
-            cancel
-            ulem
-            soul
-            xcolor
-          ]))
         ] ++ lib.optionals stdenv.isDarwin [
           frameworks.Security
           frameworks.CoreServices

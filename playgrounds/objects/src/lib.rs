@@ -2,8 +2,9 @@ use bevy::prelude::*;
 use std::f32::consts::PI;
 
 mod camera;
-mod forest;
-mod terrain;
+mod checkerboard_material;
+mod ground;
+pub mod tree;
 mod ui;
 
 use engine::{
@@ -12,59 +13,64 @@ use engine::{
 };
 
 pub use camera::CameraController;
-pub use terrain::TerrainConfig;
 
 pub use sdf;
 
-pub struct TerrainPlugin {
+pub struct ObjectsPlugin {
 	pub seed: u32,
 }
 
-impl Plugin for TerrainPlugin {
+impl Plugin for ObjectsPlugin {
 	fn build(&self, app: &mut App) {
 		// Register EdgeMaterial plugin
 		app.add_plugins(bevy::pbr::MaterialPlugin::<EdgeMaterial>::default());
+		// Register CheckerboardMaterial plugin
+		app.add_plugins(
+			bevy::pbr::MaterialPlugin::<checkerboard_material::CheckerboardMaterial>::default(),
+		);
 
-		// Set up geographic features
-		let terrain_chunk_config = ChunkConfig::<terrain::TerrainSdf>::default();
-		let terrain_resolution_config = ChunkResolutionConfig::<terrain::TerrainSdf>::default();
-		let terrain_config = TerrainConfig::new(self.seed);
-		let terrain_sdf = terrain::TerrainSdf { sdf: terrain::create_terrain_sdf(&terrain_config) };
-		let terrain_sdf_resource = SdfResource::new(terrain_sdf);
+		// Set up single tree SDF
+		// let tree_chunk_config = ChunkConfig::<tree::TreeSdf> {
+		// 	min_size: 0.01,
+		// 	number_of_rings: 2,
+		// 	grid_radius: 1,
+		// 	grid_multiple_2: 4,
+		// 	..Default::default()
+		// };
+		// let tree_resolution_config =
+		// 	ChunkResolutionConfig::<tree::TreeSdf> { base_res_2: 7, ..Default::default() };
+		// let tree_sdf = tree::create_tree_sdf();
+		// let tree_sdf_resource = SdfResource::new(tree_sdf);
 
-		// Set up forest SDF (floating at 5km)
-		let forest_chunk_config = ChunkConfig::<forest::ForestSdfWrapper> {
-			min_size: 0.1,
-			number_of_rings: 0,
-			grid_radius: 2,
-			grid_multiple_2: 4,
+		// Set up simple segment SDF at origin
+		let segment_chunk_config = ChunkConfig::<tree::SegmentSdf> {
+			min_size: 0.01,
+			number_of_rings: 2,
+			grid_radius: 1,
+			grid_multiple_2: 2,
 			..Default::default()
 		};
-		let forest_resolution_config = ChunkResolutionConfig::<forest::ForestSdfWrapper> {
-			base_res_2: 2,
-			..Default::default()
-		};
-		let forest_sdf = forest::create_forest_sdf(self.seed);
-		let forest_sdf_resource = SdfResource::new(forest_sdf);
+		let segment_resolution_config =
+			ChunkResolutionConfig::<tree::SegmentSdf> { base_res_2: 7, ..Default::default() };
+		let segment_sdf = tree::create_segment_sdf();
+		let segment_sdf_resource = SdfResource::new(segment_sdf);
 
-		app.insert_resource(terrain_config)
-			.insert_resource(ClearColor(Color::hsla(201.0, 0.69, 0.62, 1.0)))
+		app.insert_resource(ClearColor(Color::hsla(201.0, 0.69, 0.62, 1.0)))
 			.insert_resource(LoadedChunks::default())
-			// terrain
-			.insert_resource(terrain_chunk_config)
-			.insert_resource(terrain_resolution_config)
-			.insert_resource(terrain_sdf_resource)
-			// forest
-			.insert_resource(forest_chunk_config)
-			.insert_resource(forest_resolution_config)
-			.insert_resource(forest_sdf_resource)
-			.add_systems(Startup, (camera::setup_camera, setup_lighting, ui::setup_debug_ui))
+			.insert_resource(ground::CheckerSize::default())
+			.insert_resource(segment_chunk_config)
+			.insert_resource(segment_resolution_config)
+			.insert_resource(segment_sdf_resource)
+			.add_systems(
+				Startup,
+				(camera::setup_camera, setup_lighting, ground::setup_ground, ui::setup_debug_ui),
+			)
 			.add_systems(
 				Update,
 				(
 					camera::camera_controller,
-					manage_chunks::<terrain::TerrainSdf>,
-					manage_chunks::<forest::ForestSdfWrapper>,
+					ground::update_checker_size,
+					manage_chunks::<tree::SegmentSdf>,
 					ui::update_coordinate_display,
 				),
 			);
