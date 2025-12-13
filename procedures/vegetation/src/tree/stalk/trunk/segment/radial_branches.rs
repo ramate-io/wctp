@@ -67,7 +67,7 @@ impl Sdf for RadialBranchesSegment {
 		// Start with base trunk segment
 		let mut dist = self.base_segment.distance(p);
 
-		// Generate branch join point bumps and union them
+		// Generate branch join point segments and union them
 		let branch_noise = Perlin::new(self.config.seed + self.branch_seed_offset);
 		for i in 0..self.num_branches {
 			// Use noise to determine position along segment
@@ -78,25 +78,18 @@ impl Sdf for RadialBranchesSegment {
 			let angle_noise = branch_noise.get([i as f64 * 0.7, 1.0]) as f32;
 			let angle = (angle_noise + 1.0) * std::f32::consts::PI;
 
-			// Calculate radius at this position for placing bump slightly within
-			let normalized_y = unit_position;
-			let radius_at_pos = self.config.base_radius * (1.0 - normalized_y)
-				+ self.config.top_radius * normalized_y;
-			let bump_radius = radius_at_pos * 0.8; // Slightly within the radius
-
-			// Create join point bump
-			let join_bump = JoinPointSdf::new(
+			// Create join point segment (SimpleTrunkSegment angled in 3D)
+			// Use upward_component of 0.0 for branches (horizontal)
+			let join_segment = JoinPointSdf::new(
 				unit_position,
 				angle,
-				bump_radius,
-				0.1, // Bump height
-				self.config.seed + self.branch_seed_offset + i as u32,
-				self.config.noise_amplitude,
-				self.config.noise_frequency,
+				self.config.clone(),
+				self.branch_seed_offset + i as u32,
+				0.0,
 			);
 
 			// Union with base segment
-			dist = dist.min(join_bump.distance(p));
+			dist = dist.min(join_segment.distance(p));
 		}
 
 		dist

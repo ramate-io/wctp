@@ -11,8 +11,8 @@ pub use analysis::bounds::Bounds;
 pub use analysis::interval::{Sign, SignBoundary, SignUniformInterval, SignUniformIntervals};
 pub use capsule::CapsuleSdf;
 pub use combinators::{
-	AddY, Difference, Elongate, Intersection, RotateY, Round, Scale, SmoothDifference,
-	SmoothIntersection, SmoothUnion, Translate, Union,
+	AddY, Difference, Elongate, Intersection, RotateAlongRay, RotateY, Round, Scale,
+	SmoothDifference, SmoothIntersection, SmoothUnion, Translate, Union,
 };
 pub use ellipsoid::EllipsoidSdf;
 pub use sphere::SphereSdf;
