@@ -55,27 +55,33 @@ impl Plugin for ObjectsPlugin {
 		// let segment_sdf = tree::create_segment_sdf();
 		// let segment_sdf_resource = SdfResource::new(segment_sdf);
 
-		// Set up trunk split segment SDF at origin
-		let trunk_split_chunk_config = ChunkConfig::<tree::TrunkSplitSegmentSdf> {
+		// Set up mesh-composition approach: three separate segments (base + 2 splits)
+		let (base_segment, _split_segment_1, _split_segment_2) =
+			tree::create_trunk_split_segments();
+
+		// Configuration for all segments (they're all SegmentSdf type)
+		let segment_chunk_config = ChunkConfig::<tree::SegmentSdf> {
 			min_size: 0.01,
 			number_of_rings: 2,
 			grid_radius: 1,
 			grid_multiple_2: 2,
 			..Default::default()
 		};
-		let trunk_split_resolution_config = ChunkResolutionConfig::<tree::TrunkSplitSegmentSdf> {
-			base_res_2: 7,
-			..Default::default()
-		};
-		let trunk_split_sdf = tree::create_trunk_split_segment_sdf();
-		let trunk_split_sdf_resource = SdfResource::new(trunk_split_sdf);
+		let segment_resolution_config =
+			ChunkResolutionConfig::<tree::SegmentSdf> { base_res_2: 7, ..Default::default() };
+
+		let base_sdf_resource = SdfResource::new(base_segment);
+		let split_sdf_resource_1 = SdfResource::new(_split_segment_1);
+		let split_sdf_resource_2 = SdfResource::new(_split_segment_2);
 
 		app.insert_resource(ClearColor(Color::hsla(201.0, 0.69, 0.62, 1.0)))
 			.insert_resource(LoadedChunks::default())
 			.insert_resource(ground::CheckerSize::default())
-			.insert_resource(trunk_split_chunk_config)
-			.insert_resource(trunk_split_resolution_config)
-			.insert_resource(trunk_split_sdf_resource)
+			.insert_resource(segment_chunk_config)
+			.insert_resource(segment_resolution_config)
+			.insert_resource(base_sdf_resource)
+			.insert_resource(split_sdf_resource_1)
+			.insert_resource(split_sdf_resource_2)
 			.add_systems(
 				Startup,
 				(camera::setup_camera, setup_lighting, ground::setup_ground, ui::setup_debug_ui),
@@ -85,7 +91,7 @@ impl Plugin for ObjectsPlugin {
 				(
 					camera::camera_controller,
 					ground::update_checker_size,
-					manage_chunks::<tree::TrunkSplitSegmentSdf>,
+					manage_chunks::<tree::SegmentSdf>,
 					ui::update_coordinate_display,
 				),
 			);

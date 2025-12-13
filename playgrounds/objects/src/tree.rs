@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use noise::NoiseFn;
 use sdf::Sdf;
 use vegetation_sdf::tree::stalk::trunk::segment::{
 	simple::SimpleTrunkSegment, trunk_split::TrunkSplitSegment, SegmentConfig,
@@ -125,6 +126,80 @@ pub fn create_segment_sdf() -> SegmentSdf {
 	let scale = 0.01;
 
 	SegmentSdf::new(segment, scale)
+}
+
+/// Create three separate segments for mesh composition: base + 2 splits
+/// Returns (base_segment, split_segment_1, split_segment_2)
+pub fn create_trunk_split_segments() -> (SegmentSdf, SegmentSdf, SegmentSdf) {
+	let config = SegmentConfig {
+		seed: 42,
+		base_radius: 0.5,
+		top_radius: 0.4,
+		noise_amplitude: 0.05,
+		noise_frequency: 5.0,
+	};
+
+	// Scale to 0.01 km (10 meters) height
+	let scale = 0.01;
+
+	// Base segment at origin
+	let base_segment = SimpleTrunkSegment::new(config.clone());
+	let base_sdf = SegmentSdf::new(base_segment, scale);
+
+	// Generate split positions using the same logic as TrunkSplitSegment
+	let num_splits = 2;
+	let split_seed_offset = 2000;
+	let split_noise = noise::Perlin::new(config.seed + split_seed_offset);
+
+	let mut split_segments = Vec::new();
+
+	for i in 0..num_splits {
+		// All splits are slightly below the top (0.95 instead of 1.0)
+		let unit_position = 0.95;
+
+		// Use noise to determine angle around trunk, evenly distributed
+		let base_angle = (i as f32 / num_splits as f32) * 2.0 * std::f32::consts::PI;
+		let angle_noise = split_noise.get([i as f64 * 0.3, 0.0]) as f32;
+		let angle = base_angle + angle_noise * 0.2;
+
+		// Create segment for this split
+		let mut split_config = config.clone();
+		split_config.seed = config.seed + split_seed_offset + i as u32;
+		let split_segment = SimpleTrunkSegment::new(split_config);
+
+		// Compute direction vector for the angled segment
+		// The angle is around the Y axis, so we compute a direction in the XZ plane
+		// and add an upward component for trunk splits
+		let horizontal_dir = Vec3::new(angle.cos(), 0.0, angle.sin());
+
+		// For trunk splits, angle upward and outward
+		// Mix horizontal direction with upward direction
+		let upward_component = 0.3; // How much to angle upward (0 = horizontal, 1 = vertical)
+		let direction =
+			(horizontal_dir * (1.0 - upward_component) + Vec3::Y * upward_component).normalize();
+
+		// Compute rotation from Y axis to direction
+		let y_axis = Vec3::Y;
+		let rotation = if direction.dot(y_axis) > 0.999 {
+			Quat::IDENTITY
+		} else if direction.dot(y_axis) < -0.999 {
+			Quat::from_rotation_x(std::f32::consts::PI)
+		} else {
+			Quat::from_rotation_arc(y_axis, direction)
+		};
+
+		// Position at join point (unit_position * scale in world space)
+		// The segment's bottom (y=0) should be at this position
+		let translation = Vec3::new(0.0, unit_position * scale, 0.0);
+
+		let split_sdf = SegmentSdf::new(split_segment, scale)
+			.with_translation(translation)
+			.with_rotation(rotation);
+		split_segments.push(split_sdf);
+	}
+
+	// Return the segments - caller will need to handle cloning if needed
+	(base_sdf, split_segments.remove(0), split_segments.remove(0))
 }
 
 /// Wrapper SDF for a trunk split segment that transforms world space to unit space

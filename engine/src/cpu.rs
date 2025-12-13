@@ -442,7 +442,7 @@ impl CpuMeshGenerator {
 				TerrainChunk { chunk: cascade_chunk },
 				Mesh3d(mesh_handle.clone()),
 				MeshMaterial3d::<EdgeMaterial>(material_handle.clone()),
-				Transform::from_translation(world_pos),
+				Transform::from_translation(world_pos).with_rotation(sdf.rotation()).with_scale(sdf.scale())
 			))
 			.id();
 
