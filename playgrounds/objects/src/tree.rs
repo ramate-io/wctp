@@ -70,11 +70,23 @@ pub struct SegmentSdf {
 	/// Scale factor to convert unit space to world space (km)
 	/// Segment height in world space = scale
 	scale: f32,
+	/// Translation of the segment in world space
+	translation: Vec3,
+	/// Rotation of the segment in world space
+	rotation: Quat,
 }
 
 impl SegmentSdf {
 	pub fn new(segment: SimpleTrunkSegment, scale: f32) -> Self {
-		Self { segment, scale }
+		Self { segment, scale, translation: Vec3::ZERO, rotation: Quat::IDENTITY }
+	}
+
+	pub fn with_translation(self, translation: Vec3) -> Self {
+		Self { translation, ..self }
+	}
+
+	pub fn with_rotation(self, rotation: Quat) -> Self {
+		Self { rotation, ..self }
 	}
 }
 
@@ -87,6 +99,14 @@ impl Sdf for SegmentSdf {
 
 		// Get distance in unit space and scale back to world space
 		self.segment.distance(unit_p) * self.scale
+	}
+
+	fn translation(&self) -> Vec3 {
+		self.translation
+	}
+
+	fn rotation(&self) -> Quat {
+		self.rotation
 	}
 }
 
