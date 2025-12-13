@@ -436,6 +436,7 @@ impl CpuMeshGenerator {
 		// Use cascade chunk origin for world position
 		// Note: mesh vertices are in local space relative to chunk origin
 		let world_pos = cascade_chunk.origin + sdf.translation();
+		log::info!("Typename: {:?}, Translation: {:?}", std::any::type_name::<S>(), sdf.translation());
 
 		let entity = commands
 			.spawn((

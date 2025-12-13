@@ -128,9 +128,68 @@ pub fn create_segment_sdf() -> SegmentSdf {
 	SegmentSdf::new(segment, scale)
 }
 
+/// Wrapper types for each segment instance to allow separate Bevy resource management
+pub struct BaseSegmentSdf(pub SegmentSdf);
+pub struct SplitSegment1Sdf(pub SegmentSdf);
+pub struct SplitSegment2Sdf(pub SegmentSdf);
+
+impl Sdf for BaseSegmentSdf {
+	fn distance(&self, p: Vec3) -> f32 {
+		self.0.distance(p)
+	}
+
+	fn translation(&self) -> Vec3 {
+		self.0.translation()
+	}
+
+	fn rotation(&self) -> Quat {
+		self.0.rotation()
+	}
+
+	fn scale(&self) -> Vec3 {
+		self.0.scale()
+	}
+}
+
+impl Sdf for SplitSegment1Sdf {
+	fn distance(&self, p: Vec3) -> f32 {
+		self.0.distance(p)
+	}
+
+	fn translation(&self) -> Vec3 {
+		self.0.translation()
+	}
+
+	fn rotation(&self) -> Quat {
+		self.0.rotation()
+	}
+
+	fn scale(&self) -> Vec3 {
+		self.0.scale()
+	}
+}
+
+impl Sdf for SplitSegment2Sdf {
+	fn distance(&self, p: Vec3) -> f32 {
+		self.0.distance(p)
+	}
+
+	fn translation(&self) -> Vec3 {
+		self.0.translation()
+	}
+
+	fn rotation(&self) -> Quat {
+		self.0.rotation()
+	}
+
+	fn scale(&self) -> Vec3 {
+		self.0.scale()
+	}
+}
+
 /// Create three separate segments for mesh composition: base + 2 splits
-/// Returns (base_segment, split_segment_1, split_segment_2)
-pub fn create_trunk_split_segments() -> (SegmentSdf, SegmentSdf, SegmentSdf) {
+/// Returns (base_segment, split_segment_1, split_segment_2) as wrapper types
+pub fn create_trunk_split_segments() -> (BaseSegmentSdf, SplitSegment1Sdf, SplitSegment2Sdf) {
 	let config = SegmentConfig {
 		seed: 42,
 		base_radius: 0.5,
@@ -160,46 +219,49 @@ pub fn create_trunk_split_segments() -> (SegmentSdf, SegmentSdf, SegmentSdf) {
 		// Use noise to determine angle around trunk, evenly distributed
 		let base_angle = (i as f32 / num_splits as f32) * 2.0 * std::f32::consts::PI;
 		let angle_noise = split_noise.get([i as f64 * 0.3, 0.0]) as f32;
-		let angle = base_angle + angle_noise * 0.2;
+		let _angle = base_angle + angle_noise * 0.2;
 
 		// Create segment for this split
 		let mut split_config = config.clone();
 		split_config.seed = config.seed + split_seed_offset + i as u32;
 		let split_segment = SimpleTrunkSegment::new(split_config);
 
-		// Compute direction vector for the angled segment
+		// Compute direction vector for the angled segment (commented out for now)
 		// The angle is around the Y axis, so we compute a direction in the XZ plane
 		// and add an upward component for trunk splits
-		let horizontal_dir = Vec3::new(angle.cos(), 0.0, angle.sin());
+		// let horizontal_dir = Vec3::new(angle.cos(), 0.0, angle.sin());
 
 		// For trunk splits, angle upward and outward
 		// Mix horizontal direction with upward direction
-		let upward_component = 0.3; // How much to angle upward (0 = horizontal, 1 = vertical)
-		let direction =
-			(horizontal_dir * (1.0 - upward_component) + Vec3::Y * upward_component).normalize();
+		// let upward_component = 0.3; // How much to angle upward (0 = horizontal, 1 = vertical)
+		// let direction =
+		// 	(horizontal_dir * (1.0 - upward_component) + Vec3::Y * upward_component).normalize();
 
-		// Compute rotation from Y axis to direction
-		let y_axis = Vec3::Y;
-		let rotation = if direction.dot(y_axis) > 0.999 {
-			Quat::IDENTITY
-		} else if direction.dot(y_axis) < -0.999 {
-			Quat::from_rotation_x(std::f32::consts::PI)
-		} else {
-			Quat::from_rotation_arc(y_axis, direction)
-		};
+		// Compute rotation from Y axis to direction (commented out for now)
+		// let y_axis = Vec3::Y;
+		// let rotation = if direction.dot(y_axis) > 0.999 {
+		// 	Quat::IDENTITY
+		// } else if direction.dot(y_axis) < -0.999 {
+		// 	Quat::from_rotation_x(std::f32::consts::PI)
+		// } else {
+		// 	Quat::from_rotation_arc(y_axis, direction)
+		// };
 
 		// Position at join point (unit_position * scale in world space)
 		// The segment's bottom (y=0) should be at this position
 		let translation = Vec3::new(0.0, unit_position * scale, 0.0);
 
-		let split_sdf = SegmentSdf::new(split_segment, scale)
-			.with_translation(translation)
-			.with_rotation(rotation);
+		let split_sdf = SegmentSdf::new(split_segment, scale).with_translation(translation);
+		// .with_rotation(rotation);
 		split_segments.push(split_sdf);
 	}
 
-	// Return the segments - caller will need to handle cloning if needed
-	(base_sdf, split_segments.remove(0), split_segments.remove(0))
+	// Return the segments as wrapper types
+	(
+		BaseSegmentSdf(base_sdf),
+		SplitSegment1Sdf(split_segments.remove(0)),
+		SplitSegment2Sdf(split_segments.remove(0)),
+	)
 }
 
 /// Wrapper SDF for a trunk split segment that transforms world space to unit space

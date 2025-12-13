@@ -56,32 +56,63 @@ impl Plugin for ObjectsPlugin {
 		// let segment_sdf_resource = SdfResource::new(segment_sdf);
 
 		// Set up mesh-composition approach: three separate segments (base + 2 splits)
-		let (base_segment, _split_segment_1, _split_segment_2) =
-			tree::create_trunk_split_segments();
+		let (base_segment, split_segment_1, split_segment_2) = tree::create_trunk_split_segments();
 
-		// Configuration for all segments (they're all SegmentSdf type)
-		let segment_chunk_config = ChunkConfig::<tree::SegmentSdf> {
+		// Configuration for base segment
+		let base_chunk_config = ChunkConfig::<tree::BaseSegmentSdf> {
 			min_size: 0.01,
 			number_of_rings: 2,
 			grid_radius: 1,
 			grid_multiple_2: 2,
 			..Default::default()
 		};
-		let segment_resolution_config =
-			ChunkResolutionConfig::<tree::SegmentSdf> { base_res_2: 7, ..Default::default() };
+		let base_resolution_config =
+			ChunkResolutionConfig::<tree::BaseSegmentSdf> { base_res_2: 7, ..Default::default() };
 
+		// Configuration for split segment 1
+		let split1_chunk_config = ChunkConfig::<tree::SplitSegment1Sdf> {
+			min_size: 0.01,
+			number_of_rings: 2,
+			grid_radius: 1,
+			grid_multiple_2: 2,
+			..Default::default()
+		};
+		let split1_resolution_config =
+			ChunkResolutionConfig::<tree::SplitSegment1Sdf> { base_res_2: 7, ..Default::default() };
+
+		// Configuration for split segment 2
+		let split2_chunk_config = ChunkConfig::<tree::SplitSegment2Sdf> {
+			min_size: 0.01,
+			number_of_rings: 2,
+			grid_radius: 1,
+			grid_multiple_2: 2,
+			..Default::default()
+		};
+		let split2_resolution_config =
+			ChunkResolutionConfig::<tree::SplitSegment2Sdf> { base_res_2: 7, ..Default::default() };
+
+		// Create SDF resources for each segment
 		let base_sdf_resource = SdfResource::new(base_segment);
-		let split_sdf_resource_1 = SdfResource::new(_split_segment_1);
-		let split_sdf_resource_2 = SdfResource::new(_split_segment_2);
+		let split1_sdf_resource = SdfResource::new(split_segment_1);
+		let split2_sdf_resource = SdfResource::new(split_segment_2);
 
 		app.insert_resource(ClearColor(Color::hsla(201.0, 0.69, 0.62, 1.0)))
-			.insert_resource(LoadedChunks::default())
 			.insert_resource(ground::CheckerSize::default())
-			.insert_resource(segment_chunk_config)
-			.insert_resource(segment_resolution_config)
+			// Base segment resources
+			.insert_resource(base_chunk_config)
+			.insert_resource(base_resolution_config)
 			.insert_resource(base_sdf_resource)
-			.insert_resource(split_sdf_resource_1)
-			.insert_resource(split_sdf_resource_2)
+			.insert_resource(LoadedChunks::default())
+			// Split segment 1 resources
+			.insert_resource(split1_chunk_config)
+			.insert_resource(split1_resolution_config)
+			.insert_resource(split1_sdf_resource)
+			.insert_resource(LoadedChunks::default())
+			// Split segment 2 resources
+			.insert_resource(split2_chunk_config)
+			.insert_resource(split2_resolution_config)
+			.insert_resource(split2_sdf_resource)
+			.insert_resource(LoadedChunks::default())
 			.add_systems(
 				Startup,
 				(camera::setup_camera, setup_lighting, ground::setup_ground, ui::setup_debug_ui),
@@ -91,7 +122,9 @@ impl Plugin for ObjectsPlugin {
 				(
 					camera::camera_controller,
 					ground::update_checker_size,
-					manage_chunks::<tree::SegmentSdf>,
+					manage_chunks::<tree::BaseSegmentSdf>,
+					manage_chunks::<tree::SplitSegment1Sdf>,
+					manage_chunks::<tree::SplitSegment2Sdf>,
 					ui::update_coordinate_display,
 				),
 			);
