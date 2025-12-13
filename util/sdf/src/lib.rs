@@ -49,4 +49,19 @@ pub trait Sdf: Send + Sync {
 	fn bounds(&self) -> Bounds {
 		Bounds::Unbounded
 	}
+
+	/// The stateful translation of the SDF.
+	fn translation(&self) -> Vec3 {
+		Vec3::ZERO
+	}
+
+	/// The stateful rotation of the SDF.
+	fn rotation(&self) -> Quat {
+		Quat::IDENTITY
+	}
+
+	/// The stateful scale of the SDF.
+	fn scale(&self) -> Vec3 {
+		Vec3::ONE
+	}
 }

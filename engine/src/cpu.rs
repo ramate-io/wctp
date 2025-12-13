@@ -416,7 +416,8 @@ impl CpuMeshGenerator {
 	}
 
 	/// Spawn a terrain chunk entity from a pre-generated mesh
-	pub fn spawn_chunk_with_mesh(
+	pub fn spawn_chunk_with_mesh<S: Sdf + Send + Sync>(
+		sdf: &Arc<S>,
 		commands: &mut Commands,
 		meshes: &mut ResMut<Assets<Mesh>>,
 		materials: &mut ResMut<Assets<EdgeMaterial>>,
@@ -434,7 +435,7 @@ impl CpuMeshGenerator {
 
 		// Use cascade chunk origin for world position
 		// Note: mesh vertices are in local space relative to chunk origin
-		let world_pos = cascade_chunk.origin;
+		let world_pos = cascade_chunk.origin + sdf.translation();
 
 		let entity = commands
 			.spawn((
@@ -465,7 +466,7 @@ impl CpuMeshGenerator {
 	) -> Entity {
 		// Generate mesh using cascade chunk
 		let start_time = std::time::Instant::now();
-		let Some(mesh) = Self::generate_chunk_mesh(&cascade_chunk, sdf) else {
+		let Some(mesh) = Self::generate_chunk_mesh(&cascade_chunk, sdf.clone()) else {
 			// Chunk is entirely above terrain, don't spawn it
 			log::debug!(
 				"Skipping chunk at origin {:?} - entirely above terrain",
@@ -479,6 +480,6 @@ impl CpuMeshGenerator {
 		log::info!("Mesh time: {:?}", duration);
 
 		// Default to grid (brown) for backward compatibility when called directly
-		Self::spawn_chunk_with_mesh(commands, meshes, materials, cascade_chunk, mesh, false)
+		Self::spawn_chunk_with_mesh(&sdf, commands, meshes, materials, cascade_chunk, mesh, false)
 	}
 }
