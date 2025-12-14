@@ -25,7 +25,7 @@ pub trait MeshFetcher: Clone + Hash + Eq {
 
 pub trait MeshCache: Clone + Hash + Eq {
 	/// Caches a mesh.
-	fn cache_mesh(&self, mesh: &Mesh);
+	fn cache_mesh(&self, mesh: &Mesh, cascade_chunk: &CascadeChunk);
 
 	/// Fetches a mesh from the cache.
 	fn fetch_cached_mesh(&self, cascade_chunk: &CascadeChunk) -> Option<Mesh>;
@@ -33,7 +33,7 @@ pub trait MeshCache: Clone + Hash + Eq {
 
 pub trait MeshHandleCache: Clone + Hash + Eq {
 	/// Caches a mesh handle.
-	fn cache_mesh_handle(&self, mesh_handle: Handle<Mesh>);
+	fn cache_mesh_handle(&self, mesh_handle: Handle<Mesh>, cascade_chunk: &CascadeChunk);
 
 	/// Fetches a mesh handle from the cache.
 	fn fetch_cached_mesh_handle(
@@ -60,13 +60,13 @@ impl<T: MeshBuilder + MeshCache + MeshHandleCache> MeshFetcher for T {
 			Some(meshes.add(mesh))
 		} else {
 			self.build_mesh(cascade_chunk).map(|mesh| {
-				self.cache_mesh(&mesh);
+				self.cache_mesh(&mesh, cascade_chunk);
 				meshes.add(mesh)
 			})
 		};
 
 		mesh_handle.map(|handle| {
-			self.cache_mesh_handle(handle.clone());
+			self.cache_mesh_handle(handle.clone(), cascade_chunk);
 			handle
 		})
 	}

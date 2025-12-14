@@ -1,6 +1,8 @@
 use bevy::math::bounding::Aabb3d;
 use bevy::prelude::*;
 use std::fmt::Debug;
+use std::hash::Hash;
+use std::hash::Hasher;
 
 pub trait ResolutionMap: Debug + Clone + Copy {
 	fn ring_to_power_of_2(&self, ring: u8) -> u8;
@@ -85,6 +87,16 @@ pub struct CascadeChunk {
 	pub omit: Option<Aabb3d>,
 }
 
+impl Hash for CascadeChunk {
+	fn hash<H: Hasher>(&self, state: &mut H) {
+		self.origin.x.to_bits().hash(state);
+		self.origin.y.to_bits().hash(state);
+		self.origin.z.to_bits().hash(state);
+		self.size.to_bits().hash(state);
+		self.res_2.hash(state);
+	}
+}
+
 impl CascadeChunk {
 	pub fn resolution(&self) -> usize {
 		2_usize.pow(self.res_2 as u32)
@@ -126,10 +138,8 @@ impl PartialOrd for CascadeChunk {
 	}
 }
 
-#[cfg(test)]
 impl Eq for CascadeChunk {}
 
-#[cfg(test)]
 impl Ord for CascadeChunk {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
 		self.partial_cmp(other).unwrap()

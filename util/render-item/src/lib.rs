@@ -1,4 +1,6 @@
 pub mod mesh;
+// Early development caches to be reused by RenderItem developers.
+pub mod cache;
 pub mod sdf;
 
 use bevy::prelude::*;
