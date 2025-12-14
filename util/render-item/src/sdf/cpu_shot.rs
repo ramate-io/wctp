@@ -7,7 +7,7 @@ use std::sync::Arc;
 use rayon::prelude::*;
 use marching_cubes::{get_cube_index, interpolate_vertex, TRIANGULATIONS};
 use crate::mesh::MeshBuilder;
-
+use crate::NormalizeChunk;
 pub trait CpuShotSdf: Sdf + Clone {
 	fn cpu_chunk_mesh(&self, cascade_chunk: &CascadeChunk) -> Option<Mesh> {
         // ---------- grid setup ---------------------------------------------------
@@ -405,7 +405,9 @@ pub trait CpuShotSdf: Sdf + Clone {
     }
 }
 
-impl <T: CpuShotSdf> MeshBuilder for T {
+impl <T: Sdf + Clone> CpuShotSdf for T {}
+
+impl <T: CpuShotSdf + NormalizeChunk> MeshBuilder for T {
 	fn build_mesh_impl(&self, cascade_chunk: &CascadeChunk) -> Option<Mesh> {
 		self.cpu_chunk_mesh(cascade_chunk)
 	}

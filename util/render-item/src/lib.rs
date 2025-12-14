@@ -54,3 +54,15 @@ pub fn render_items<T: RenderItem, M: Material>(
 ) -> Vec<Entity> {
 	dispatch_render_item.spawn_render_items(commands, cascade_chunk, transform, meshes, materials)
 }
+
+pub trait NormalizeChunk {
+	/// Normalizes the cascaded chunk to the mesh space.
+	///
+	/// Some reusable meshes may normalize the chunk space to something like the origin,
+	/// then rely on transforms to position the mesh in the world.
+	///
+	/// Higher order systems are responsible for accounting for whether the mesh is normalized or not.
+	fn normalize_chunk(&self, cascade_chunk: &CascadeChunk) -> CascadeChunk {
+		cascade_chunk.clone()
+	}
+}

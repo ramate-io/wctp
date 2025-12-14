@@ -1,18 +1,9 @@
+use crate::NormalizeChunk;
 use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;
 use std::hash::Hash;
 
-pub trait MeshBuilder: Clone {
-	/// Normalizes the cascaded chunk to the mesh space.
-	///
-	/// Some reusable meshes may normalize the chunk space to something like the origin,
-	/// then rely on transforms to position the mesh in the world.
-	///
-	/// Higher order systems are responsible for accounting for whether the mesh is normalized or not.
-	fn normalize_chunk(&self, cascade_chunk: &CascadeChunk) -> CascadeChunk {
-		cascade_chunk.clone()
-	}
-
+pub trait MeshBuilder: Clone + NormalizeChunk {
 	/// The actual implementation which builds the mesh.
 	fn build_mesh_impl(&self, cascade_chunk: &CascadeChunk) -> Option<Mesh>;
 
