@@ -6,6 +6,7 @@ use sdf::{Sign, Sdf};
 use std::sync::Arc;
 use rayon::prelude::*;
 use marching_cubes::{get_cube_index, interpolate_vertex, TRIANGULATIONS};
+use crate::mesh::MeshBuilder;
 
 pub trait CpuShotSdf: Sdf + Clone {
 	fn cpu_chunk_mesh(&self, cascade_chunk: &CascadeChunk) -> Option<Mesh> {
@@ -402,4 +403,10 @@ pub trait CpuShotSdf: Sdf + Clone {
 		Some(mesh)
 
     }
+}
+
+impl <T: CpuShotSdf> MeshBuilder for T {
+	fn build_mesh(&self, cascade_chunk: &CascadeChunk) -> Option<Mesh> {
+		self.cpu_chunk_mesh(cascade_chunk)
+	}
 }
