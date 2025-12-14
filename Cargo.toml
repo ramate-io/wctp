@@ -17,7 +17,9 @@ members = [
 
   # util
   ## sdf
-  "util/sdf"
+  "util/sdf",
+  "util/chunk",
+  "util/render-item"
 
 ]
 
@@ -100,6 +102,8 @@ rayon = { version = "1.11.0" }
 clap-markdown-ext = { git = "https://github.com/movementlabsxyz/clap-markdown-ext.git", rev = "8f54fe424504bf37fb01dc69aaed8166e429fe6a"}
 
 sdf = { path = "util/sdf" }
+render-item = { path = "util/render-item" }
+chunk = { path = "util/chunk" }
 
 terrain-sdf = { path = "procedures/terrain" }
 vegetation-sdf = { path = "procedures/vegetation" }

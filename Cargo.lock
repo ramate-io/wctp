@@ -1735,6 +1735,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "chunk"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "bytemuck",
+ "chrono",
+ "log",
+ "noise",
+ "rayon",
+ "serde",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "clang-sys"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3934,6 +3949,21 @@ name = "regex-syntax"
 version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "caf4aa5b0f434c91fe5c7f1ecb6a5ece2130b02ad2a590589dda5146df959001"
+
+[[package]]
+name = "render-item"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "chrono",
+ "chunk",
+ "log",
+ "rayon",
+ "sdf",
+ "serde",
+ "thiserror 1.0.69",
+]
 
 [[package]]
 name = "renderdoc-sys"
