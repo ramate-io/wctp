@@ -406,7 +406,7 @@ pub trait CpuShotSdf: Sdf + Clone {
 }
 
 impl <T: CpuShotSdf> MeshBuilder for T {
-	fn build_mesh(&self, cascade_chunk: &CascadeChunk) -> Option<Mesh> {
+	fn build_mesh_impl(&self, cascade_chunk: &CascadeChunk) -> Option<Mesh> {
 		self.cpu_chunk_mesh(cascade_chunk)
 	}
 }
