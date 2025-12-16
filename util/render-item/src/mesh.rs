@@ -83,17 +83,15 @@ impl<T: MeshFetcher> MeshDispatch<T> {
 	}
 }
 
-/// Fetches a mesh and spawns it.
-pub fn fetch_meshes<T: MeshFetcher, M: Material>(
-	commands: &mut Commands,
-	mesh_dispatch: &MeshDispatch<T>,
-	cascade_chunk: &CascadeChunk,
-	transform: Transform,
-	meshes: &mut ResMut<Assets<Mesh>>,
-	material: MeshMaterial3d<M>,
+/// Fetches meshes and spawns them into the world.
+pub fn fetch_meshes<T: MeshFetcher + Send + Sync + 'static, M: Material>(
+	mut commands: Commands,
+	mut meshes: ResMut<Assets<Mesh>>,
+	query: Query<(Entity, &MeshDispatch<T>, &CascadeChunk, &Transform, &MeshMaterial3d<M>)>,
 ) {
-	let mesh = mesh_dispatch.fetcher.fetch_mesh(meshes, cascade_chunk);
-	if let Some(mesh) = mesh {
-		commands.spawn((Mesh3d(mesh), transform, material));
+	for (_entity, mesh_dispatch, cascade_chunk, transform, material) in &query {
+		if let Some(mesh) = mesh_dispatch.fetcher.fetch_mesh(&mut meshes, cascade_chunk) {
+			commands.spawn((Mesh3d(mesh), *transform, material.clone()));
+		}
 	}
 }

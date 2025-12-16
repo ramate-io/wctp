@@ -43,14 +43,13 @@ impl<T: RenderItem> DispatchRenderItem<T> {
 ///
 /// NOTE: this is not procedural contract for all produce all items of the type.
 /// Rather, when a render item is dispatched, this begins the process of rendering said item.
-pub fn render_items<T: RenderItem, M: Material>(
-	commands: &mut Commands,
-	dispatch_render_item: &DispatchRenderItem<T>,
-	cascade_chunk: &CascadeChunk,
-	transform: Transform,
-	material: MeshMaterial3d<M>,
-) -> Vec<Entity> {
-	dispatch_render_item.spawn_render_items(commands, cascade_chunk, transform, material)
+pub fn render_items<T: RenderItem + Send + Sync + 'static, M: Material>(
+	mut commands: Commands,
+	query: Query<(Entity, &DispatchRenderItem<T>, &CascadeChunk, &Transform, &MeshMaterial3d<M>)>,
+) {
+	for (_entity, dispatch, chunk, transform, material) in &query {
+		dispatch.spawn_render_items(&mut commands, chunk, *transform, material.clone());
+	}
 }
 
 pub trait NormalizeChunk {
