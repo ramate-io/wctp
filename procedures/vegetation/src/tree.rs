@@ -2,7 +2,11 @@ pub mod meshes;
 
 use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;
-use render_item::RenderItem;
+use meshes::trunk::segment::{SegmentConfig, SimpleTrunkSegment};
+use render_item::{
+	mesh::{handle::MeshHandle, MeshDispatch},
+	RenderItem,
+};
 
 #[derive(Component, Clone)]
 pub struct TreeRenderItem {}
@@ -13,9 +17,19 @@ impl RenderItem for TreeRenderItem {
 		commands: &mut Commands,
 		cascade_chunk: &CascadeChunk,
 		transform: Transform,
-		meshes: &mut ResMut<Assets<Mesh>>,
-		materials: &mut ResMut<Assets<M>>,
+		material: MeshMaterial3d<M>,
 	) -> Vec<Entity> {
+		let mut entities = vec![];
+
+		// Build tree segment dispatch
+		let tree_segment = SimpleTrunkSegment::new(SegmentConfig::default());
+		let mesh_handle = MeshHandle::new(tree_segment);
+		let mesh_dispatch = MeshDispatch::new(mesh_handle);
+
+		// spawn it
+		entities
+			.push(commands.spawn((cascade_chunk.clone(), mesh_dispatch, transform, material)).id());
+
 		vec![]
 	}
 }

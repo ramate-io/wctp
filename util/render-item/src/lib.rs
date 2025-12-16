@@ -12,11 +12,11 @@ pub trait RenderItem: Clone {
 		commands: &mut Commands,
 		cascade_chunk: &CascadeChunk,
 		transform: Transform,
-		meshes: &mut ResMut<Assets<Mesh>>,
-		materials: &mut ResMut<Assets<M>>,
+		material: MeshMaterial3d<M>,
 	) -> Vec<Entity>;
 }
 
+/// Signals an intent to render an item into the world.
 #[derive(Component)]
 pub struct DispatchRenderItem<T: RenderItem> {
 	item: T,
@@ -33,11 +33,9 @@ impl<T: RenderItem> DispatchRenderItem<T> {
 		commands: &mut Commands,
 		cascade_chunk: &CascadeChunk,
 		transform: Transform,
-		meshes: &mut ResMut<Assets<Mesh>>,
-		materials: &mut ResMut<Assets<M>>,
+		material: MeshMaterial3d<M>,
 	) -> Vec<Entity> {
-		self.item
-			.spawn_render_items(commands, cascade_chunk, transform, meshes, materials)
+		self.item.spawn_render_items(commands, cascade_chunk, transform, material)
 	}
 }
 
@@ -50,10 +48,9 @@ pub fn render_items<T: RenderItem, M: Material>(
 	dispatch_render_item: &DispatchRenderItem<T>,
 	cascade_chunk: &CascadeChunk,
 	transform: Transform,
-	meshes: &mut ResMut<Assets<Mesh>>,
-	materials: &mut ResMut<Assets<M>>,
+	material: MeshMaterial3d<M>,
 ) -> Vec<Entity> {
-	dispatch_render_item.spawn_render_items(commands, cascade_chunk, transform, meshes, materials)
+	dispatch_render_item.spawn_render_items(commands, cascade_chunk, transform, material)
 }
 
 pub trait NormalizeChunk {

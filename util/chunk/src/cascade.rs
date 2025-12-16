@@ -79,7 +79,7 @@ fn lex_cmp(a: &Vec3, b: &Vec3) -> std::cmp::Ordering {
 		.then_with(|| a.z.partial_cmp(&b.z).unwrap_or(std::cmp::Ordering::Equal))
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Component, Debug, Clone, Copy, PartialEq)]
 pub struct CascadeChunk {
 	pub origin: Vec3,
 	pub size: f32,
