@@ -43,6 +43,8 @@ impl<T: RenderItem> DispatchRenderItem<T> {
 ///
 /// NOTE: this is not procedural contract for all produce all items of the type.
 /// Rather, when a render item is dispatched, this begins the process of rendering said item.
+///
+/// TODO: this needs to be made event-based.
 pub fn render_items<T: RenderItem + Send + Sync + 'static, M: Material>(
 	mut commands: Commands,
 	query: Query<(Entity, &DispatchRenderItem<T>, &CascadeChunk, &Transform, &MeshMaterial3d<M>)>,

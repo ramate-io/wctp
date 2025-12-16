@@ -84,6 +84,8 @@ impl<T: MeshFetcher> MeshDispatch<T> {
 }
 
 /// Fetches meshes and spawns them into the world.
+///
+/// TODO: this needs to be made event-based.
 pub fn fetch_meshes<T: MeshFetcher + Send + Sync + 'static, M: Material>(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
