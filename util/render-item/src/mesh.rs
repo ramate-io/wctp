@@ -89,7 +89,10 @@ impl<T: MeshFetcher> MeshDispatch<T> {
 pub fn fetch_meshes<T: MeshFetcher + Send + Sync + 'static, M: Material>(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
-	query: Query<(Entity, &MeshDispatch<T>, &CascadeChunk, &Transform, &MeshMaterial3d<M>)>,
+	query: Query<
+		(Entity, &MeshDispatch<T>, &CascadeChunk, &Transform, &MeshMaterial3d<M>),
+		Added<MeshDispatch<T>>,
+	>,
 ) {
 	for (_entity, mesh_dispatch, cascade_chunk, transform, material) in &query {
 		if let Some(mesh) = mesh_dispatch.fetcher.fetch_mesh(&mut meshes, cascade_chunk) {

@@ -47,7 +47,10 @@ impl<T: RenderItem> DispatchRenderItem<T> {
 /// TODO: this needs to be made event-based.
 pub fn render_items<T: RenderItem + Send + Sync + 'static, M: Material>(
 	mut commands: Commands,
-	query: Query<(Entity, &DispatchRenderItem<T>, &CascadeChunk, &Transform, &MeshMaterial3d<M>)>,
+	query: Query<
+		(Entity, &DispatchRenderItem<T>, &CascadeChunk, &Transform, &MeshMaterial3d<M>),
+		Added<DispatchRenderItem<T>>,
+	>,
 ) {
 	for (_entity, dispatch, chunk, transform, material) in &query {
 		dispatch.spawn_render_items(&mut commands, chunk, *transform, material.clone());
