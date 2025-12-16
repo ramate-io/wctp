@@ -1,11 +1,8 @@
-pub mod canopy;
-pub mod stalk;
+pub mod meshes;
 
 use bevy::prelude::*;
-pub use canopy::CanopySdf;
 use chunk::cascade::CascadeChunk;
 use render_item::RenderItem;
-pub use stalk::{BranchSdf, RootSdf, TrunkSdf};
 
 #[derive(Component, Clone)]
 pub struct TreeRenderItem {}

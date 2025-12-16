@@ -1,12 +1,42 @@
-use super::{
-	join_point::{JoinPoint, JoinType},
-	SegmentConfig,
-};
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
+use render_item::{
+	cache::handle_cache::HandleCache,
+	mesh::{MeshBuilder, MeshCache, MeshFetcher, MeshHandleCache},
+	NormalizeChunk,
+};
 use sdf::Sdf;
 
+/// Base configuration for a trunk segment
+/// All segments work in unit space (0-1) and are transformed later
+#[derive(Clone)]
+pub struct SegmentConfig {
+	/// Seed for noise generation
+	pub seed: u32,
+	/// Base radius at bottom (in unit space, typically 0.5)
+	pub base_radius: f32,
+	/// Top radius at top (in unit space, typically 0.4)
+	pub top_radius: f32,
+	/// Noise amplitude for surface variation
+	pub noise_amplitude: f32,
+	/// Noise frequency for surface variation
+	pub noise_frequency: f32,
+}
+
+impl Default for SegmentConfig {
+	fn default() -> Self {
+		Self {
+			seed: 0,
+			base_radius: 0.5,
+			top_radius: 0.4,
+			noise_amplitude: 0.05,
+			noise_frequency: 5.0,
+		}
+	}
+}
+
 /// Simple trunk segment: noisy cylinder with trunk join points on top and bottom
+#[derive(Clone)]
 pub struct SimpleTrunkSegment {
 	config: SegmentConfig,
 	noise: Perlin,
@@ -16,18 +46,6 @@ impl SimpleTrunkSegment {
 	pub fn new(config: SegmentConfig) -> Self {
 		let noise = Perlin::new(config.seed);
 		Self { config, noise }
-	}
-
-	/// Get join points: one at bottom (0.0) and one at top (1.0)
-	pub fn join_points(&self) -> Vec<JoinPoint> {
-		vec![
-			JoinPoint {
-				unit_position: 0.0,
-				angle: 0.0, // Angle doesn't matter for single trunk join
-				join_type: JoinType::Trunk,
-			},
-			JoinPoint { unit_position: 1.0, angle: 0.0, join_type: JoinType::Trunk },
-		]
 	}
 }
 

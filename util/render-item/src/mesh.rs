@@ -1,7 +1,17 @@
+pub mod cache;
+pub mod handle;
+
 use crate::NormalizeChunk;
 use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;
 use std::hash::Hash;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MeshId(String);
+
+pub trait IdentifiedMesh {
+	fn id(&self) -> MeshId;
+}
 
 pub trait MeshBuilder: Clone + NormalizeChunk {
 	/// The actual implementation which builds the mesh.
@@ -14,7 +24,7 @@ pub trait MeshBuilder: Clone + NormalizeChunk {
 	}
 }
 
-pub trait MeshFetcher: Clone + Hash + Eq {
+pub trait MeshFetcher: Clone + IdentifiedMesh {
 	/// Builds mesh if it doesn't exist or fetches from the assets. Returns the handle to the mesh.
 	fn fetch_mesh(
 		&self,
@@ -23,7 +33,7 @@ pub trait MeshFetcher: Clone + Hash + Eq {
 	) -> Option<Handle<Mesh>>;
 }
 
-pub trait MeshCache: Clone + Hash + Eq {
+pub trait MeshCache: Clone + IdentifiedMesh {
 	/// Caches a mesh.
 	fn cache_mesh(&self, mesh: &Mesh, cascade_chunk: &CascadeChunk);
 
@@ -31,16 +41,12 @@ pub trait MeshCache: Clone + Hash + Eq {
 	fn fetch_cached_mesh(&self, cascade_chunk: &CascadeChunk) -> Option<Mesh>;
 }
 
-pub trait MeshHandleCache: Clone + Hash + Eq {
+pub trait MeshHandleCache: Clone + IdentifiedMesh {
 	/// Caches a mesh handle.
 	fn cache_mesh_handle(&self, mesh_handle: Handle<Mesh>, cascade_chunk: &CascadeChunk);
 
 	/// Fetches a mesh handle from the cache.
-	fn fetch_cached_mesh_handle(
-		&self,
-		meshes: &mut ResMut<Assets<Mesh>>,
-		cascade_chunk: &CascadeChunk,
-	) -> Option<Handle<Mesh>>;
+	fn fetch_cached_mesh_handle(&self, cascade_chunk: &CascadeChunk) -> Option<Handle<Mesh>>;
 }
 
 /// If it's already defined how the mesh is built, cached, and fetched, this trait can be used to fetch the mesh.
@@ -51,7 +57,7 @@ impl<T: MeshBuilder + MeshCache + MeshHandleCache> MeshFetcher for T {
 		cascade_chunk: &CascadeChunk,
 	) -> Option<Handle<Mesh>> {
 		// Check if the mesh handle is already cached.
-		if let Some(mesh) = self.fetch_cached_mesh_handle(meshes, cascade_chunk) {
+		if let Some(mesh) = self.fetch_cached_mesh_handle(cascade_chunk) {
 			return Some(mesh);
 		}
 
