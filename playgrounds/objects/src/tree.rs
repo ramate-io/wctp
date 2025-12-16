@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use chunk::cascade::CascadeChunk;
 use engine::shaders::outline::EdgeMaterial;
 use render_item::DispatchRenderItem;
 use vegetation_sdf::tree::TreeRenderItem;
@@ -19,9 +20,26 @@ pub fn setup_tree_edge_material(
 }
 
 pub fn tree_playground<M: Material>(mut commands: Commands, material: Res<TreeMaterial<M>>) {
+	log::info!("Spawning tree playground");
+
 	commands.spawn((
+		CascadeChunk::unit_chunk().with_res_2(7),
 		DispatchRenderItem::new(TreeRenderItem::new()),
-		Transform::from_xyz(0.0, 0.0, 0.0),
+		Transform::from_xyz(-0.01, -0.01, -0.01).with_scale(Vec3::new(0.01, 0.01, 0.01)),
+		MeshMaterial3d(material.0.clone()),
+	));
+
+	commands.spawn((
+		CascadeChunk::unit_center_chunk().with_res_2(7),
+		DispatchRenderItem::new(TreeRenderItem::new()),
+		Transform::from_xyz(0.0, 0.0, 0.0).with_scale(Vec3::new(0.01, 0.01, 0.01)),
+		MeshMaterial3d(material.0.clone()),
+	));
+
+	commands.spawn((
+		CascadeChunk::unit_chunk().with_res_2(7),
+		DispatchRenderItem::new(TreeRenderItem::new()),
+		Transform::from_xyz(0.01, 0.01, 0.01).with_scale(Vec3::new(0.01, 0.01, 0.01)),
 		MeshMaterial3d(material.0.clone()),
 	));
 }

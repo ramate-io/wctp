@@ -25,6 +25,8 @@ impl RenderItem for TreeRenderItem {
 		transform: Transform,
 		material: MeshMaterial3d<M>,
 	) -> Vec<Entity> {
+		log::info!("Spawning tree render items");
+
 		let mut entities = vec![];
 
 		// Build tree segment dispatch
