@@ -3,6 +3,7 @@ pub mod handle;
 
 use crate::NormalizeChunk;
 use bevy::prelude::*;
+use cache::{handle::MeshHandleCache, mesh::MeshCache};
 use chunk::cascade::CascadeChunk;
 use std::hash::Hash;
 
@@ -31,22 +32,6 @@ pub trait MeshFetcher: Clone + IdentifiedMesh {
 		meshes: &mut ResMut<Assets<Mesh>>,
 		cascade_chunk: &CascadeChunk,
 	) -> Option<Handle<Mesh>>;
-}
-
-pub trait MeshCache: Clone + IdentifiedMesh {
-	/// Caches a mesh.
-	fn cache_mesh(&self, mesh: &Mesh, cascade_chunk: &CascadeChunk);
-
-	/// Fetches a mesh from the cache.
-	fn fetch_cached_mesh(&self, cascade_chunk: &CascadeChunk) -> Option<Mesh>;
-}
-
-pub trait MeshHandleCache: Clone + IdentifiedMesh {
-	/// Caches a mesh handle.
-	fn cache_mesh_handle(&self, mesh_handle: Handle<Mesh>, cascade_chunk: &CascadeChunk);
-
-	/// Fetches a mesh handle from the cache.
-	fn fetch_cached_mesh_handle(&self, cascade_chunk: &CascadeChunk) -> Option<Handle<Mesh>>;
 }
 
 /// If it's already defined how the mesh is built, cached, and fetched, this trait can be used to fetch the mesh.

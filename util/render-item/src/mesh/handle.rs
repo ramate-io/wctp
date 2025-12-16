@@ -1,5 +1,6 @@
 use crate::mesh::{
-	cache::handle::map::HandleMap, IdentifiedMesh, MeshBuilder, MeshCache, MeshHandleCache, MeshId,
+	cache::handle::map::HandleMap, cache::handle::MeshHandleCache, cache::mesh::MeshCache,
+	IdentifiedMesh, MeshBuilder, MeshId,
 };
 use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;
