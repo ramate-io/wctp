@@ -1,15 +1,15 @@
 use bevy::prelude::*;
+use chunk::cascade::CascadeChunk;
 use noise::{NoiseFn, Perlin};
 use render_item::{
-	cache::handle_cache::HandleCache,
-	mesh::{MeshBuilder, MeshCache, MeshFetcher, MeshHandleCache},
+	mesh::{IdentifiedMesh, MeshId},
 	NormalizeChunk,
 };
 use sdf::Sdf;
 
 /// Base configuration for a trunk segment
 /// All segments work in unit space (0-1) and are transformed later
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SegmentConfig {
 	/// Seed for noise generation
 	pub seed: u32,
@@ -36,7 +36,7 @@ impl Default for SegmentConfig {
 }
 
 /// Simple trunk segment: noisy cylinder with trunk join points on top and bottom
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SimpleTrunkSegment {
 	config: SegmentConfig,
 	noise: Perlin,
@@ -49,6 +49,7 @@ impl SimpleTrunkSegment {
 	}
 }
 
+/// We should get the MeshBuilder trait for free since this is an SDF.
 impl Sdf for SimpleTrunkSegment {
 	/// NOTE: early on there appeared to be a  bug that gives this some slightly weird sharp facets.
 	/// By playing with chunk settings, it was possible to make facets disappear,
@@ -92,5 +93,18 @@ impl Sdf for SimpleTrunkSegment {
 		}
 
 		dist
+	}
+}
+
+impl NormalizeChunk for SimpleTrunkSegment {
+	fn normalize_chunk(&self, cascade_chunk: &CascadeChunk) -> CascadeChunk {
+		CascadeChunk::unit_center_chunk().with_res_2(cascade_chunk.res_2)
+	}
+}
+
+impl IdentifiedMesh for SimpleTrunkSegment {
+	fn id(&self) -> MeshId {
+		let debug_string = format!("{:?}", self);
+		MeshId::new(debug_string)
 	}
 }

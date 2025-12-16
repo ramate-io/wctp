@@ -101,6 +101,21 @@ impl CascadeChunk {
 	pub fn resolution(&self) -> usize {
 		2_usize.pow(self.res_2 as u32)
 	}
+
+	/// Creates a chunk with a bottom left corner at the origin and a size of 1.0.
+	pub fn unit_chunk() -> Self {
+		Self { origin: Vec3::ZERO, size: 1.0, res_2: 0, omit: None }
+	}
+
+	/// Creates a chunk with the center at the origin and diameters of 1.0.
+	pub fn unit_center_chunk() -> Self {
+		Self { origin: Vec3::new(-1.0, -1.0, -1.0), size: 2.0, res_2: 0, omit: None }
+	}
+
+	pub fn with_res_2(mut self, res_2: u8) -> Self {
+		self.res_2 = res_2;
+		self
+	}
 }
 
 fn vec3a_cmp(a: &bevy::math::Vec3A, b: &bevy::math::Vec3A) -> std::cmp::Ordering {

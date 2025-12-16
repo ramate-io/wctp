@@ -10,6 +10,12 @@ use std::hash::Hash;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MeshId(String);
 
+impl MeshId {
+	pub fn new(id: String) -> Self {
+		Self(id)
+	}
+}
+
 pub trait IdentifiedMesh {
 	fn id(&self) -> MeshId;
 }
