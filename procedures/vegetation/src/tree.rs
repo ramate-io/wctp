@@ -11,6 +11,12 @@ use render_item::{
 #[derive(Component, Clone)]
 pub struct TreeRenderItem {}
 
+impl TreeRenderItem {
+	pub fn new() -> Self {
+		Self {}
+	}
+}
+
 impl RenderItem for TreeRenderItem {
 	fn spawn_render_items<M: Material>(
 		&self,
