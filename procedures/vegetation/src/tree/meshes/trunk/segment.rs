@@ -98,7 +98,9 @@ impl Sdf for SimpleTrunkSegment {
 
 impl NormalizeChunk for SimpleTrunkSegment {
 	fn normalize_chunk(&self, cascade_chunk: &CascadeChunk) -> CascadeChunk {
-		CascadeChunk::unit_center_chunk().with_res_2(cascade_chunk.res_2)
+		CascadeChunk::unit_center_chunk()
+			.with_res_2(cascade_chunk.res_2)
+			.with_mu(self.config.noise_amplitude + 0.001)
 	}
 }
 

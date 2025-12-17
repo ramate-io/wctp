@@ -109,7 +109,14 @@ impl CascadeChunk {
 
 	/// Creates a chunk with the center at the origin and diameters of 1.0.
 	pub fn unit_center_chunk() -> Self {
-		Self { origin: Vec3::new(-1.5, -1.5, -1.5), size: 3.0, res_2: 0, omit: None }
+		Self { origin: Vec3::new(-0.5, 0.0, -0.5), size: 1.0, res_2: 0, omit: None }
+	}
+
+	/// Updates a chunk with some Mu for the geometry that goes slightly beyond the unit.
+	pub fn with_mu(self, mu: f32) -> Self {
+		let origin = self.origin + Vec3::new(-mu, -mu, -mu);
+		let size = self.size + 2.0 * mu;
+		Self { origin, size, res_2: self.res_2, omit: self.omit }
 	}
 
 	pub fn with_res_2(mut self, res_2: u8) -> Self {

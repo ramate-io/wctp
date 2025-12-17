@@ -23,13 +23,6 @@ pub fn tree_playground<M: Material>(mut commands: Commands, material: Res<TreeMa
 	log::info!("Spawning tree playground");
 
 	commands.spawn((
-		CascadeChunk::unit_chunk().with_res_2(7),
-		DispatchRenderItem::new(TreeRenderItem::new()),
-		Transform::from_xyz(-0.01, -0.01, -0.01).with_scale(Vec3::new(0.01, 0.01, 0.01)),
-		MeshMaterial3d(material.0.clone()),
-	));
-
-	commands.spawn((
 		CascadeChunk::unit_center_chunk().with_res_2(7),
 		DispatchRenderItem::new(TreeRenderItem::new()),
 		Transform::from_xyz(0.0, 0.0, 0.0).with_scale(Vec3::new(0.01, 0.01, 0.01)),
@@ -39,7 +32,9 @@ pub fn tree_playground<M: Material>(mut commands: Commands, material: Res<TreeMa
 	commands.spawn((
 		CascadeChunk::unit_chunk().with_res_2(7),
 		DispatchRenderItem::new(TreeRenderItem::new()),
-		Transform::from_xyz(0.01, 0.01, 0.01).with_scale(Vec3::new(0.01, 0.01, 0.01)),
+		Transform::from_xyz(0.003, 0.003, 0.003)
+			.with_scale(Vec3::new(0.01, 0.01, 0.01))
+			.with_rotation(Quat::from_rotation_arc(Vec3::new(1.0, 1.0, 1.0), Vec3::ZERO)),
 		MeshMaterial3d(material.0.clone()),
 	));
 }
