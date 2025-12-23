@@ -2,6 +2,7 @@ use crate::mesh::{IdentifiedMesh, MeshId};
 use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::sync::RwLock;
@@ -11,6 +12,18 @@ pub struct ChunkMeshKey<T: IdentifiedMesh> {
 	chunk: CascadeChunk,
 	mesh_id: MeshId,
 	phantom: std::marker::PhantomData<T>,
+}
+
+impl<T: IdentifiedMesh> Display for ChunkMeshKey<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(
+			f,
+			"ChunkMeshKey::<{}>::(chunk: {:?}, mesh_id: {:?})",
+			std::any::type_name::<T>(),
+			self.chunk,
+			self.mesh_id
+		)
+	}
 }
 
 impl<T: IdentifiedMesh> PartialEq for ChunkMeshKey<T> {
@@ -52,7 +65,8 @@ impl<T: IdentifiedMesh> HandleMap<T> {
 
 	pub fn insert(&self, chunk: &CascadeChunk, mesh_builder: &T, mesh: Handle<Mesh>) {
 		let mut cache = self.cache.write().unwrap();
-		cache.insert(ChunkMeshKey::new(chunk.clone(), mesh_builder.id()), mesh);
+		let key = ChunkMeshKey::new(chunk.clone(), mesh_builder.id());
+		cache.insert(key, mesh);
 	}
 }
 

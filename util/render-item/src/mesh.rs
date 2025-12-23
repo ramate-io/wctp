@@ -47,23 +47,27 @@ impl<T: MeshBuilder + MeshCache + MeshHandleCache> MeshFetcher for T {
 		meshes: &mut ResMut<Assets<Mesh>>,
 		cascade_chunk: &CascadeChunk,
 	) -> Option<Handle<Mesh>> {
+		let normalized_cascade_chunk = self.normalize_chunk(cascade_chunk);
+
 		// Check if the mesh handle is already cached.
-		if let Some(mesh) = self.fetch_cached_mesh_handle(cascade_chunk) {
+		if let Some(mesh) = self.fetch_cached_mesh_handle(&normalized_cascade_chunk) {
 			return Some(mesh);
 		}
 
 		// Check if the mesh is already cached (this will most often get hit when the mesh is on disk).
-		let mesh_handle = if let Some(mesh) = self.fetch_cached_mesh(cascade_chunk) {
+		let mesh_handle = if let Some(mesh) = self.fetch_cached_mesh(&normalized_cascade_chunk) {
 			Some(meshes.add(mesh))
 		} else {
 			self.build_mesh(cascade_chunk).map(|mesh| {
-				self.cache_mesh(&mesh, cascade_chunk);
+				self.cache_mesh(&mesh, &normalized_cascade_chunk);
+				log::info!("Adding mesh to assets");
 				meshes.add(mesh)
 			})
 		};
 
 		mesh_handle.map(|handle| {
-			self.cache_mesh_handle(handle.clone(), cascade_chunk);
+			self.cache_mesh_handle(handle.clone(), &normalized_cascade_chunk);
+			log::info!("Caching mesh handle");
 			handle
 		})
 	}

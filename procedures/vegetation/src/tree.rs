@@ -4,16 +4,23 @@ use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;
 use meshes::trunk::segment::{SegmentConfig, SimpleTrunkSegment};
 use render_item::{
-	mesh::{handle::MeshHandle, MeshDispatch},
+	mesh::{cache::handle::map::HandleMap, handle::MeshHandle, MeshDispatch},
 	RenderItem,
 };
 
 #[derive(Component, Clone)]
-pub struct TreeRenderItem {}
+pub struct TreeRenderItem {
+	tree_cache: HandleMap<SimpleTrunkSegment>,
+}
 
 impl TreeRenderItem {
 	pub fn new() -> Self {
-		Self {}
+		Self { tree_cache: HandleMap::new() }
+	}
+
+	pub fn with_tree_cache(mut self, tree_cache: HandleMap<SimpleTrunkSegment>) -> Self {
+		self.tree_cache = tree_cache;
+		self
 	}
 }
 
@@ -31,7 +38,7 @@ impl RenderItem for TreeRenderItem {
 
 		// Build tree segment dispatch
 		let tree_segment = SimpleTrunkSegment::new(SegmentConfig::default());
-		let mesh_handle = MeshHandle::new(tree_segment);
+		let mesh_handle = MeshHandle::new(tree_segment).with_handle_cache(self.tree_cache.clone());
 		let mesh_dispatch = MeshDispatch::new(mesh_handle);
 
 		// spawn it
