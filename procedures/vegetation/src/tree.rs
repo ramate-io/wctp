@@ -34,16 +34,37 @@ impl RenderItem for TreeRenderItem {
 	) -> Vec<Entity> {
 		log::info!("Spawning tree render items");
 
-		let mut entities = vec![];
-
 		// Build tree segment dispatch
 		let tree_segment = SimpleTrunkSegment::new(SegmentConfig::default());
 		let mesh_handle = MeshHandle::new(tree_segment).with_handle_cache(self.tree_cache.clone());
-		let mesh_dispatch = MeshDispatch::new(mesh_handle);
 
-		// spawn it
-		entities
-			.push(commands.spawn((cascade_chunk.clone(), mesh_dispatch, transform, material)).id());
+		commands.spawn((
+			CascadeChunk::unit_center_chunk().with_res_2(3),
+			MeshDispatch::new(mesh_handle.clone()),
+			Transform::from_translation(transform.translation + Vec3::new(0.0, 0.0, 0.0))
+				.with_scale(Vec3::new(0.01, 0.01, 0.01)),
+			MeshMaterial3d(material.0.clone()),
+		));
+
+		commands.spawn((
+			CascadeChunk::unit_chunk().with_res_2(3),
+			MeshDispatch::new(mesh_handle.clone()),
+			Transform::from_translation(transform.translation + Vec3::new(0.003, 0.005, 0.004))
+				.with_scale(Vec3::new(0.005, 0.005, 0.005))
+				.with_rotation(Quat::from_rotation_arc(
+					Vec3::new(1.0, 1.0, 1.0).normalize(),
+					Vec3::Y,
+				)),
+			MeshMaterial3d(material.0.clone()),
+		));
+
+		commands.spawn((
+			cascade_chunk.clone(),
+			MeshDispatch::new(mesh_handle.clone()),
+			Transform::from_translation(transform.translation + Vec3::new(0.0005, 0.0, 0.0005))
+				.with_scale(Vec3::new(0.009, 0.02, 0.009)),
+			MeshMaterial3d(material.0.clone()),
+		));
 
 		vec![]
 	}
