@@ -1,3 +1,5 @@
+pub mod branch;
+
 use bevy::prelude::*;
 use sdf::{EllipsoidSdf, Sdf};
 
