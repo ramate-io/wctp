@@ -22,18 +22,14 @@ impl TreeRenderItem {
 		self.tree_cache = tree_cache;
 		self
 	}
-}
 
-impl RenderItem for TreeRenderItem {
-	fn spawn_render_items<M: Material>(
+	pub fn spawn_trunk<M: Material>(
 		&self,
 		commands: &mut Commands,
 		cascade_chunk: &CascadeChunk,
 		transform: Transform,
 		material: MeshMaterial3d<M>,
-	) -> Vec<Entity> {
-		log::info!("Spawning tree render items");
-
+	) {
 		// Build tree segment dispatch
 		let tree_segment = SimpleTrunkSegment::new(SegmentConfig::default());
 		let mesh_handle = MeshHandle::new(tree_segment).with_handle_cache(self.tree_cache.clone());
@@ -65,6 +61,20 @@ impl RenderItem for TreeRenderItem {
 				.with_scale(Vec3::new(0.009, 0.02, 0.009)),
 			MeshMaterial3d(material.0.clone()),
 		));
+	}
+}
+
+impl RenderItem for TreeRenderItem {
+	fn spawn_render_items<M: Material>(
+		&self,
+		commands: &mut Commands,
+		cascade_chunk: &CascadeChunk,
+		transform: Transform,
+		material: MeshMaterial3d<M>,
+	) -> Vec<Entity> {
+		log::info!("Spawning tree render items");
+
+		self.spawn_trunk(commands, cascade_chunk, transform, material);
 
 		vec![]
 	}
