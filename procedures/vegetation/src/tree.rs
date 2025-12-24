@@ -76,26 +76,24 @@ impl TreeRenderItem {
 		let mut branch_builder = BranchBuilder::common_tree_builder();
 
 		// anchor is on the ring of the trunk
-		branch_builder.anchor = transform.translation + Vec3::new(0.0, 0.05, 0.005);
+		branch_builder.anchor = transform.translation + Vec3::new(0.0, 0.005, 0.005);
 
 		// initial ray is sticking out to the side
 		branch_builder.initial_ray = Vec3::new(0.0, 0.0, 1.0);
 
 		// min segment length is 0.002
-		branch_builder.min_segment_length = 0.02;
+		branch_builder.min_segment_length = 0.002;
 
 		// max segment length is 0.004
-		branch_builder.max_segment_length = 0.04;
+		branch_builder.max_segment_length = 0.01;
 
 		// min radius is 0.002
-		branch_builder.min_radius = 0.02;
+		branch_builder.min_radius = 0.001;
 
 		// max radius is 0.004
-		branch_builder.max_radius = 0.04;
+		branch_builder.max_radius = 0.002;
 
 		let branch = branch_builder.build();
-
-		println!("Builder: {:?}, Branch: {:?}", branch_builder, branch);
 
 		// for now use the trunk segment
 		let tree_segment = SimpleTrunkSegment::new(SegmentConfig::default());
@@ -103,7 +101,7 @@ impl TreeRenderItem {
 
 		for segment in branch.segments() {
 			let ray = segment.ray();
-			let direction = ray.normalize();
+			let direction = ray.clone().normalize();
 			let length = ray.length();
 
 			log::info!("Segment: {:?}, Direction: {:?}, Length: {:?}", segment, direction, length);

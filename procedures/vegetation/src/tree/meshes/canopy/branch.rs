@@ -1,12 +1,12 @@
 use bevy::prelude::*;
-use noise::{NoiseFn, Perlin};
+use noise::{Fbm, NoiseFn, OpenSimplex, Perlin};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 use std::hash::Hasher;
 
 #[derive(Debug, Clone)]
 pub struct BranchBuilder {
-	pub noise: Perlin,
+	pub noise: Fbm<OpenSimplex>,
 	pub anchor: Vec3,
 	pub initial_ray: Vec3,
 	pub angle_tolerance: f32,
@@ -22,7 +22,7 @@ pub struct BranchBuilder {
 impl BranchBuilder {
 	pub fn new() -> Self {
 		Self {
-			noise: Perlin::new(0),
+			noise: Fbm::new(0),
 			anchor: Vec3::ZERO,
 			initial_ray: Vec3::ZERO,
 			angle_tolerance: 0.0,
@@ -38,11 +38,11 @@ impl BranchBuilder {
 
 	pub fn common_tree_builder() -> Self {
 		Self {
-			noise: Perlin::new(0),
+			noise: Fbm::new(0),
 			anchor: Vec3::ZERO,
 			initial_ray: Vec3::ZERO,
 			// 8 degrees of angle tolerance
-			angle_tolerance: 8.0,
+			angle_tolerance: 10.0,
 			initial_radius: 0.0,
 			min_radius: 0.0,
 			max_radius: 0.0,
@@ -76,33 +76,34 @@ impl BranchBuilder {
 	) -> Vec3 {
 		let parent_dir = parent_ray.normalize();
 
-		// Sample noise for deterministic angular variation
-		let noise = self.noise.get([
+		// Sample 2D drift noise
+		let nx = self.noise.get([
 			position.x as f64,
 			position.y as f64,
 			position.z as f64,
 			child_index as f64,
 		]) as f32;
 
-		// Map noise [0,1] → [0, angle_tolerance]
-		let max_angle = self.angle_tolerance.to_radians();
-		let theta = noise.clamp(0.0, 1.0) * max_angle;
+		let nz = self.noise.get([
+			position.x as f64,
+			position.y as f64,
+			position.z as f64,
+			child_index as f64,
+		]) as f32;
 
-		// Random azimuth around the parent ray
-		let phi = noise;
-
-		// Build an orthonormal basis around parent_dir
+		// Build perpendicular basis
 		let up = if parent_dir.abs().y < 0.99 { Vec3::Y } else { Vec3::X };
 
 		let tangent = parent_dir.cross(up).normalize();
 		let bitangent = parent_dir.cross(tangent);
 
-		// Direction inside the cone
-		let direction = parent_dir * theta.cos()
-			+ tangent * theta.sin() * phi.cos()
-			+ bitangent * theta.sin() * phi.sin();
+		// Drift strength (in radians, small!)
+		let drift = self.angle_tolerance; // <-- store this in radians
 
-		direction.normalize()
+		// Apply lateral drift
+		let drift_vec = tangent * nx * drift + bitangent * nz * drift;
+
+		(parent_dir + drift_vec).normalize()
 	}
 
 	/// Generates a ray within the angle and length tolerance
@@ -117,11 +118,17 @@ impl BranchBuilder {
 			child_index as f64,
 		]) as f32;
 
+		log::info!("n_length: {}", n_length);
+
 		// Map [-1,1] → [0,1]
 		let n_length = (n_length * 0.5 + 0.5).clamp(0.0, 1.0);
 
 		let length = self.min_segment_length
 			+ n_length * (self.max_segment_length - self.min_segment_length);
+
+		log::info!("length: {}", length);
+		log::info!("direction: {:?}", direction);
+		log::info!("direction * length: {:?}", direction * length);
 
 		direction * length
 	}
@@ -161,10 +168,8 @@ impl BranchBuilder {
 					let child_node = BranchNode::new(child_position, child_radius);
 
 					// add the child to the branch and queue it for processing
-					println!("Adding child {:?} to parent {:?}", child_node, node);
 					branch.add_child(node.clone(), child_node.clone());
 					next_queue.push_back((child_node.clone(), child_ray));
-					println!("Branch: {:#?}", branch);
 				}
 				// if we still haven't added the node, add it
 				branch.add_node(node);
@@ -208,7 +213,7 @@ pub struct BranchSegment<'a> {
 
 impl<'a> BranchSegment<'a> {
 	pub fn ray(&self) -> Vec3 {
-		(self.end.position - self.start.position).normalize()
+		self.end.position - self.start.position
 	}
 }
 
