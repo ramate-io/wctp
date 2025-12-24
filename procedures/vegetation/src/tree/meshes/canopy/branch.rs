@@ -6,17 +6,17 @@ use std::hash::Hasher;
 
 #[derive(Debug, Clone)]
 pub struct BranchBuilder {
-	noise: Perlin,
-	anchor: Vec3,
-	initial_ray: Vec3,
-	angle_tolerance: f32,
-	initial_radius: f32,
-	min_radius: f32,
-	max_radius: f32,
-	depth: usize,
-	splitting_coefficient: f32,
-	min_segment_length: f32,
-	max_segment_length: f32,
+	pub noise: Perlin,
+	pub anchor: Vec3,
+	pub initial_ray: Vec3,
+	pub angle_tolerance: f32,
+	pub initial_radius: f32,
+	pub min_radius: f32,
+	pub max_radius: f32,
+	pub depth: usize,
+	pub splitting_coefficient: f32,
+	pub min_segment_length: f32,
+	pub max_segment_length: f32,
 }
 
 impl BranchBuilder {
@@ -31,6 +31,24 @@ impl BranchBuilder {
 			max_radius: 0.0,
 			depth: 0,
 			splitting_coefficient: 0.0,
+			min_segment_length: 0.0,
+			max_segment_length: 0.0,
+		}
+	}
+
+	pub fn common_tree_builder() -> Self {
+		Self {
+			noise: Perlin::new(0),
+			anchor: Vec3::ZERO,
+			initial_ray: Vec3::ZERO,
+			// 8 degrees of angle tolerance
+			angle_tolerance: 8.0,
+			initial_radius: 0.0,
+			min_radius: 0.0,
+			max_radius: 0.0,
+			depth: 0,
+			// 80% of the time the node will not split
+			splitting_coefficient: 0.8,
 			min_segment_length: 0.0,
 			max_segment_length: 0.0,
 		}
