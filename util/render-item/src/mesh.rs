@@ -99,17 +99,7 @@ pub fn fetch_meshes<T: MeshFetcher + Send + Sync + 'static, M: Material>(
 	>,
 ) {
 	for (_entity, mesh_dispatch, cascade_chunk, transform, material) in &query {
-		log::info!(
-			"Fetching mesh for {} with material {}",
-			std::any::type_name::<T>(),
-			std::any::type_name::<M>()
-		);
 		if let Some(mesh) = mesh_dispatch.fetcher.fetch_mesh(&mut meshes, cascade_chunk) {
-			log::info!(
-				"Spawning mesh for {} with material {}",
-				std::any::type_name::<T>(),
-				std::any::type_name::<M>()
-			);
 			commands.spawn((Mesh3d(mesh), *transform, material.clone()));
 		}
 	}

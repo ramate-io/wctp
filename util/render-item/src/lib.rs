@@ -53,11 +53,6 @@ pub fn render_items<T: RenderItem + Send + Sync + 'static, M: Material>(
 	>,
 ) {
 	for (_entity, dispatch, chunk, transform, material) in &query {
-		log::info!(
-			"Spawning render item for {} with material {}",
-			std::any::type_name::<T>(),
-			std::any::type_name::<M>()
-		);
 		dispatch.spawn_render_items(&mut commands, chunk, *transform, material.clone());
 	}
 }

@@ -46,7 +46,7 @@ impl BranchBuilder {
 			initial_radius: 0.0,
 			min_radius: 0.0,
 			max_radius: 0.0,
-			depth: 0,
+			depth: 6,
 			// 80% of the time the node will not split
 			splitting_coefficient: 0.8,
 			min_segment_length: 0.0,
@@ -63,7 +63,7 @@ impl BranchBuilder {
 		let sample = (sample * 0.5 + 0.5).clamp(0.0, 1.0);
 
 		// floor sample/splitting_coefficient to get number of children
-		let children = (sample / self.splitting_coefficient).floor() as usize;
+		let children = 1 + (sample / self.splitting_coefficient).floor() as usize;
 		children
 	}
 
@@ -150,6 +150,7 @@ impl BranchBuilder {
 		queue.push_back((initial_node.clone(), self.initial_ray.clone()));
 
 		for _ in 0..self.depth {
+			let mut next_queue = VecDeque::new();
 			while let Some((node, ray)) = queue.pop_front() {
 				let children = self.node_children_from(node.position);
 				for i in 0..children {
@@ -160,13 +161,16 @@ impl BranchBuilder {
 					let child_node = BranchNode::new(child_position, child_radius);
 
 					// add the child to the branch and queue it for processing
+					println!("Adding child {:?} to parent {:?}", child_node, node);
 					branch.add_child(node.clone(), child_node.clone());
-					queue.push_back((child_node.clone(), child_ray));
+					next_queue.push_back((child_node.clone(), child_ray));
+					println!("Branch: {:#?}", branch);
 				}
-
 				// if we still haven't added the node, add it
 				branch.add_node(node);
 			}
+			// swap the queues
+			queue = next_queue;
 		}
 
 		branch
@@ -219,11 +223,18 @@ impl Branch {
 	}
 
 	fn add_node(&mut self, node: BranchNode) {
-		self.nodes.insert(node, HashSet::new());
+		// add node if the node is not already in the branch
+		if !self.nodes.contains_key(&node) {
+			self.nodes.insert(node, HashSet::new());
+		}
 	}
 
 	fn add_child(&mut self, parent: BranchNode, child: BranchNode) {
 		self.nodes.entry(parent).or_insert(HashSet::new()).insert(child);
+	}
+
+	pub fn get_children(&self, node: &BranchNode) -> impl Iterator<Item = &BranchNode> {
+		self.nodes.get(node).map(|children| children.iter()).unwrap_or_default()
 	}
 
 	pub fn nodes(&self) -> impl Iterator<Item = &BranchNode> {
@@ -239,5 +250,60 @@ impl Branch {
 			.flatten()
 			.collect::<Vec<BranchSegment>>()
 			.into_iter()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_add_child() {
+		let mut branch = Branch::new();
+		let parent = BranchNode::new(Vec3::ZERO, 0.0);
+		let child = BranchNode::new(Vec3::new(0.0, 1.0, 0.0), 0.0);
+		branch.add_child(parent.clone(), child.clone());
+		assert_eq!(branch.nodes().count(), 1);
+
+		assert_eq!(branch.get_children(&parent).count(), 1);
+		assert_eq!(branch.get_children(&parent).next().unwrap().position, child.position);
+	}
+
+	#[test]
+	fn test_ray_from() {
+		let branch_builder = BranchBuilder::common_tree_builder();
+		let branch = branch_builder.build();
+		let node = branch.nodes().next().unwrap();
+		let ray = branch_builder.ray_from(node.position, Vec3::ZERO, 0);
+		assert_eq!(ray, Vec3::new(0.0, 0.0, 1.0));
+	}
+
+	#[test]
+	fn test_builder_build() {
+		let mut branch_builder = BranchBuilder::common_tree_builder();
+
+		let transform = Transform::from_translation(Vec3::new(0.0, 0.0, 0.0));
+
+		// anchor is on the ring of the trunk
+		branch_builder.anchor = transform.translation + Vec3::new(0.0, 0.05, 0.005);
+
+		// initial ray is sticking out to the side
+		branch_builder.initial_ray = Vec3::new(0.0, 0.0, 1.0);
+
+		// min segment length is 0.002
+		branch_builder.min_segment_length = 0.02;
+
+		// max segment length is 0.004
+		branch_builder.max_segment_length = 0.04;
+
+		// min radius is 0.002
+		branch_builder.min_radius = 0.02;
+
+		// max radius is 0.004
+		branch_builder.max_radius = 0.04;
+
+		let branch = branch_builder.build();
+		assert!(branch.nodes().count() > 5);
+		assert!(branch.segments().count() > 4);
 	}
 }
