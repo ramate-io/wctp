@@ -42,7 +42,7 @@ impl BranchBuilder {
 			anchor: Vec3::ZERO,
 			initial_ray: Vec3::ZERO,
 			// 8 degrees of angle tolerance
-			angle_tolerance: 10.0,
+			angle_tolerance: 7.0,
 			initial_radius: 0.0,
 			min_radius: 0.0,
 			max_radius: 0.0,

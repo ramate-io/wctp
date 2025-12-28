@@ -106,12 +106,25 @@ impl TreeRenderItem {
 
 			log::info!("Segment: {:?}, Direction: {:?}, Length: {:?}", segment, direction, length);
 
-			let rotation = Quat::from_rotation_arc(Vec3::Y, direction);
+			// let rotation = Quat::from_rotation_arc(Vec3::Y, direction);
+
+			let up = direction;
+
+			// Pick a reference axis that is NOT parallel
+			let reference = if up.abs_diff_eq(Vec3::Y, 1e-4) { Vec3::X } else { Vec3::Y };
+
+			let right = up.cross(reference).normalize();
+			let forward = right.cross(up);
+
+			let rotation = Quat::from_mat3(&Mat3::from_cols(right, up, forward));
+
+			let pivot_offset = Vec3::new(0.5, 0.0, 0.5);
+			let scale = Vec3::new(segment.start.radius, length, segment.start.radius);
 
 			let transform = Transform {
-				translation: segment.start.position,
+				translation: segment.start.position - rotation * (pivot_offset * scale),
 				rotation,
-				scale: Vec3::new(segment.start.radius, length, segment.start.radius),
+				scale,
 			};
 
 			commands.spawn((
