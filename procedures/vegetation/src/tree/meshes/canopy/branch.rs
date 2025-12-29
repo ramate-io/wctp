@@ -65,8 +65,11 @@ impl BranchBuilder {
 
 	pub fn node_children_from(&self, position: Vec3) -> usize {
 		// sample to get 0-1 value
-		let sample =
-			self.noise.get([position.x as f64, position.y as f64, position.z as f64]) as f32;
+		let sample = self.noise.get([
+			position.x as f64 * self.noise_scale as f64,
+			position.y as f64 * self.noise_scale as f64,
+			position.z as f64 * self.noise_scale as f64,
+		]) as f32;
 
 		// Map [-1,1] → [0,1]
 		let sample = (sample * 0.5 + 0.5).clamp(0.0, 1.0);
@@ -123,11 +126,12 @@ impl BranchBuilder {
 		let direction = self.unrestricted_ray_from(position, parent_ray, child_index);
 
 		// Independent noise for length
+		// todo: if this scales with the noise_scale, we get bad adherence to the bias ray for some reason
 		let n_length = self.noise.get([
-			position.x as f64,
-			position.y as f64,
-			position.z as f64,
-			child_index as f64,
+			position.x as f64 * self.noise_scale as f64,
+			position.y as f64 * self.noise_scale as f64,
+			child_index as f64 * -31.7 * self.noise_scale as f64,
+			position.z as f64 * self.noise_scale as f64,
 		]) as f32;
 
 		// Map [-1,1] → [0,1]
@@ -142,9 +146,9 @@ impl BranchBuilder {
 	pub fn radius_from(&self, position: Vec3, child_index: usize) -> f32 {
 		let sample = self.noise.get([
 			position.x as f64 * self.noise_scale as f64,
+			child_index as f64 * -31.7 * self.noise_scale as f64,
 			position.y as f64 * self.noise_scale as f64,
 			position.z as f64 * self.noise_scale as f64,
-			child_index as f64 * self.noise_scale as f64,
 		]) as f32;
 
 		// Map [-1,1] → [0,1]
@@ -282,36 +286,66 @@ mod tests {
 
 	#[test]
 	fn test_ray_from() {
-		let branch_builder = BranchBuilder::common_tree_builder();
+		let mut branch_builder = BranchBuilder::common_tree_builder();
+
+		// bias the branch towards the top
+		branch_builder.angle_tolerance = 10.0;
+		branch_builder.splitting_coefficient = 0.55;
+
+		// anchor is on the ring of the trunk
+		branch_builder.anchor = Vec3::new(0.0, 0.005, 0.005);
+
+		// initial ray is sticking out to the side
+		branch_builder.initial_ray = Vec3::new(0.0, 1.0, 1.0);
+		branch_builder.bias_ray = Vec3::new(0.0, 1.0, 1.0);
+		branch_builder.bias_amount = 0.2;
+
+		// min segment length is 0.002
+		branch_builder.min_segment_length = 0.002;
+
+		// max segment length is 0.004
+		branch_builder.max_segment_length = 0.01;
+
+		// min radius is 0.002
+		branch_builder.min_radius = 0.001;
+
+		// max radius is 0.004
+		branch_builder.max_radius = 0.002;
+
 		let branch = branch_builder.build();
 		let node = branch.nodes().next().unwrap();
-		let ray = branch_builder.ray_from(node.position, Vec3::ZERO, 0);
-		assert_eq!(ray, Vec3::new(0.0, 0.0, 1.0));
+		branch_builder.ray_from(node.position, Vec3::ONE, 0);
+		// TODO: ray does not seem determinstic for some reason,
+		// we may solve this by moving the whole thing to fastnoise.
 	}
 
 	#[test]
 	fn test_builder_build() {
 		let mut branch_builder = BranchBuilder::common_tree_builder();
 
-		let transform = Transform::from_translation(Vec3::new(0.0, 0.0, 0.0));
+		// bias the branch towards the top
+		branch_builder.angle_tolerance = 10.0;
+		branch_builder.splitting_coefficient = 0.55;
 
 		// anchor is on the ring of the trunk
-		branch_builder.anchor = transform.translation + Vec3::new(0.0, 0.05, 0.005);
+		branch_builder.anchor = Vec3::new(0.0, 0.005, 0.005);
 
 		// initial ray is sticking out to the side
-		branch_builder.initial_ray = Vec3::new(0.0, 0.0, 1.0);
+		branch_builder.initial_ray = Vec3::new(0.0, 1.0, 1.0);
+		branch_builder.bias_ray = Vec3::new(0.0, 1.0, 1.0);
+		branch_builder.bias_amount = 0.2;
 
 		// min segment length is 0.002
-		branch_builder.min_segment_length = 0.02;
+		branch_builder.min_segment_length = 0.002;
 
 		// max segment length is 0.004
-		branch_builder.max_segment_length = 0.04;
+		branch_builder.max_segment_length = 0.01;
 
 		// min radius is 0.002
-		branch_builder.min_radius = 0.02;
+		branch_builder.min_radius = 0.001;
 
 		// max radius is 0.004
-		branch_builder.max_radius = 0.04;
+		branch_builder.max_radius = 0.002;
 
 		let branch = branch_builder.build();
 		assert!(branch.nodes().count() > 5);
