@@ -77,7 +77,7 @@ impl TreeRenderItem {
 
 		// bias the branch towards the top
 		branch_builder.angle_tolerance = 10.0;
-		branch_builder.splitting_coefficient = 0.51;
+		branch_builder.splitting_coefficient = 0.6;
 
 		// anchor is on the ring of the trunk
 		branch_builder.anchor = transform.translation + Vec3::new(0.0, 0.005, 0.005);

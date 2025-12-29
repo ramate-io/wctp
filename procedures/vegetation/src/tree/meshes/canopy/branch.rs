@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use noise::{Fbm, NoiseFn, OpenSimplex, Perlin};
+use noise::{Fbm, NoiseFn, OpenSimplex};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -19,6 +19,7 @@ pub struct BranchBuilder {
 	pub splitting_coefficient: f32,
 	pub min_segment_length: f32,
 	pub max_segment_length: f32,
+	pub noise_scale: f32,
 }
 
 impl BranchBuilder {
@@ -37,6 +38,7 @@ impl BranchBuilder {
 			splitting_coefficient: 0.0,
 			min_segment_length: 0.0,
 			max_segment_length: 0.0,
+			noise_scale: 1000.0,
 		}
 	}
 
@@ -57,6 +59,7 @@ impl BranchBuilder {
 			splitting_coefficient: 0.8,
 			min_segment_length: 0.0,
 			max_segment_length: 0.0,
+			noise_scale: 1000.0,
 		}
 	}
 
@@ -89,17 +92,17 @@ impl BranchBuilder {
 
 		// 3. Sample 2D drift noise (independent!)
 		let nx = self.noise.get([
-			position.x as f64 * 1000.0,
-			position.y as f64 * 1000.0,
-			position.z as f64 * 1000.0,
-			child_index as f64 * -31.7,
+			position.x as f64 * self.noise_scale as f64,
+			position.y as f64 * self.noise_scale as f64,
+			position.z as f64 * self.noise_scale as f64,
+			child_index as f64 * -31.7 * self.noise_scale as f64,
 		]) as f32;
 
 		let nz = self.noise.get([
-			position.x as f64 * 1000.0,
-			position.y as f64 * 1000.0,
-			position.z as f64 * 1000.0,
-			child_index as f64 * 31.7, // decorrelate
+			position.x as f64 * self.noise_scale as f64,
+			position.y as f64 * self.noise_scale as f64,
+			position.z as f64 * self.noise_scale as f64,
+			child_index as f64 * 31.7 * self.noise_scale as f64, // decorrelate
 		]) as f32;
 
 		// 4. Build perpendicular basis around *mean_dir*
@@ -138,10 +141,10 @@ impl BranchBuilder {
 
 	pub fn radius_from(&self, position: Vec3, child_index: usize) -> f32 {
 		let sample = self.noise.get([
-			position.x as f64,
-			position.y as f64,
-			position.z as f64,
-			child_index as f64,
+			position.x as f64 * self.noise_scale as f64,
+			position.y as f64 * self.noise_scale as f64,
+			position.z as f64 * self.noise_scale as f64,
+			child_index as f64 * self.noise_scale as f64,
 		]) as f32;
 
 		// Map [-1,1] → [0,1]
