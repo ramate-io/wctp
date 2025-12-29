@@ -75,11 +75,17 @@ impl TreeRenderItem {
 	) {
 		let mut branch_builder = BranchBuilder::common_tree_builder();
 
+		// bias the branch towards the top
+		branch_builder.angle_tolerance = 10.0;
+		branch_builder.splitting_coefficient = 0.51;
+
 		// anchor is on the ring of the trunk
 		branch_builder.anchor = transform.translation + Vec3::new(0.0, 0.005, 0.005);
 
 		// initial ray is sticking out to the side
-		branch_builder.initial_ray = Vec3::new(0.0, 0.0, 1.0);
+		branch_builder.initial_ray = Vec3::new(0.0, 1.0, 1.0);
+		branch_builder.bias_ray = Vec3::new(0.0, 1.0, 1.0);
+		branch_builder.bias_amount = 0.2;
 
 		// min segment length is 0.002
 		branch_builder.min_segment_length = 0.002;

@@ -9,6 +9,8 @@ pub struct BranchBuilder {
 	pub noise: Fbm<OpenSimplex>,
 	pub anchor: Vec3,
 	pub initial_ray: Vec3,
+	pub bias_ray: Vec3,
+	pub bias_amount: f32,
 	pub angle_tolerance: f32,
 	pub initial_radius: f32,
 	pub min_radius: f32,
@@ -25,6 +27,8 @@ impl BranchBuilder {
 			noise: Fbm::new(0),
 			anchor: Vec3::ZERO,
 			initial_ray: Vec3::ZERO,
+			bias_ray: Vec3::ZERO,
+			bias_amount: 0.0,
 			angle_tolerance: 0.0,
 			initial_radius: 0.0,
 			min_radius: 0.0,
@@ -41,8 +45,10 @@ impl BranchBuilder {
 			noise: Fbm::new(0),
 			anchor: Vec3::ZERO,
 			initial_ray: Vec3::ZERO,
+			bias_ray: Vec3::ZERO,
+			bias_amount: 0.0,
 			// 8 degrees of angle tolerance
-			angle_tolerance: 7.0,
+			angle_tolerance: 5.0,
 			initial_radius: 0.0,
 			min_radius: 0.0,
 			max_radius: 0.0,
@@ -74,36 +80,39 @@ impl BranchBuilder {
 		parent_ray: Vec3,
 		child_index: usize,
 	) -> Vec3 {
+		// 1. Normalize parent
 		let parent_dir = parent_ray.normalize();
 
-		// Sample 2D drift noise
+		// 2. Compute biased mean direction (slow, stable correction)
+		let bias_dir = self.bias_ray.normalize();
+		let mean_dir = parent_dir.slerp(bias_dir, self.bias_amount);
+
+		// 3. Sample 2D drift noise (independent!)
 		let nx = self.noise.get([
-			position.x as f64,
-			position.y as f64,
-			position.z as f64,
-			child_index as f64,
+			position.x as f64 * 1000.0,
+			position.y as f64 * 1000.0,
+			position.z as f64 * 1000.0,
+			child_index as f64 * -31.7,
 		]) as f32;
 
 		let nz = self.noise.get([
-			position.x as f64,
-			position.y as f64,
-			position.z as f64,
-			child_index as f64,
+			position.x as f64 * 1000.0,
+			position.y as f64 * 1000.0,
+			position.z as f64 * 1000.0,
+			child_index as f64 * 31.7, // decorrelate
 		]) as f32;
 
-		// Build perpendicular basis
-		let up = if parent_dir.abs().y < 0.99 { Vec3::Y } else { Vec3::X };
+		// 4. Build perpendicular basis around *mean_dir*
+		let up = if mean_dir.abs().y < 0.99 { Vec3::Y } else { Vec3::X };
+		let tangent = mean_dir.cross(up).normalize();
+		let bitangent = mean_dir.cross(tangent);
 
-		let tangent = parent_dir.cross(up).normalize();
-		let bitangent = parent_dir.cross(tangent);
-
-		// Drift strength (in radians, small!)
-		let drift = self.angle_tolerance; // <-- store this in radians
-
-		// Apply lateral drift
+		// 5. Apply angular drift
+		let drift = self.angle_tolerance; // radians
 		let drift_vec = tangent * nx * drift + bitangent * nz * drift;
 
-		(parent_dir + drift_vec).normalize()
+		// 6. Final direction
+		(mean_dir + drift_vec).normalize()
 	}
 
 	/// Generates a ray within the angle and length tolerance
@@ -118,17 +127,11 @@ impl BranchBuilder {
 			child_index as f64,
 		]) as f32;
 
-		log::info!("n_length: {}", n_length);
-
 		// Map [-1,1] → [0,1]
 		let n_length = (n_length * 0.5 + 0.5).clamp(0.0, 1.0);
 
 		let length = self.min_segment_length
 			+ n_length * (self.max_segment_length - self.min_segment_length);
-
-		log::info!("length: {}", length);
-		log::info!("direction: {:?}", direction);
-		log::info!("direction * length: {:?}", direction * length);
 
 		direction * length
 	}
