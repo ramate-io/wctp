@@ -2,7 +2,6 @@ use bevy::prelude::*;
 use std::f32::consts::PI;
 
 mod camera;
-mod forest;
 mod terrain;
 mod ui;
 
@@ -32,21 +31,6 @@ impl Plugin for TerrainPlugin {
 		let terrain_sdf = terrain::TerrainSdf { sdf: terrain::create_terrain_sdf(&terrain_config) };
 		let terrain_sdf_resource = SdfResource::new(terrain_sdf);
 
-		// Set up forest SDF (floating at 5km)
-		let forest_chunk_config = ChunkConfig::<forest::ForestSdfWrapper> {
-			min_size: 0.1,
-			number_of_rings: 0,
-			grid_radius: 2,
-			grid_multiple_2: 4,
-			..Default::default()
-		};
-		let forest_resolution_config = ChunkResolutionConfig::<forest::ForestSdfWrapper> {
-			base_res_2: 2,
-			..Default::default()
-		};
-		let forest_sdf = forest::create_forest_sdf(self.seed);
-		let forest_sdf_resource = SdfResource::new(forest_sdf);
-
 		app.insert_resource(terrain_config)
 			.insert_resource(ClearColor(Color::hsla(201.0, 0.69, 0.62, 1.0)))
 			.insert_resource(LoadedChunks::default())
@@ -55,16 +39,12 @@ impl Plugin for TerrainPlugin {
 			.insert_resource(terrain_resolution_config)
 			.insert_resource(terrain_sdf_resource)
 			// forest
-			.insert_resource(forest_chunk_config)
-			.insert_resource(forest_resolution_config)
-			.insert_resource(forest_sdf_resource)
 			.add_systems(Startup, (camera::setup_camera, setup_lighting, ui::setup_debug_ui))
 			.add_systems(
 				Update,
 				(
 					camera::camera_controller,
 					manage_chunks::<terrain::TerrainSdf>,
-					manage_chunks::<forest::ForestSdfWrapper>,
 					ui::update_coordinate_display,
 				),
 			);
