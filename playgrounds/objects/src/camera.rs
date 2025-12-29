@@ -56,7 +56,7 @@ pub fn setup_camera(mut commands: Commands) {
 			..default()
 		}),
 		CameraController {
-			speed: 0.001, // 1 m/s in km/s
+			speed: 0.01, // 10 m/s in km/s
 			sensitivity: 0.005,
 			yaw,
 			pitch,

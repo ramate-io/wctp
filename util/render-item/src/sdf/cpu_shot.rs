@@ -1,25 +1,16 @@
-pub mod sparse_cubes;
+pub mod marching_cubes;
 
-use crate::cascade::CascadeChunk;
-use crate::chunk::TerrainChunk;
-use crate::shaders::outline::EdgeMaterial;
 use bevy::prelude::*;
-use rayon::prelude::*;
+use chunk::cascade::CascadeChunk;
 use sdf::{Sign, Sdf};
 use std::sync::Arc;
-
-/// CPU-based terrain mesh generator
-pub struct CpuMeshGenerator;
-
-impl CpuMeshGenerator {
-	/// Generate a terrain mesh for a specific chunk by sampling an SDF
-	/// Supports both heightfield (fast, no caves) and volumetric (marching cubes, supports caves)
-	/// Returns None if the chunk is entirely above the terrain surface
-	pub fn generate_chunk_mesh<S: Sdf + Send + Sync>(
-		cascade_chunk: &CascadeChunk,
-		sdf: Arc<S>,
-	) -> Option<Mesh> {
-		// ---------- grid setup ---------------------------------------------------
+use rayon::prelude::*;
+use marching_cubes::{get_cube_index, interpolate_vertex, TRIANGULATIONS};
+use crate::mesh::MeshBuilder;
+use crate::NormalizeChunk;
+pub trait CpuShotSdf: Sdf + Clone {
+	fn cpu_chunk_mesh(&self, cascade_chunk: &CascadeChunk) -> Option<Mesh> {
+        // ---------- grid setup ---------------------------------------------------
 		let chunk_size = cascade_chunk.size;
 		let res = cascade_chunk.resolution();
 		let cube_size = chunk_size / res as f32;
@@ -44,7 +35,7 @@ impl CpuMeshGenerator {
 		// ---------- sample SDF in world space (parallelized) --------------------
 		// Parallelize over Z slices for sparse sampling using sign_uniform_on_y
 		// Collect results per Z slice and merge sequentially
-		let sdf_clone = Arc::clone(&sdf);
+		let sdf_clone = Arc::new(self.clone());
 		let z_slices: Vec<_> = (0..nz)
 			.into_par_iter()
 			.map(|z| {
@@ -193,9 +184,6 @@ impl CpuMeshGenerator {
 		let end_time = std::time::Instant::now();
 		let duration = end_time.duration_since(start_time);
 		log::debug!("Merging time: {:?}", duration);
-
-		// ---------- Marching Cubes (parallelized) --------------------------------
-		use crate::marching_cubes::{get_cube_index, interpolate_vertex, TRIANGULATIONS};
 
 		// Number of cubes along each axis
 		let cx = nx - 1;
@@ -413,74 +401,15 @@ impl CpuMeshGenerator {
 		mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
 		mesh.insert_indices(bevy::mesh::Indices::U32(indices));
 		Some(mesh)
-	}
 
-	/// Spawn a terrain chunk entity from a pre-generated mesh
-	pub fn spawn_chunk_with_mesh<S: Sdf + Send + Sync>(
-		sdf: &Arc<S>,
-		commands: &mut Commands,
-		meshes: &mut ResMut<Assets<Mesh>>,
-		materials: &mut ResMut<Assets<EdgeMaterial>>,
-		cascade_chunk: CascadeChunk,
-		mesh: Mesh,
-		is_cascade: bool,
-	) -> Entity {
-		let mesh_handle = meshes.add(mesh);
+    }
+}
 
-		// Create edge material (shader handles the rendering)
-		let material_handle = materials.add(EdgeMaterial {
-			// brownish color
-			base_color: if is_cascade {  Vec4::new(0.89, 0.886, 0.604, 1.0) } else { Vec4::new(0.89, 0.886, 0.604, 1.0) },
-		});
+impl <T: Sdf + Clone> CpuShotSdf for T {}
 
-		// Use cascade chunk origin for world position
-		// Note: mesh vertices are in local space relative to chunk origin
-		let world_pos = cascade_chunk.origin + sdf.translation();
-		log::info!("Typename: {:?}, Translation: {:?}", std::any::type_name::<S>(), sdf.translation());
-
-		let entity = commands
-			.spawn((
-				TerrainChunk { chunk: cascade_chunk },
-				Mesh3d(mesh_handle.clone()),
-				MeshMaterial3d::<EdgeMaterial>(material_handle.clone()),
-				Transform::from_translation(world_pos).with_rotation(sdf.rotation()).with_scale(sdf.scale())
-			))
-			.id();
-
-		log::debug!(
-			"Spawned chunk (CPU) at origin {:?} with size {} and resolution {}",
-			cascade_chunk.origin,
-			cascade_chunk.size,
-			cascade_chunk.resolution()
-		);
-
-		entity
-	}
-
-	/// Spawn a terrain chunk entity using CPU mesh generation
-	pub fn spawn_chunk<S: Sdf + Send + Sync>(
-		commands: &mut Commands,
-		meshes: &mut ResMut<Assets<Mesh>>,
-		materials: &mut ResMut<Assets<EdgeMaterial>>,
-		cascade_chunk: CascadeChunk,
-		sdf: Arc<S>,
-	) -> Entity {
-		// Generate mesh using cascade chunk
-		let start_time = std::time::Instant::now();
-		let Some(mesh) = Self::generate_chunk_mesh(&cascade_chunk, sdf.clone()) else {
-			// Chunk is entirely above terrain, don't spawn it
-			log::debug!(
-				"Skipping chunk at origin {:?} - entirely above terrain",
-				cascade_chunk.origin
-			);
-			// Return a dummy entity that will be cleaned up
-			return commands.spawn_empty().id();
-		};
-		let end_time = std::time::Instant::now();
-		let duration = end_time.duration_since(start_time);
-		log::info!("Mesh time: {:?}", duration);
-
-		// Default to grid (brown) for backward compatibility when called directly
-		Self::spawn_chunk_with_mesh(&sdf, commands, meshes, materials, cascade_chunk, mesh, false)
+impl <T: CpuShotSdf + NormalizeChunk> MeshBuilder for T {
+	fn build_mesh_impl(&self, cascade_chunk: &CascadeChunk) -> Option<Mesh> {
+		log::info!("Building mesh for chunk: {:?}", cascade_chunk);
+		self.cpu_chunk_mesh(cascade_chunk)
 	}
 }

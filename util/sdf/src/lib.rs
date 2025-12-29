@@ -11,8 +11,8 @@ pub use analysis::bounds::Bounds;
 pub use analysis::interval::{Sign, SignBoundary, SignUniformInterval, SignUniformIntervals};
 pub use capsule::CapsuleSdf;
 pub use combinators::{
-	AddY, Difference, Elongate, Intersection, RotateY, Round, Scale, SmoothDifference,
-	SmoothIntersection, SmoothUnion, Translate, Union,
+	AddY, Difference, Elongate, Intersection, RotateAlongRay, RotateY, Round, Scale,
+	SmoothDifference, SmoothIntersection, SmoothUnion, Translate, Union,
 };
 pub use ellipsoid::EllipsoidSdf;
 pub use sphere::SphereSdf;
@@ -48,5 +48,20 @@ pub trait Sdf: Send + Sync {
 	/// Often times, you can compute tighter bounds. But, this is useful when doing so is computationally expensive.
 	fn bounds(&self) -> Bounds {
 		Bounds::Unbounded
+	}
+
+	/// The stateful translation of the SDF.
+	fn translation(&self) -> Vec3 {
+		Vec3::ZERO
+	}
+
+	/// The stateful rotation of the SDF.
+	fn rotation(&self) -> Quat {
+		Quat::IDENTITY
+	}
+
+	/// The stateful scale of the SDF.
+	fn scale(&self) -> Vec3 {
+		Vec3::ONE
 	}
 }

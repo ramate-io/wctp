@@ -182,7 +182,9 @@ pub fn manage_chunks<S: Sdf + Send + Sync + 'static>(
 	for (cascade_chunk, mesh_opt, _) in cascade_mesh_results {
 		let wrapped_origin = wrap_chunk_origin(cascade_chunk.origin);
 		if let Some(mesh) = mesh_opt {
+			log::info!("Managing chunks for type: {:?}", std::any::type_name::<S>());
 			CpuMeshGenerator::spawn_chunk_with_mesh(
+				&sdf_resource.sdf,
 				&mut commands,
 				&mut meshes,
 				&mut materials,
@@ -205,6 +207,7 @@ pub fn manage_chunks<S: Sdf + Send + Sync + 'static>(
 		let wrapped_origin = wrap_chunk_origin(cascade_chunk.origin);
 		if let Some(mesh) = mesh_opt {
 			CpuMeshGenerator::spawn_chunk_with_mesh(
+				&sdf_resource.sdf,
 				&mut commands,
 				&mut meshes,
 				&mut materials,

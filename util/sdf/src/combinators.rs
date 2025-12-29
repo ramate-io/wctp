@@ -268,6 +268,44 @@ impl<A: Sdf> Sdf for RotateY<A> {
 	}
 }
 
+/// Rotate an SDF along an arbitrary direction (ray)
+/// The SDF's local Y axis will be aligned with the given direction
+pub struct RotateAlongRay<A> {
+	sdf: A,
+	rotation: Quat,
+}
+
+impl<A: Sdf> RotateAlongRay<A> {
+	/// Create a rotation that aligns the SDF's Y axis with the given direction
+	/// The direction should be normalized
+	pub fn new(sdf: A, direction: Vec3) -> Self {
+		let direction = direction.normalize();
+		// Default Y axis is Vec3::Y
+		let y_axis = Vec3::Y;
+
+		// If direction is already aligned with Y, no rotation needed
+		let rotation = if direction.dot(y_axis) > 0.999 {
+			Quat::IDENTITY
+		} else if direction.dot(y_axis) < -0.999 {
+			// 180 degree rotation around X or Z
+			Quat::from_rotation_x(std::f32::consts::PI)
+		} else {
+			// Compute rotation from Y axis to direction
+			Quat::from_rotation_arc(y_axis, direction)
+		};
+
+		Self { sdf, rotation }
+	}
+}
+
+impl<A: Sdf> Sdf for RotateAlongRay<A> {
+	fn distance(&self, p: Vec3) -> f32 {
+		// Rotate point by inverse rotation (rotate world point to local space)
+		let local_p = self.rotation.inverse() * p;
+		self.sdf.distance(local_p)
+	}
+}
+
 /// Round the edges of an SDF (chamfer)
 pub struct Round<A> {
 	sdf: A,

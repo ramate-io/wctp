@@ -1,106 +1,53 @@
 use bevy::prelude::*;
-use sdf::Sdf;
-use vegetation_sdf::tree::stalk::trunk::segment::{simple::SimpleTrunkSegment, SegmentConfig};
-use vegetation_sdf::tree::{CanopySdf, TrunkSdf};
+use chunk::cascade::CascadeChunk;
+use engine::shaders::outline::EdgeMaterial;
+use render_item::{mesh::cache::handle::map::HandleMap, DispatchRenderItem};
+use vegetation_sdf::tree::{meshes::trunk::segment::SimpleTrunkSegment, TreeRenderItem};
 
-/// A single tree SDF combining trunk and canopy
-pub struct TreeSdf {
-	trunk: TrunkSdf,
-	canopy: CanopySdf,
+#[derive(Resource, Clone)]
+pub struct TreeMaterial<M: Material>(pub Handle<M>);
+
+pub fn setup_tree_edge_material(
+	mut commands: Commands,
+	mut materials: ResMut<Assets<EdgeMaterial>>,
+) {
+	let material_handle = materials.add(EdgeMaterial {
+		// brownish color
+		base_color: Vec4::new(0.89, 0.886, 0.604, 1.0),
+	});
+
+	commands.insert_resource(TreeMaterial(material_handle));
 }
 
-impl TreeSdf {
-	pub fn new(
-		base: Vec3,
-		trunk_height: f32,
-		trunk_base_radius: f32,
-		trunk_top_radius: f32,
-		canopy_radius: f32,
-		canopy_height: f32,
-	) -> Self {
-		let top = base + Vec3::Y * trunk_height;
-		let trunk = TrunkSdf::new(base, top, trunk_base_radius, trunk_top_radius);
+pub fn tree_playground<M: Material>(mut commands: Commands, material: Res<TreeMaterial<M>>) {
+	log::info!("Spawning tree playground");
 
-		// Place canopy above trunk, centered at top
-		let canopy_center = top + Vec3::Y * canopy_height * 0.3; // Slightly above trunk top
-		let canopy =
-			CanopySdf::new(canopy_center, Vec3::new(canopy_radius, canopy_height, canopy_radius));
+	let tree_cache = HandleMap::<SimpleTrunkSegment>::new();
 
-		Self { trunk, canopy }
+	// grid out some trees
+	const N: i32 = 1;
+	for x in -N..=N {
+		for z in -N..=N {
+			tree(
+				&mut commands,
+				Vec3::new(x as f32 * 0.02, 0.0, z as f32 * 0.02),
+				&material,
+				tree_cache.clone(),
+			);
+		}
 	}
 }
 
-impl Sdf for TreeSdf {
-	fn distance(&self, p: Vec3) -> f32 {
-		// Union of trunk and canopy
-		let trunk_dist = self.trunk.distance(p);
-		let canopy_dist = self.canopy.distance(p);
-		trunk_dist.min(canopy_dist)
-	}
-}
-
-/// Create a single tree SDF configured for kilometers
-/// Tree is placed at origin (0, 0, 0)
-pub fn create_tree_sdf() -> TreeSdf {
-	// Tree parameters in kilometers
-	let base = Vec3::ZERO;
-	let trunk_height = 0.005; // 5 meters
-	let trunk_base_radius = 0.0005; // 0.5 meters
-	let trunk_top_radius = trunk_base_radius * 0.6; // Tapered
-	let canopy_radius = 0.003; // 3 meters
-	let canopy_height = canopy_radius * 0.8; // Slightly flattened
-
-	TreeSdf::new(
-		base,
-		trunk_height,
-		trunk_base_radius,
-		trunk_top_radius,
-		canopy_radius,
-		canopy_height,
-	)
-}
-
-/// Wrapper SDF for a trunk segment that transforms world space to unit space
-/// The segment works in unit space (0-1 for y, centered at origin for x/z)
-/// This wrapper scales it to world space (kilometers)
-pub struct SegmentSdf {
-	segment: SimpleTrunkSegment,
-	/// Scale factor to convert unit space to world space (km)
-	/// Segment height in world space = scale
-	scale: f32,
-}
-
-impl SegmentSdf {
-	pub fn new(segment: SimpleTrunkSegment, scale: f32) -> Self {
-		Self { segment, scale }
-	}
-}
-
-impl Sdf for SegmentSdf {
-	fn distance(&self, p: Vec3) -> f32 {
-		// Transform world space to unit space
-		// In unit space: y is 0-1, x/z are centered at origin
-		// We'll scale x/z by the same factor as y to maintain proportions
-		let unit_p = Vec3::new(p.x / self.scale, p.y / self.scale, p.z / self.scale);
-
-		// Get distance in unit space and scale back to world space
-		self.segment.distance(unit_p) * self.scale
-	}
-}
-
-/// Create a simple segment SDF at the origin
-pub fn create_segment_sdf() -> SegmentSdf {
-	let config = SegmentConfig {
-		seed: 42,
-		base_radius: 0.5,
-		top_radius: 0.4,
-		noise_amplitude: 0.05,
-		noise_frequency: 5.0,
-	};
-	let segment = SimpleTrunkSegment::new(config);
-
-	// Scale to 0.01 km (10 meters) height
-	let scale = 0.01;
-
-	SegmentSdf::new(segment, scale)
+pub fn tree<M: Material>(
+	commands: &mut Commands,
+	origin: Vec3,
+	material: &Res<TreeMaterial<M>>,
+	tree_cache: HandleMap<SimpleTrunkSegment>,
+) {
+	commands.spawn((
+		CascadeChunk::unit_center_chunk().with_res_2(3),
+		DispatchRenderItem::new(TreeRenderItem::new().with_tree_cache(tree_cache.clone())),
+		Transform::from_translation(origin),
+		MeshMaterial3d(material.0.clone()),
+	));
 }

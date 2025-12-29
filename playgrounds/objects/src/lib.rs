@@ -7,9 +7,12 @@ mod ground;
 pub mod tree;
 mod ui;
 
-use engine::{
-	manage_chunks, shaders::outline::EdgeMaterial, ChunkConfig, ChunkResolutionConfig,
-	LoadedChunks, SdfResource,
+use engine::shaders::outline::EdgeMaterial;
+use vegetation_sdf::tree::{meshes::trunk::segment::SimpleTrunkSegment, TreeRenderItem};
+
+use render_item::{
+	mesh::{fetch_meshes, handle::MeshHandle},
+	render_items,
 };
 
 pub use camera::CameraController;
@@ -29,49 +32,29 @@ impl Plugin for ObjectsPlugin {
 			bevy::pbr::MaterialPlugin::<checkerboard_material::CheckerboardMaterial>::default(),
 		);
 
-		// Set up single tree SDF
-		// let tree_chunk_config = ChunkConfig::<tree::TreeSdf> {
-		// 	min_size: 0.01,
-		// 	number_of_rings: 2,
-		// 	grid_radius: 1,
-		// 	grid_multiple_2: 4,
-		// 	..Default::default()
-		// };
-		// let tree_resolution_config =
-		// 	ChunkResolutionConfig::<tree::TreeSdf> { base_res_2: 7, ..Default::default() };
-		// let tree_sdf = tree::create_tree_sdf();
-		// let tree_sdf_resource = SdfResource::new(tree_sdf);
-
-		// Set up simple segment SDF at origin
-		let segment_chunk_config = ChunkConfig::<tree::SegmentSdf> {
-			min_size: 0.01,
-			number_of_rings: 2,
-			grid_radius: 1,
-			grid_multiple_2: 2,
-			..Default::default()
-		};
-		let segment_resolution_config =
-			ChunkResolutionConfig::<tree::SegmentSdf> { base_res_2: 7, ..Default::default() };
-		let segment_sdf = tree::create_segment_sdf();
-		let segment_sdf_resource = SdfResource::new(segment_sdf);
-
 		app.insert_resource(ClearColor(Color::hsla(201.0, 0.69, 0.62, 1.0)))
-			.insert_resource(LoadedChunks::default())
 			.insert_resource(ground::CheckerSize::default())
-			.insert_resource(segment_chunk_config)
-			.insert_resource(segment_resolution_config)
-			.insert_resource(segment_sdf_resource)
 			.add_systems(
 				Startup,
-				(camera::setup_camera, setup_lighting, ground::setup_ground, ui::setup_debug_ui),
+				(
+					camera::setup_camera,
+					setup_lighting,
+					ground::setup_ground,
+					ui::setup_debug_ui,
+					tree::setup_tree_edge_material,
+				),
 			)
 			.add_systems(
 				Update,
 				(
 					camera::camera_controller,
 					ground::update_checker_size,
-					manage_chunks::<tree::SegmentSdf>,
 					ui::update_coordinate_display,
+					render_items::<TreeRenderItem, EdgeMaterial>,
+					fetch_meshes::<MeshHandle<SimpleTrunkSegment>, EdgeMaterial>,
+					tree::tree_playground::<EdgeMaterial>
+						.run_if(resource_exists::<tree::TreeMaterial<EdgeMaterial>>)
+						.run_if(run_once),
 				),
 			);
 	}

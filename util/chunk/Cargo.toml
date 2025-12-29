@@ -1,5 +1,5 @@
 [package]
-name = "objects-playground"
+name = "chunk"
 version = { workspace = true }
 edition  = { workspace = true }
 license  = { workspace = true }
@@ -23,14 +23,6 @@ bevy = { workspace = true }
 # Procedural generation
 noise = "0.9"
 bytemuck = { version = "1.14", features = ["derive"] }
-
-# sdf
-sdf = { workspace = true }
-render-item = { workspace = true }
-engine = { workspace = true }
-terrain-sdf = { workspace = true }
-vegetation-sdf = { workspace = true }
-chunk = { workspace = true }
 
 [lints]
 workspace = true

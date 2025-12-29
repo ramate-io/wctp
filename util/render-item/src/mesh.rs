@@ -1,0 +1,106 @@
+pub mod cache;
+pub mod handle;
+
+use crate::NormalizeChunk;
+use bevy::prelude::*;
+use cache::{handle::MeshHandleCache, mesh::MeshCache};
+use chunk::cascade::CascadeChunk;
+use std::hash::Hash;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MeshId(String);
+
+impl MeshId {
+	pub fn new(id: String) -> Self {
+		Self(id)
+	}
+}
+
+pub trait IdentifiedMesh {
+	fn id(&self) -> MeshId;
+}
+
+pub trait MeshBuilder: Clone + NormalizeChunk {
+	/// The actual implementation which builds the mesh.
+	fn build_mesh_impl(&self, cascade_chunk: &CascadeChunk) -> Option<Mesh>;
+
+	/// Builds a mesh by normalizing the chunk and then building the mesh.
+	fn build_mesh(&self, cascade_chunk: &CascadeChunk) -> Option<Mesh> {
+		let normalized_chunk = self.normalize_chunk(cascade_chunk);
+		self.build_mesh_impl(&normalized_chunk)
+	}
+}
+
+pub trait MeshFetcher: Clone + IdentifiedMesh {
+	/// Builds mesh if it doesn't exist or fetches from the assets. Returns the handle to the mesh.
+	fn fetch_mesh(
+		&self,
+		meshes: &mut ResMut<Assets<Mesh>>,
+		cascade_chunk: &CascadeChunk,
+	) -> Option<Handle<Mesh>>;
+}
+
+/// If it's already defined how the mesh is built, cached, and fetched, this trait can be used to fetch the mesh.
+impl<T: MeshBuilder + MeshCache + MeshHandleCache> MeshFetcher for T {
+	fn fetch_mesh(
+		&self,
+		meshes: &mut ResMut<Assets<Mesh>>,
+		cascade_chunk: &CascadeChunk,
+	) -> Option<Handle<Mesh>> {
+		let normalized_cascade_chunk = self.normalize_chunk(cascade_chunk);
+
+		// Check if the mesh handle is already cached.
+		if let Some(mesh) = self.fetch_cached_mesh_handle(&normalized_cascade_chunk) {
+			return Some(mesh);
+		}
+
+		// Check if the mesh is already cached (this will most often get hit when the mesh is on disk).
+		let mesh_handle = if let Some(mesh) = self.fetch_cached_mesh(&normalized_cascade_chunk) {
+			Some(meshes.add(mesh))
+		} else {
+			self.build_mesh(cascade_chunk).map(|mesh| {
+				self.cache_mesh(&mesh, &normalized_cascade_chunk);
+				log::info!("Adding mesh to assets");
+				meshes.add(mesh)
+			})
+		};
+
+		mesh_handle.map(|handle| {
+			self.cache_mesh_handle(handle.clone(), &normalized_cascade_chunk);
+			log::info!("Caching mesh handle");
+			handle
+		})
+	}
+}
+
+/// A mesh dispatch signals an intent for the item to be spawned into the world.
+/// This is set up for asynchronous pipelines
+/// wherein the mesh may need to be built, fetched from cache, etc.
+#[derive(Component)]
+pub struct MeshDispatch<T: MeshFetcher> {
+	fetcher: T,
+}
+
+impl<T: MeshFetcher> MeshDispatch<T> {
+	pub fn new(fetcher: T) -> Self {
+		Self { fetcher }
+	}
+}
+
+/// Fetches meshes and spawns them into the world.
+///
+/// TODO: this needs to be made event-based.
+pub fn fetch_meshes<T: MeshFetcher + Send + Sync + 'static, M: Material>(
+	mut commands: Commands,
+	mut meshes: ResMut<Assets<Mesh>>,
+	query: Query<
+		(Entity, &MeshDispatch<T>, &CascadeChunk, &Transform, &MeshMaterial3d<M>),
+		Added<MeshDispatch<T>>,
+	>,
+) {
+	for (_entity, mesh_dispatch, cascade_chunk, transform, material) in &query {
+		if let Some(mesh) = mesh_dispatch.fetcher.fetch_mesh(&mut meshes, cascade_chunk) {
+			commands.spawn((Mesh3d(mesh), *transform, material.clone()));
+		}
+	}
+}

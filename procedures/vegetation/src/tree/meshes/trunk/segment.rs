@@ -1,12 +1,42 @@
-use super::{
-	join_point::{JoinPoint, JoinType},
-	SegmentConfig,
-};
 use bevy::prelude::*;
+use chunk::cascade::CascadeChunk;
 use noise::{NoiseFn, Perlin};
+use render_item::{
+	mesh::{IdentifiedMesh, MeshId},
+	NormalizeChunk,
+};
 use sdf::Sdf;
 
+/// Base configuration for a trunk segment
+/// All segments work in unit space (0-1) and are transformed later
+#[derive(Debug, Clone)]
+pub struct SegmentConfig {
+	/// Seed for noise generation
+	pub seed: u32,
+	/// Base radius at bottom (in unit space, typically 0.5)
+	pub base_radius: f32,
+	/// Top radius at top (in unit space, typically 0.4)
+	pub top_radius: f32,
+	/// Noise amplitude for surface variation
+	pub noise_amplitude: f32,
+	/// Noise frequency for surface variation
+	pub noise_frequency: f32,
+}
+
+impl Default for SegmentConfig {
+	fn default() -> Self {
+		Self {
+			seed: 0,
+			base_radius: 0.5,
+			top_radius: 0.4,
+			noise_amplitude: 0.05,
+			noise_frequency: 5.0,
+		}
+	}
+}
+
 /// Simple trunk segment: noisy cylinder with trunk join points on top and bottom
+#[derive(Debug, Clone)]
 pub struct SimpleTrunkSegment {
 	config: SegmentConfig,
 	noise: Perlin,
@@ -17,20 +47,9 @@ impl SimpleTrunkSegment {
 		let noise = Perlin::new(config.seed);
 		Self { config, noise }
 	}
-
-	/// Get join points: one at bottom (0.0) and one at top (1.0)
-	pub fn join_points(&self) -> Vec<JoinPoint> {
-		vec![
-			JoinPoint {
-				unit_position: 0.0,
-				angle: 0.0, // Angle doesn't matter for single trunk join
-				join_type: JoinType::Trunk,
-			},
-			JoinPoint { unit_position: 1.0, angle: 0.0, join_type: JoinType::Trunk },
-		]
-	}
 }
 
+/// We should get the MeshBuilder trait for free since this is an SDF.
 impl Sdf for SimpleTrunkSegment {
 	/// NOTE: early on there appeared to be a  bug that gives this some slightly weird sharp facets.
 	/// By playing with chunk settings, it was possible to make facets disappear,
@@ -74,5 +93,20 @@ impl Sdf for SimpleTrunkSegment {
 		}
 
 		dist
+	}
+}
+
+impl NormalizeChunk for SimpleTrunkSegment {
+	fn normalize_chunk(&self, cascade_chunk: &CascadeChunk) -> CascadeChunk {
+		CascadeChunk::unit_center_chunk()
+			.with_res_2(cascade_chunk.res_2)
+			.with_mu(self.config.noise_amplitude + 0.001)
+	}
+}
+
+impl IdentifiedMesh for SimpleTrunkSegment {
+	fn id(&self) -> MeshId {
+		let debug_string = format!("{:?}", self);
+		MeshId::new(debug_string)
 	}
 }
