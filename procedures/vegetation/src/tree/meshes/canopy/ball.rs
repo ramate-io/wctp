@@ -75,7 +75,7 @@ impl Sdf for NoisyBall {
 
 impl NormalizeChunk for NoisyBall {
 	fn normalize_chunk(&self, cascade_chunk: &CascadeChunk) -> CascadeChunk {
-		CascadeChunk::unit_center_chunk()
+		CascadeChunk::unit_3d_center_chunk()
 			.with_res_2(cascade_chunk.res_2)
 			.with_mu(self.config.noise_amplitude + 0.001)
 	}

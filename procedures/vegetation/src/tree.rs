@@ -3,7 +3,10 @@ pub mod meshes;
 use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;
 use meshes::{
-	canopy::{ball::NoisyBall, branch::BranchBuilder},
+	canopy::{
+		ball::{NoisyBall, NoisyBallConfig},
+		branch::BranchBuilder,
+	},
 	trunk::segment::{SegmentConfig, SimpleTrunkSegment},
 };
 use render_item::{
@@ -153,13 +156,7 @@ impl TreeRenderItem {
 		}
 
 		for node in branch.nodes() {
-			self.spawn_leaf_ball(
-				commands,
-				cascade_chunk,
-				transform,
-				material.clone(),
-				node.position,
-			);
+			self.spawn_leaf_ball(commands, cascade_chunk, material.clone(), node.position);
 		}
 	}
 
@@ -183,9 +180,26 @@ impl TreeRenderItem {
 		&self,
 		commands: &mut Commands,
 		cascade_chunk: &CascadeChunk,
-		transform: Transform,
 		material: MeshMaterial3d<M>,
+		position: Vec3,
 	) {
+		// Build noisy ball mesh dispatch
+		let noisy_ball = NoisyBall::new(NoisyBallConfig::default());
+		let mesh_handle = MeshHandle::new(noisy_ball).with_handle_cache(self.leaf_cache.clone());
+
+		// Spawn at the node position with appropriate scale
+		let pivot_offset = Vec3::new(0.5, 0.5, 0.5);
+		let scale = Vec3::splat(0.005);
+		let translation = position - pivot_offset * scale;
+
+		let ball_transform = Transform::from_translation(translation).with_scale(scale); // Scale for leaf ball size
+
+		commands.spawn((
+			cascade_chunk.clone(),
+			MeshDispatch::new(mesh_handle),
+			ball_transform,
+			MeshMaterial3d(material.0.clone()),
+		));
 	}
 }
 

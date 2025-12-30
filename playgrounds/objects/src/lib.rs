@@ -8,7 +8,9 @@ pub mod tree;
 mod ui;
 
 use engine::shaders::{leaf_material::LeafMaterial, outline::EdgeMaterial};
-use vegetation_sdf::tree::{meshes::trunk::segment::SimpleTrunkSegment, TreeRenderItem};
+use vegetation_sdf::tree::{
+	meshes::canopy::ball::NoisyBall, meshes::trunk::segment::SimpleTrunkSegment, TreeRenderItem,
+};
 
 use render_item::{
 	mesh::{fetch_meshes, handle::MeshHandle},
@@ -54,6 +56,7 @@ impl Plugin for ObjectsPlugin {
 					ui::update_coordinate_display,
 					render_items::<TreeRenderItem, EdgeMaterial>,
 					fetch_meshes::<MeshHandle<SimpleTrunkSegment>, EdgeMaterial>,
+					fetch_meshes::<MeshHandle<NoisyBall>, EdgeMaterial>,
 					tree::tree_playground::<EdgeMaterial>
 						.run_if(resource_exists::<tree::TreeMaterial<EdgeMaterial>>)
 						.run_if(run_once),
