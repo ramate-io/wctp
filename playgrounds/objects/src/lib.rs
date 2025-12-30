@@ -43,6 +43,7 @@ impl Plugin for ObjectsPlugin {
 					ground::setup_ground,
 					ui::setup_debug_ui,
 					tree::setup_tree_edge_material,
+					setup_leaf_ball,
 				),
 			)
 			.add_systems(
@@ -51,10 +52,10 @@ impl Plugin for ObjectsPlugin {
 					camera::camera_controller,
 					ground::update_checker_size,
 					ui::update_coordinate_display,
-					render_items::<TreeRenderItem, LeafMaterial>,
-					fetch_meshes::<MeshHandle<SimpleTrunkSegment>, LeafMaterial>,
-					tree::tree_playground::<LeafMaterial>
-						.run_if(resource_exists::<tree::TreeMaterial<LeafMaterial>>)
+					render_items::<TreeRenderItem, EdgeMaterial>,
+					fetch_meshes::<MeshHandle<SimpleTrunkSegment>, EdgeMaterial>,
+					tree::tree_playground::<EdgeMaterial>
+						.run_if(resource_exists::<tree::TreeMaterial<EdgeMaterial>>)
 						.run_if(run_once),
 				),
 			);
@@ -104,4 +105,55 @@ fn setup_lighting(mut commands: Commands) {
 		DirectionalLight { illuminance: 500.0, shadows_enabled: false, ..default() },
 		Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -PI / 2.0, 0.0, 0.0)),
 	));
+}
+
+fn setup_leaf_ball(
+	mut commands: Commands,
+	mut meshes: ResMut<Assets<Mesh>>,
+	mut materials: ResMut<Assets<LeafMaterial>>,
+) {
+	// Create leaf material with green color
+	let leaf_material = materials.add(LeafMaterial {
+		base_color: Vec4::new(0.2, 0.8, 0.3, 1.0), // Green color
+	});
+
+	// Create a disc mesh (small size for leaves)
+	let leaf_size = 0.01; // Size in kilometers (radius)
+	let disc_mesh = meshes.add(Circle::new(leaf_size));
+
+	// Spawn 3-8 discs that intersect at one point and fan out like a star
+	let num_discs = 8; // Number of discs (3-8, adjust as needed)
+	let center = Vec3::new(0.0, 0.03, 0.0); // All planes intersect at origin
+
+	// Use Fibonacci sphere algorithm for even distribution of directions
+	let golden_angle = PI * (3.0 - (5.0_f32).sqrt()); // Golden angle in radians
+
+	for i in 0..num_discs {
+		// Calculate direction using Fibonacci sphere for even distribution
+		let theta = golden_angle * i as f32;
+		let y = 1.0 - (2.0 * i as f32) / (num_discs as f32 - 1.0); // y goes from 1 to -1
+		let radius_at_y = (1.0 - y * y).sqrt(); // Radius at this y level
+
+		// Calculate direction vector (normal of the disc)
+		let x = radius_at_y * theta.cos();
+		let z = radius_at_y * theta.sin();
+		let direction = Vec3::new(x, y, z).normalize();
+
+		// All discs are at the same point (slightly offset to avoid z-fighting)
+		let position = center + direction * 0.00001; // Tiny offset
+
+		// Create rotation so disc normal points in the direction
+		// Disc's default normal is Vec3::Z, so rotate Z to direction
+		let rotation = if direction.abs_diff_eq(Vec3::Z, 1e-4) {
+			Quat::IDENTITY
+		} else {
+			Quat::from_rotation_arc(Vec3::Z, direction)
+		};
+
+		commands.spawn((
+			Mesh3d(disc_mesh.clone()),
+			MeshMaterial3d(leaf_material.clone()),
+			Transform { translation: position, rotation, scale: Vec3::ONE },
+		));
+	}
 }
