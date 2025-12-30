@@ -30,7 +30,7 @@ pub fn tree_playground<M: Material>(mut commands: Commands, material: Res<TreeMa
 	let tree_cache = HandleMap::<SimpleTrunkSegment>::new();
 
 	// grid out some trees
-	const N: i32 = 1;
+	const N: i32 = 0;
 	for x in -N..=N {
 		for z in -N..=N {
 			tree(
