@@ -30,6 +30,11 @@ impl TreeRenderItem {
 		self
 	}
 
+	pub fn with_leaf_cache(mut self, leaf_cache: HandleMap<NoisyBall>) -> Self {
+		self.leaf_cache = leaf_cache;
+		self
+	}
+
 	pub fn centroid_anchor(&self, transform: Transform) -> Vec3 {
 		let pivot_offset = Vec3::new(0.5, 0.0, 0.5);
 		transform.translation - transform.rotation * (pivot_offset * Vec3::new(0.01, 0.01, 0.01))

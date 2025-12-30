@@ -2,7 +2,10 @@ use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;
 use engine::shaders::{leaf_material::LeafMaterial, outline::EdgeMaterial};
 use render_item::{mesh::cache::handle::map::HandleMap, DispatchRenderItem};
-use vegetation_sdf::tree::{meshes::trunk::segment::SimpleTrunkSegment, TreeRenderItem};
+use vegetation_sdf::tree::{
+	meshes::{canopy::ball::NoisyBall, trunk::segment::SimpleTrunkSegment},
+	TreeRenderItem,
+};
 
 #[derive(Resource, Clone)]
 pub struct TreeMaterial<M: Material>(pub Handle<M>);
@@ -28,6 +31,7 @@ pub fn tree_playground<M: Material>(mut commands: Commands, material: Res<TreeMa
 	log::info!("Spawning tree playground");
 
 	let tree_cache = HandleMap::<SimpleTrunkSegment>::new();
+	let leaf_cache = HandleMap::<NoisyBall>::new();
 
 	// grid out some trees
 	const N: i32 = 0;
@@ -38,6 +42,7 @@ pub fn tree_playground<M: Material>(mut commands: Commands, material: Res<TreeMa
 				Vec3::new(x as f32 * 0.02, 0.0, z as f32 * 0.02),
 				&material,
 				tree_cache.clone(),
+				leaf_cache.clone(),
 			);
 		}
 	}
@@ -48,10 +53,15 @@ pub fn tree<M: Material>(
 	origin: Vec3,
 	material: &Res<TreeMaterial<M>>,
 	tree_cache: HandleMap<SimpleTrunkSegment>,
+	leaf_cache: HandleMap<NoisyBall>,
 ) {
 	commands.spawn((
 		CascadeChunk::unit_center_chunk().with_res_2(3),
-		DispatchRenderItem::new(TreeRenderItem::new().with_tree_cache(tree_cache.clone())),
+		DispatchRenderItem::new(
+			TreeRenderItem::new()
+				.with_tree_cache(tree_cache.clone())
+				.with_leaf_cache(leaf_cache.clone()),
+		),
 		Transform::from_translation(origin),
 		MeshMaterial3d(material.0.clone()),
 	));
