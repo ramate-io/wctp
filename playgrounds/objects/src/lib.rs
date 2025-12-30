@@ -7,7 +7,7 @@ mod ground;
 pub mod tree;
 mod ui;
 
-use engine::shaders::outline::EdgeMaterial;
+use engine::shaders::{leaf_material::LeafMaterial, outline::EdgeMaterial};
 use vegetation_sdf::tree::{meshes::trunk::segment::SimpleTrunkSegment, TreeRenderItem};
 
 use render_item::{
@@ -27,6 +27,7 @@ impl Plugin for ObjectsPlugin {
 	fn build(&self, app: &mut App) {
 		// Register EdgeMaterial plugin
 		app.add_plugins(bevy::pbr::MaterialPlugin::<EdgeMaterial>::default());
+		app.add_plugins(bevy::pbr::MaterialPlugin::<LeafMaterial>::default());
 		// Register CheckerboardMaterial plugin
 		app.add_plugins(
 			bevy::pbr::MaterialPlugin::<checkerboard_material::CheckerboardMaterial>::default(),
@@ -50,10 +51,10 @@ impl Plugin for ObjectsPlugin {
 					camera::camera_controller,
 					ground::update_checker_size,
 					ui::update_coordinate_display,
-					render_items::<TreeRenderItem, EdgeMaterial>,
-					fetch_meshes::<MeshHandle<SimpleTrunkSegment>, EdgeMaterial>,
-					tree::tree_playground::<EdgeMaterial>
-						.run_if(resource_exists::<tree::TreeMaterial<EdgeMaterial>>)
+					render_items::<TreeRenderItem, LeafMaterial>,
+					fetch_meshes::<MeshHandle<SimpleTrunkSegment>, LeafMaterial>,
+					tree::tree_playground::<LeafMaterial>
+						.run_if(resource_exists::<tree::TreeMaterial<LeafMaterial>>)
 						.run_if(run_once),
 				),
 			);
