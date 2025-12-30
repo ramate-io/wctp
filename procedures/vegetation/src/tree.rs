@@ -3,7 +3,7 @@ pub mod meshes;
 use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;
 use meshes::{
-	canopy::branch::BranchBuilder,
+	canopy::{ball::NoisyBall, branch::BranchBuilder},
 	trunk::segment::{SegmentConfig, SimpleTrunkSegment},
 };
 use render_item::{
@@ -14,11 +14,12 @@ use render_item::{
 #[derive(Component, Clone)]
 pub struct TreeRenderItem {
 	tree_cache: HandleMap<SimpleTrunkSegment>,
+	leaf_cache: HandleMap<NoisyBall>,
 }
 
 impl TreeRenderItem {
 	pub fn new() -> Self {
-		Self { tree_cache: HandleMap::new() }
+		Self { tree_cache: HandleMap::new(), leaf_cache: HandleMap::new() }
 	}
 
 	pub fn with_tree_cache(mut self, tree_cache: HandleMap<SimpleTrunkSegment>) -> Self {
@@ -150,6 +151,16 @@ impl TreeRenderItem {
 				MeshMaterial3d(material.0.clone()),
 			));
 		}
+
+		for node in branch.nodes() {
+			self.spawn_leaf_ball(
+				commands,
+				cascade_chunk,
+				transform,
+				material.clone(),
+				node.position,
+			);
+		}
 	}
 
 	pub fn spawn_radial_branches<M: Material>(
@@ -166,6 +177,15 @@ impl TreeRenderItem {
 				Vec3::new(angle.cos(), angle.sin() + angle.cos(), angle.sin()).normalize();
 			self.spawn_branch(commands, cascade_chunk, transform, material.clone(), initial_ray);
 		}
+	}
+
+	pub fn spawn_leaf_ball<M: Material>(
+		&self,
+		commands: &mut Commands,
+		cascade_chunk: &CascadeChunk,
+		transform: Transform,
+		material: MeshMaterial3d<M>,
+	) {
 	}
 }
 
