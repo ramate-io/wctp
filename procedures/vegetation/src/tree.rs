@@ -26,6 +26,11 @@ impl TreeRenderItem {
 		self
 	}
 
+	pub fn centroid_anchor(&self, transform: Transform) -> Vec3 {
+		let pivot_offset = Vec3::new(0.5, 0.0, 0.5);
+		transform.translation - transform.rotation * (pivot_offset * Vec3::new(0.01, 0.01, 0.01));
+	}
+
 	pub fn spawn_trunk<M: Material>(
 		&self,
 		commands: &mut Commands,
@@ -37,9 +42,7 @@ impl TreeRenderItem {
 		let tree_segment = SimpleTrunkSegment::new(SegmentConfig::default());
 		let mesh_handle = MeshHandle::new(tree_segment).with_handle_cache(self.tree_cache.clone());
 
-		let pivot_offset = Vec3::new(0.5, 0.0, 0.5);
-		let centroid_anchor = transform.translation
-			- transform.rotation * (pivot_offset * Vec3::new(0.01, 0.01, 0.01));
+		let centroid_anchor = self.centroid_anchor(transform);
 
 		commands.spawn((
 			CascadeChunk::unit_center_chunk().with_res_2(3),
@@ -76,6 +79,7 @@ impl TreeRenderItem {
 		cascade_chunk: &CascadeChunk,
 		transform: Transform,
 		material: MeshMaterial3d<M>,
+		initial_ray: Vec3,
 	) {
 		let mut branch_builder = BranchBuilder::common_tree_builder();
 
@@ -84,11 +88,11 @@ impl TreeRenderItem {
 		branch_builder.splitting_coefficient = 0.55;
 
 		// anchor is on the ring of the trunk
-		branch_builder.anchor = transform.translation + Vec3::new(0.0, 0.005, 0.005);
+		branch_builder.anchor = self.centroid_anchor(transform);
 
 		// initial ray is sticking out to the side
-		branch_builder.initial_ray = Vec3::new(0.0, 1.0, 1.0);
-		branch_builder.bias_ray = Vec3::new(0.0, 1.0, 1.0);
+		branch_builder.initial_ray = initial_ray;
+		branch_builder.bias_ray = initial_ray;
 		branch_builder.bias_amount = 0.2;
 
 		// min segment length is 0.002
@@ -145,6 +149,22 @@ impl TreeRenderItem {
 			));
 		}
 	}
+
+	pub fn spawn_radial_branches<M: Material>(
+		&self,
+		commands: &mut Commands,
+		cascade_chunk: &CascadeChunk,
+		transform: Transform,
+		material: MeshMaterial3d<M>,
+		branch_count: usize,
+	) {
+		for i in 0..branch_count {
+			let initial_ray = Vec3::new(0.0, 1.0, 1.0).with_rotation(Quat::from_rotation_y(
+				i as f32 * 2.0 * std::f32::consts::PI / branch_count as f32,
+			));
+			self.spawn_branch(commands, cascade_chunk, transform, material, initial_ray);
+		}
+	}
 }
 
 impl RenderItem for TreeRenderItem {
@@ -157,7 +177,7 @@ impl RenderItem for TreeRenderItem {
 	) -> Vec<Entity> {
 		self.spawn_trunk(commands, cascade_chunk, transform, material.clone());
 
-		self.spawn_branch(commands, cascade_chunk, transform, material);
+		self.spawn_radial_branches(commands, cascade_chunk, transform, material, 10);
 
 		vec![]
 	}
