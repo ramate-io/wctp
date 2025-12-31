@@ -27,7 +27,11 @@ pub fn setup_tree_edge_material(
 	commands.insert_resource(TreeMaterial(leaf_material_handle));
 }
 
-pub fn tree_playground<M: Material>(mut commands: Commands, material: Res<TreeMaterial<M>>) {
+pub fn tree_playground<T: Material, L: Material>(
+	mut commands: Commands,
+	trunk_material: Res<TreeMaterial<T>>,
+	leaf_material: Res<TreeMaterial<L>>,
+) {
 	log::info!("Spawning tree playground");
 
 	let tree_cache = HandleMap::<SimpleTrunkSegment>::new();
@@ -40,7 +44,8 @@ pub fn tree_playground<M: Material>(mut commands: Commands, material: Res<TreeMa
 			tree(
 				&mut commands,
 				Vec3::new(x as f32 * 0.02, 0.0, z as f32 * 0.02),
-				&material,
+				&trunk_material,
+				&leaf_material,
 				tree_cache.clone(),
 				leaf_cache.clone(),
 			);
@@ -48,21 +53,24 @@ pub fn tree_playground<M: Material>(mut commands: Commands, material: Res<TreeMa
 	}
 }
 
-pub fn tree<M: Material>(
+pub fn tree<T: Material, L: Material>(
 	commands: &mut Commands,
 	origin: Vec3,
-	material: &Res<TreeMaterial<M>>,
+	trunk_material: &Res<TreeMaterial<T>>,
+	leaf_material: &Res<TreeMaterial<L>>,
 	tree_cache: HandleMap<SimpleTrunkSegment>,
 	leaf_cache: HandleMap<NoisyBall>,
 ) {
 	commands.spawn((
 		CascadeChunk::unit_center_chunk().with_res_2(3),
 		DispatchRenderItem::new(
-			TreeRenderItem::new()
-				.with_tree_cache(tree_cache.clone())
-				.with_leaf_cache(leaf_cache.clone()),
+			TreeRenderItem::new(
+				MeshMaterial3d(trunk_material.0.clone()),
+				MeshMaterial3d(leaf_material.0.clone()),
+			)
+			.with_tree_cache(tree_cache.clone())
+			.with_leaf_cache(leaf_cache.clone()),
 		),
 		Transform::from_translation(origin),
-		MeshMaterial3d(material.0.clone()),
 	));
 }

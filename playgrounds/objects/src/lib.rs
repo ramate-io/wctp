@@ -54,10 +54,10 @@ impl Plugin for ObjectsPlugin {
 					camera::camera_controller,
 					ground::update_checker_size,
 					ui::update_coordinate_display,
-					render_items::<TreeRenderItem, EdgeMaterial>,
+					render_items::<TreeRenderItem<EdgeMaterial, LeafMaterial>>,
 					fetch_meshes::<MeshHandle<SimpleTrunkSegment>, EdgeMaterial>,
-					fetch_meshes::<MeshHandle<NoisyBall>, EdgeMaterial>,
-					tree::tree_playground::<EdgeMaterial>
+					fetch_meshes::<MeshHandle<NoisyBall>, LeafMaterial>,
+					tree::tree_playground::<EdgeMaterial, LeafMaterial>
 						.run_if(resource_exists::<tree::TreeMaterial<EdgeMaterial>>)
 						.run_if(run_once),
 				),

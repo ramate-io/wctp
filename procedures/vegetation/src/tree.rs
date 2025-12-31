@@ -15,14 +15,21 @@ use render_item::{
 };
 
 #[derive(Component, Clone)]
-pub struct TreeRenderItem {
+pub struct TreeRenderItem<T: Material, L: Material> {
 	tree_cache: HandleMap<SimpleTrunkSegment>,
+	trunk_material: MeshMaterial3d<T>,
 	leaf_cache: HandleMap<NoisyBall>,
+	leaf_material: MeshMaterial3d<L>,
 }
 
-impl TreeRenderItem {
-	pub fn new() -> Self {
-		Self { tree_cache: HandleMap::new(), leaf_cache: HandleMap::new() }
+impl<T: Material, L: Material> TreeRenderItem<T, L> {
+	pub fn new(trunk_material: MeshMaterial3d<T>, leaf_material: MeshMaterial3d<L>) -> Self {
+		Self {
+			tree_cache: HandleMap::new(),
+			trunk_material,
+			leaf_cache: HandleMap::new(),
+			leaf_material,
+		}
 	}
 
 	pub fn with_tree_cache(mut self, tree_cache: HandleMap<SimpleTrunkSegment>) -> Self {
@@ -40,12 +47,12 @@ impl TreeRenderItem {
 		transform.translation - transform.rotation * (pivot_offset * Vec3::new(0.01, 0.01, 0.01))
 	}
 
-	pub fn spawn_trunk<M: Material>(
+	pub fn spawn_trunk(
 		&self,
 		commands: &mut Commands,
 		cascade_chunk: &CascadeChunk,
 		transform: Transform,
-		material: MeshMaterial3d<M>,
+		material: MeshMaterial3d<T>,
 	) {
 		// Build tree segment dispatch
 		let tree_segment = SimpleTrunkSegment::new(SegmentConfig::default());
@@ -82,12 +89,11 @@ impl TreeRenderItem {
 		));
 	}
 
-	pub fn spawn_branch<M: Material>(
+	pub fn spawn_branch(
 		&self,
 		commands: &mut Commands,
 		cascade_chunk: &CascadeChunk,
 		transform: Transform,
-		material: MeshMaterial3d<M>,
 		initial_ray: Vec3,
 	) {
 		let mut branch_builder = BranchBuilder::common_tree_builder();
@@ -156,36 +162,34 @@ impl TreeRenderItem {
 				cascade_chunk.clone(),
 				MeshDispatch::new(mesh_handle.clone()),
 				transform,
-				MeshMaterial3d(material.0.clone()),
+				MeshMaterial3d(self.trunk_material.0.clone()),
 			));
 		}
 
 		for node in branch.nodes() {
-			self.spawn_leaf_ball(commands, cascade_chunk, material.clone(), node.position);
+			self.spawn_leaf_ball(commands, cascade_chunk, node.position);
 		}
 	}
 
-	pub fn spawn_radial_branches<M: Material>(
+	pub fn spawn_radial_branches(
 		&self,
 		commands: &mut Commands,
 		cascade_chunk: &CascadeChunk,
 		transform: Transform,
-		material: MeshMaterial3d<M>,
 		branch_count: usize,
 	) {
 		for i in 0..branch_count {
 			let angle = i as f32 * 2.0 * std::f32::consts::PI / branch_count as f32;
 			let initial_ray =
 				Vec3::new(angle.cos(), angle.sin() + angle.cos(), angle.sin()).normalize();
-			self.spawn_branch(commands, cascade_chunk, transform, material.clone(), initial_ray);
+			self.spawn_branch(commands, cascade_chunk, transform, initial_ray);
 		}
 	}
 
-	pub fn spawn_leaf_ball<M: Material>(
+	pub fn spawn_leaf_ball(
 		&self,
 		commands: &mut Commands,
 		cascade_chunk: &CascadeChunk,
-		material: MeshMaterial3d<M>,
 		position: Vec3,
 	) {
 		// Build noisy ball mesh dispatch
@@ -203,22 +207,21 @@ impl TreeRenderItem {
 			cascade_chunk.clone(),
 			MeshDispatch::new(mesh_handle),
 			ball_transform,
-			MeshMaterial3d(material.0.clone()),
+			MeshMaterial3d(self.leaf_material.0.clone()),
 		));
 	}
 }
 
-impl RenderItem for TreeRenderItem {
-	fn spawn_render_items<M: Material>(
+impl<T: Material, L: Material> RenderItem for TreeRenderItem<T, L> {
+	fn spawn_render_items(
 		&self,
 		commands: &mut Commands,
 		cascade_chunk: &CascadeChunk,
 		transform: Transform,
-		material: MeshMaterial3d<M>,
 	) -> Vec<Entity> {
-		self.spawn_trunk(commands, cascade_chunk, transform, material.clone());
+		self.spawn_trunk(commands, cascade_chunk, transform, self.trunk_material.clone());
 
-		self.spawn_radial_branches(commands, cascade_chunk, transform, material, 10);
+		self.spawn_radial_branches(commands, cascade_chunk, transform, 10);
 
 		vec![]
 	}
