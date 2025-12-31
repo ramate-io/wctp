@@ -110,7 +110,7 @@ fn fragment(
     let noise_value = fractal_noise(mesh.uv * noise_scale);
     
     // Threshold: above = visible, below = transparent
-    let threshold = 0.45;
+    let threshold = 0.55;
     
     // If noise is above threshold, visible, otherwise transparent
     let alpha = step(threshold, noise_value);

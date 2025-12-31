@@ -20,8 +20,9 @@ pub fn setup_tree_edge_material(
 		base_color: Vec4::new(0.89, 0.886, 0.604, 1.0),
 	});
 
+	// green color
 	let leaf_material_handle =
-		leaf_materials.add(LeafMaterial { base_color: Vec4::new(0.89, 0.886, 0.604, 1.0) });
+		leaf_materials.add(LeafMaterial { base_color: Vec4::new(0.2, 0.8, 0.3, 1.0) });
 
 	commands.insert_resource(TreeMaterial(material_handle));
 	commands.insert_resource(TreeMaterial(leaf_material_handle));
