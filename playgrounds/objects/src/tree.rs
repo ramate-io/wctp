@@ -39,12 +39,12 @@ pub fn tree_playground<T: Material, L: Material>(
 	let leaf_cache = HandleMap::<NoisyBall>::new();
 
 	// grid out some trees
-	const N: i32 = 0;
+	const N: i32 = 4;
 	for x in -N..=N {
 		for z in -N..=N {
 			tree(
 				&mut commands,
-				Vec3::new(x as f32 * 0.02, 0.0, z as f32 * 0.02),
+				Vec3::new(x as f32 * 0.004, 0.0, z as f32 * 0.004),
 				&trunk_material,
 				&leaf_material,
 				tree_cache.clone(),

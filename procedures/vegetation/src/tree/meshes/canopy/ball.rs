@@ -147,27 +147,36 @@ impl MeshBuilder for NoisyBall {
 				ShapeType::Triangle => generate_unit_triangle(size),
 			};
 
-			// Apply noise to edge vertices (not center vertex for discs)
-			let center_vertex_index =
-				if matches!(shape_types[i], ShapeType::Disk) { 0 } else { usize::MAX };
-			for (idx, vertex) in plane_vertices.iter_mut().enumerate() {
-				if idx != center_vertex_index {
-					// This is an edge vertex, apply noise
-					let noise_x = self.noise.get([
-						vertex[0] as f64 * edge_noise_frequency as f64,
-						vertex[1] as f64 * edge_noise_frequency as f64,
-						(i as f64) * 0.5, // Vary per plane
-					]) as f32;
-					let noise_y = self.noise.get([
-						vertex[0] as f64 * edge_noise_frequency as f64 + 100.0,
-						vertex[1] as f64 * edge_noise_frequency as f64 + 100.0,
-						(i as f64) * 0.5 + 50.0,
-					]) as f32;
+			// Apply noise to edge vertices (not center vertices for discs)
+			let is_disk = matches!(shape_types[i], ShapeType::Disk);
+			let back_center_index = if is_disk {
+				// For discs: front center at 0, back center at segments+2
+				Some((segments + 2) as usize)
+			} else {
+				None
+			};
 
-					// Perturb in the plane (XY plane before rotation)
-					vertex[0] += noise_x * edge_noise_amplitude;
-					vertex[1] += noise_y * edge_noise_amplitude;
+			for (idx, vertex) in plane_vertices.iter_mut().enumerate() {
+				// Skip center vertices for discs (front at 0, back at segments+2)
+				if is_disk && (idx == 0 || Some(idx) == back_center_index) {
+					continue;
 				}
+
+				// This is an edge vertex, apply noise
+				let noise_x = self.noise.get([
+					vertex[0] as f64 * edge_noise_frequency as f64,
+					vertex[1] as f64 * edge_noise_frequency as f64,
+					(i as f64) * 0.5, // Vary per plane
+				]) as f32;
+				let noise_y = self.noise.get([
+					vertex[0] as f64 * edge_noise_frequency as f64 + 100.0,
+					vertex[1] as f64 * edge_noise_frequency as f64 + 100.0,
+					(i as f64) * 0.5 + 50.0,
+				]) as f32;
+
+				// Perturb in the plane (XY plane before rotation)
+				vertex[0] += noise_x * edge_noise_amplitude;
+				vertex[1] += noise_y * edge_noise_amplitude;
 			}
 
 			// Transform plane to the appropriate orientation

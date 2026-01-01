@@ -44,7 +44,7 @@ impl<T: Material, L: Material> TreeRenderItem<T, L> {
 
 	pub fn centroid_anchor(&self, transform: Transform) -> Vec3 {
 		let pivot_offset = Vec3::new(0.5, 0.0, 0.5);
-		transform.translation - transform.rotation * (pivot_offset * Vec3::new(0.01, 0.01, 0.01))
+		transform.translation - transform.rotation * (pivot_offset * Vec3::new(0.001, 0.001, 0.001))
 	}
 
 	pub fn spawn_trunk(
@@ -64,15 +64,15 @@ impl<T: Material, L: Material> TreeRenderItem<T, L> {
 			CascadeChunk::unit_center_chunk().with_res_2(3),
 			MeshDispatch::new(mesh_handle.clone()),
 			Transform::from_translation(centroid_anchor + Vec3::new(0.0, 0.0, 0.0))
-				.with_scale(Vec3::new(0.01, 0.01, 0.01)),
+				.with_scale(Vec3::new(0.001, 0.001, 0.001)),
 			MeshMaterial3d(material.0.clone()),
 		));
 
 		commands.spawn((
 			CascadeChunk::unit_chunk().with_res_2(3),
 			MeshDispatch::new(mesh_handle.clone()),
-			Transform::from_translation(centroid_anchor + Vec3::new(0.003, 0.005, 0.004))
-				.with_scale(Vec3::new(0.005, 0.005, 0.005))
+			Transform::from_translation(centroid_anchor + Vec3::new(0.0003, 0.0005, 0.0004))
+				.with_scale(Vec3::new(0.0005, 0.0005, 0.0005))
 				.with_rotation(Quat::from_rotation_arc(
 					Vec3::new(1.0, 1.0, 1.0).normalize(),
 					Vec3::Y,
@@ -83,8 +83,8 @@ impl<T: Material, L: Material> TreeRenderItem<T, L> {
 		commands.spawn((
 			cascade_chunk.clone(),
 			MeshDispatch::new(mesh_handle.clone()),
-			Transform::from_translation(centroid_anchor + Vec3::new(0.0005, 0.0, 0.0005))
-				.with_scale(Vec3::new(0.009, 0.02, 0.009)),
+			Transform::from_translation(centroid_anchor)
+				.with_scale(Vec3::new(0.0009, 0.002, 0.0009)),
 			MeshMaterial3d(material.0.clone()),
 		));
 	}
@@ -104,24 +104,24 @@ impl<T: Material, L: Material> TreeRenderItem<T, L> {
 		branch_builder.depth = 4;
 
 		// anchor is on the ring of the trunk
-		branch_builder.anchor = transform.translation + Vec3::new(0.0, 0.015, 0.0);
+		branch_builder.anchor = transform.translation + Vec3::new(0.0, 0.0015, 0.0);
 
 		// initial ray is sticking out to the side
 		branch_builder.initial_ray = initial_ray;
 		branch_builder.bias_ray = initial_ray + Vec3::new(0.0, 0.01, 0.0);
-		branch_builder.bias_amount = 0.5;
+		branch_builder.bias_amount = 0.0;
 
 		// min segment length is 0.002
-		branch_builder.min_segment_length = 0.002;
+		branch_builder.min_segment_length = 0.0002;
 
 		// max segment length is 0.004
-		branch_builder.max_segment_length = 0.01;
+		branch_builder.max_segment_length = 0.001;
 
 		// min radius is 0.002
-		branch_builder.min_radius = 0.001;
+		branch_builder.min_radius = 0.0001;
 
 		// max radius is 0.004
-		branch_builder.max_radius = 0.002;
+		branch_builder.max_radius = 0.0002;
 
 		branch_builder.initial_radius = branch_builder.max_radius;
 
@@ -198,7 +198,7 @@ impl<T: Material, L: Material> TreeRenderItem<T, L> {
 
 		// Spawn at the node position with appropriate scale
 		let pivot_offset = Vec3::new(0.5, 0.5, 0.5);
-		let scale = Vec3::splat(0.005);
+		let scale = Vec3::splat(0.0005);
 		let _translation = position - pivot_offset * scale;
 
 		// spawn one on the point
