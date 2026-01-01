@@ -198,10 +198,10 @@ impl<T: Material, L: Material> TreeRenderItem<T, L> {
 
 		// Spawn at the node position with appropriate scale
 		let pivot_offset = Vec3::new(0.5, 0.5, 0.5);
-		let scale = Vec3::splat(0.01);
-		let translation = position - pivot_offset * scale;
+		let scale = Vec3::splat(0.005);
+		let _translation = position - pivot_offset * scale;
 
-		let ball_transform = Transform::from_translation(translation).with_scale(scale); // Scale for leaf ball size
+		let ball_transform = Transform::from_translation(position).with_scale(scale); // Scale for leaf ball size
 
 		commands.spawn((
 			cascade_chunk.clone(),
