@@ -4,6 +4,7 @@
 // This shader creates a stylized, abstract leaf appearance
 // suitable for balls of intersecting planes. It uses UV-based
 // alpha shaping to create leaf silhouettes from simple planes.
+// Uses normal bending to fake volume on flat discs.
 // Uses simple directional lighting with rim lighting.
 //---------------------------------------------------------
 
@@ -110,7 +111,7 @@ fn fragment(
     let noise_value = fractal_noise(mesh.uv * noise_scale);
     
     // Threshold: above = visible, below = transparent
-    let threshold = 0.55;
+    let threshold = 0.50;
     
     // If noise is above threshold, visible, otherwise transparent
     let alpha = step(threshold, noise_value);
@@ -122,7 +123,61 @@ fn fragment(
 
 
     //-----------------------------------------------------
-    // 2. Build PBR input (same way StandardMaterial does)
+    // 2. Normal bending (fake leaf volume)
+    //-----------------------------------------------------
+    // Compute fake spherical normal from center of disc outward
+    // This makes flat discs appear to have volume through lighting
+    
+    // Get position relative to disc center (UV center is 0.5, 0.5)
+    let uv_center = vec2<f32>(0.5, 0.5);
+    let offset_from_center = (mesh.uv - uv_center) * 2.0; // Maps to [-1, 1] range
+    let dist_from_center = length(offset_from_center);
+    
+    // Clamp distance to prevent issues at edges
+    let clamped_dist = min(dist_from_center, 0.99);
+    
+    // Compute fake spherical normal in local space (disc plane is XY, normal is Z)
+    // For a hemisphere, Z component is sqrt(1 - r^2) where r is distance from center
+    let z_component = sqrt(1.0 - clamped_dist * clamped_dist);
+    let fake_normal_local = normalize(vec3<f32>(
+        offset_from_center.x,
+        offset_from_center.y,
+        z_component * select(-1.0, 1.0, is_front) // Flip based on front/back
+    ));
+    
+    // Transform fake normal to world space
+    // We need to construct a basis from the real normal
+    let real_normal = normalize(mesh.world_normal);
+    
+    // Create tangent and bitangent vectors for the disc plane
+    // Use a stable method: pick an arbitrary vector not parallel to normal
+    var tangent_candidate = vec3<f32>(1.0, 0.0, 0.0);
+    if (abs(real_normal.x) > 0.9) {
+        tangent_candidate = vec3<f32>(0.0, 1.0, 0.0);
+    }
+    let tangent = normalize(tangent_candidate);
+    
+    // Build orthonormal basis: normal, tangent, bitangent
+    let bitangent = normalize(cross(real_normal, tangent));
+    let corrected_tangent = normalize(cross(bitangent, real_normal));
+    
+    // Transform fake normal from local space (XY plane) to world space
+    // Local X -> tangent, Local Y -> bitangent, Local Z -> normal
+    let fake_normal_world = normalize(
+        fake_normal_local.x * corrected_tangent +
+        fake_normal_local.y * bitangent +
+        fake_normal_local.z * real_normal
+    );
+    
+    // Blend between real normal and fake normal
+    // Use distance from center to control blend - more bending at edges
+    let bend_amount = 0.7; // Control strength of normal bending (0.0 = flat, 1.0 = fully spherical)
+    let blend_factor = dist_from_center * bend_amount; // More bending at edges
+    let blended_normal = normalize(mix(real_normal, fake_normal_world, blend_factor));
+
+
+    //-----------------------------------------------------
+    // 3. Build PBR input (same way StandardMaterial does)
     //-----------------------------------------------------
     var pbr_input: PbrInput = pbr_input_new();
 
@@ -135,7 +190,7 @@ fn fragment(
     pbr_input.frag_coord = mesh.position;
     pbr_input.world_position = mesh.world_position;
     pbr_input.world_normal = fns::prepare_world_normal(
-        mesh.world_normal,
+        blended_normal, // Use blended normal instead of real normal
         double_sided,
         is_front,
     );
@@ -145,13 +200,13 @@ fn fragment(
 
 
     //-----------------------------------------------------
-    // 3. Compute PBR lighting (includes shadows)
+    // 4. Compute PBR lighting (includes shadows)
     //-----------------------------------------------------
     let lit_color = fns::apply_pbr_lighting(pbr_input);
 
 
     //-----------------------------------------------------
-    // 4. Apply alpha and output
+    // 5. Apply alpha and output
     //-----------------------------------------------------
     let output_color = vec4<f32>(lit_color.rgb, base_color.a * alpha);
 
