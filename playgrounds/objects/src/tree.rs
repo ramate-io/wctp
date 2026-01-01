@@ -44,7 +44,7 @@ pub fn tree_playground<T: Material, L: Material>(
 		for z in -N..=N {
 			tree(
 				&mut commands,
-				Vec3::new(x as f32 * 0.004, 0.0, z as f32 * 0.004),
+				Vec3::new(x as f32 * 4.0, 0.0, z as f32 * 4.0),
 				&trunk_material,
 				&leaf_material,
 				tree_cache.clone(),

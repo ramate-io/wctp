@@ -24,7 +24,7 @@ pub fn setup_camera(mut commands: Commands) {
 		Transform::from_xyz(camera_pos.x, camera_pos.y, camera_pos.z).looking_at(look_at, Vec3::Y),
 		Projection::Perspective(PerspectiveProjection {
 			near: 0.0001, // 10 cm
-			far: 2000.0,  // 2000 km
+			far: 2.0,     // 2000 km
 			..default()
 		}),
 		CameraController {
