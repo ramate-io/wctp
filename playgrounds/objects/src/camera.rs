@@ -51,8 +51,8 @@ pub fn setup_camera(mut commands: Commands) {
 		Camera3d::default(),
 		transform,
 		Projection::Perspective(PerspectiveProjection {
-			near: 0.1, // 10 cm
-			far: 2.0,  // 2 m
+			near: 0.1,   // 10 cm
+			far: 2000.0, // 2 m
 			..default()
 		}),
 		CameraController {

@@ -16,6 +16,6 @@ impl Material for LeafMaterial {
 	// Enable alpha blending for transparency
 	// This allows the leaf shape alpha to create see-through areas
 	fn alpha_mode(&self) -> AlphaMode {
-		AlphaMode::Blend
+		AlphaMode::AlphaToCoverage
 	}
 }
