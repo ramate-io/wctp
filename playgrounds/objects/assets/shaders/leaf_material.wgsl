@@ -73,7 +73,6 @@ fn fractal_noise(p: vec2<f32>) -> f32 {
 //---------------------------------------------------------
 @fragment
 fn fragment(
-    @builtin(front_facing) is_front: bool,
     mesh: VertexOutput
 ) -> @location(0) vec4<f32> {
 
@@ -81,9 +80,6 @@ fn fragment(
     // UV handling (mirror on back face)
     //-----------------------------------------------------
     var uv = mesh.uv;
-    if (!is_front) {
-        uv.x = 1.0 - uv.x;
-    }
 
     //-----------------------------------------------------
     // Leaf alpha from noise (soft threshold)
@@ -124,7 +120,8 @@ fn fragment(
 
     let bend_strength = 0.7;
     let bend = smoothstep(0.0, 1.0, r) * bend_strength;
-    let final_normal = normalize(mix(N, fake_world, bend));
+    let safe_bend = min(bend, 0.05);
+    let final_normal = normalize(mix(N, fake_world, safe_bend));
 
     //-----------------------------------------------------
     // PBR setup
@@ -135,14 +132,11 @@ fn fragment(
     pbr.frag_coord = mesh.position;
     pbr.world_position = mesh.world_position;
 
-    let double_sided =
-        (pbr.material.flags & STANDARD_MATERIAL_FLAGS_DOUBLE_SIDED_BIT) != 0u;
-
-    pbr.world_normal = fns::prepare_world_normal(
-        final_normal,
-        double_sided,
-        is_front,
-    );
+    /*pbr.world_normal = fns::prepare_world_normal(
+        fake_world,
+        false,
+        true
+    );*/
 
     pbr.N = normalize(pbr.world_normal);
     pbr.is_orthographic = view.clip_from_view[3].w == 1.0;
