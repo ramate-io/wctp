@@ -1,4 +1,4 @@
-mod scratchpad;
+pub mod scratchpad;
 
 use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;

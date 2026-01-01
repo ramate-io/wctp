@@ -178,11 +178,10 @@ impl BranchBuilder {
 					let child_node = BranchNode::new(child_position, child_radius);
 
 					// add the child to the branch and queue it for processing
+					branch.add_node(child_node.clone());
 					branch.add_child(node.clone(), child_node.clone());
 					next_queue.push_back((child_node.clone(), child_ray));
 				}
-				// if we still haven't added the node, add it
-				branch.add_node(node);
 			}
 			// swap the queues
 			queue = next_queue;

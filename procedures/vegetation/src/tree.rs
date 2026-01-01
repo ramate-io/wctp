@@ -201,14 +201,36 @@ impl<T: Material, L: Material> TreeRenderItem<T, L> {
 		let scale = Vec3::splat(0.005);
 		let _translation = position - pivot_offset * scale;
 
+		// spawn one on the point
 		let ball_transform = Transform::from_translation(position).with_scale(scale); // Scale for leaf ball size
-
 		commands.spawn((
 			cascade_chunk.clone(),
-			MeshDispatch::new(mesh_handle),
+			MeshDispatch::new(mesh_handle.clone()),
 			ball_transform,
 			MeshMaterial3d(self.leaf_material.0.clone()),
 		));
+
+		// spawn another slightly maller and offset slightly
+		/*let ball_transform = Transform::from_translation(position + Vec3::new(0.001, 0.001, 0.001))
+			.with_scale(scale)
+			.with_rotation(Quat::from_rotation_arc(Vec3::new(1.0, 1.0, 1.0).normalize(), Vec3::Y));
+		commands.spawn((
+			cascade_chunk.clone(),
+			MeshDispatch::new(mesh_handle.clone()),
+			ball_transform,
+			MeshMaterial3d(self.leaf_material.0.clone()),
+		));
+
+		// spawn another slightly larger and offset slightly
+		let ball_transform = Transform::from_translation(position + Vec3::new(0.002, 0.002, 0.002))
+			.with_scale(scale)
+			.with_rotation(Quat::from_rotation_arc(Vec3::new(1.0, 1.0, 1.0).normalize(), Vec3::Y));
+		commands.spawn((
+			cascade_chunk.clone(),
+			MeshDispatch::new(mesh_handle.clone()),
+			ball_transform,
+			MeshMaterial3d(self.leaf_material.0.clone()),
+		));*/
 	}
 }
 
