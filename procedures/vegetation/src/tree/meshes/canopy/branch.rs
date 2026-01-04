@@ -48,15 +48,15 @@ impl BranchBuilder {
 			anchor: Vec3::ZERO,
 			initial_ray: Vec3::ZERO,
 			bias_ray: Vec3::ZERO,
-			bias_amount: 0.0,
+			bias_amount: 0.2,
 			// 8 degrees of angle tolerance
-			angle_tolerance: 5.0,
+			angle_tolerance: 2.0,
 			initial_radius: 0.0,
 			min_radius: 0.0,
 			max_radius: 0.0,
-			depth: 6,
-			// 80% of the time the node will not split
-			splitting_coefficient: 0.8,
+			depth: 4,
+			// 60% of the time the node will not split
+			splitting_coefficient: 0.6,
 			min_segment_length: 0.0,
 			max_segment_length: 0.0,
 			noise_scale: 1000.0,
