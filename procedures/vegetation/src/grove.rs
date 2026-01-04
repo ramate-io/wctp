@@ -16,7 +16,7 @@ pub struct NoiseConfig {
 
 impl Default for NoiseConfig {
 	fn default() -> Self {
-		Self { scale: 10.0, noise: Perlin::new(42) }
+		Self { scale: 0.1, noise: Perlin::new(42) }
 	}
 }
 
@@ -31,7 +31,6 @@ impl NoiseConfig {
 
 	pub fn get_on_unit_interval(&self, position: Vec3) -> f32 {
 		let noise = self.get(position);
-		log::info!("Noise: {:?}", noise);
 		noise * 0.5 + 0.5
 	}
 }
@@ -76,7 +75,6 @@ impl<T: Material, L: Material> GroveBuilder<T, L> {
 
 	pub fn meets_threshold(&self, position: Vec3) -> bool {
 		let noise = self.noise_config.get_on_unit_interval(position);
-		log::info!("Noise: {:?}", noise);
 		noise > self.threshold
 	}
 
@@ -98,10 +96,7 @@ impl<T: Material, L: Material> GroveBuilder<T, L> {
 						self.inner_noise(pre_position),
 					);
 
-				log::info!("Position: {:?}", position);
-
 				if self.meets_threshold(position) {
-					log::info!("Meets threshold");
 					let tree = TreeRenderItem::new(
 						self.trunk_material.clone(),
 						self.leaf_material.clone(),

@@ -3,7 +3,7 @@ use chunk::cascade::CascadeChunk;
 use engine::shaders::{leaf_material::LeafMaterial, outline::EdgeMaterial};
 use render_item::{mesh::cache::handle::map::HandleMap, DispatchRenderItem};
 use vegetation_sdf::{
-	grove::{Grove, GroveBuilder},
+	grove::GroveBuilder,
 	tree::{
 		meshes::{canopy::ball::NoisyBall, trunk::segment::SimpleTrunkSegment},
 		TreeRenderItem,
@@ -49,7 +49,11 @@ pub fn tree_playground<T: Material, L: Material>(
 	.with_leaf_cache(leaf_cache);
 	let grove = grove_builder.build();
 
-	commands.spawn(grove);
+	commands.spawn((
+		CascadeChunk::unit_center_chunk().with_res_2(3),
+		DispatchRenderItem::new(grove),
+		Transform::from_translation(Vec3::ZERO),
+	));
 }
 
 pub fn square_tree_playground<T: Material, L: Material>(

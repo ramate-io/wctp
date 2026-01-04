@@ -185,7 +185,6 @@ impl<T: Material, L: Material> TreeRenderItem<T, L> {
 			let mesh_handle =
 				MeshHandle::new(tree_segment).with_handle_cache(self.tree_cache.clone());
 
-			log::info!("Segment: {:?}", segment);
 			let ray = segment.ray();
 			let direction = ray.clone().normalize();
 			let length = ray.length();
@@ -208,8 +207,6 @@ impl<T: Material, L: Material> TreeRenderItem<T, L> {
 				rotation,
 				scale,
 			};
-
-			log::info!("Transform: {:?}", transform);
 
 			commands.spawn((
 				cascade_chunk.clone(),
