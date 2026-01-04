@@ -7,12 +7,11 @@ use chunk::cascade::CascadeChunk;
 
 /// Used for logical items that can will spawn their constituens into the world.
 pub trait RenderItem: Clone {
-	fn spawn_render_items<M: Material>(
+	fn spawn_render_items(
 		&self,
 		commands: &mut Commands,
 		cascade_chunk: &CascadeChunk,
 		transform: Transform,
-		material: MeshMaterial3d<M>,
 	) -> Vec<Entity>;
 }
 
@@ -28,14 +27,13 @@ impl<T: RenderItem> DispatchRenderItem<T> {
 		Self { item }
 	}
 
-	pub fn spawn_render_items<M: Material>(
+	pub fn spawn_render_items(
 		&self,
 		commands: &mut Commands,
 		cascade_chunk: &CascadeChunk,
 		transform: Transform,
-		material: MeshMaterial3d<M>,
 	) -> Vec<Entity> {
-		self.item.spawn_render_items(commands, cascade_chunk, transform, material)
+		self.item.spawn_render_items(commands, cascade_chunk, transform)
 	}
 }
 
@@ -45,15 +43,15 @@ impl<T: RenderItem> DispatchRenderItem<T> {
 /// Rather, when a render item is dispatched, this begins the process of rendering said item.
 ///
 /// TODO: this needs to be made event-based.
-pub fn render_items<T: RenderItem + Send + Sync + 'static, M: Material>(
+pub fn render_items<T: RenderItem + Send + Sync + 'static>(
 	mut commands: Commands,
 	query: Query<
-		(Entity, &DispatchRenderItem<T>, &CascadeChunk, &Transform, &MeshMaterial3d<M>),
+		(Entity, &DispatchRenderItem<T>, &CascadeChunk, &Transform),
 		Added<DispatchRenderItem<T>>,
 	>,
 ) {
-	for (_entity, dispatch, chunk, transform, material) in &query {
-		dispatch.spawn_render_items(&mut commands, chunk, *transform, material.clone());
+	for (_entity, dispatch, chunk, transform) in &query {
+		dispatch.spawn_render_items(&mut commands, chunk, *transform);
 	}
 }
 

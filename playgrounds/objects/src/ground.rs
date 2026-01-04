@@ -12,7 +12,7 @@ pub struct CheckerSize {
 impl Default for CheckerSize {
 	fn default() -> Self {
 		Self {
-			size_meters: 10.0, // Default: 10 meters
+			size_meters: 10.0, // Default: 1 km
 			exponent: 1,       // 10^1 = 10 meters
 		}
 	}
@@ -32,8 +32,8 @@ impl CheckerSize {
 		}
 	}
 
-	pub fn size_km(&self) -> f32 {
-		self.size_meters / 1000.0
+	pub fn size_m(&self) -> f32 {
+		self.size_meters
 	}
 }
 
@@ -47,12 +47,12 @@ pub fn setup_ground(
 	checker_size: Res<CheckerSize>,
 ) {
 	// Create a large ground plane (1km x 1km)
-	let size = 1.0; // 1km x 1km ground plane
+	let size = 1000.0; // 1km x 1km ground plane
 	let mesh = meshes.add(Plane3d::default().mesh().size(size, size));
 
 	// Create a checkered material
 	let material = materials.add(CheckerboardMaterial {
-		checker_size_km: checker_size.size_km(),
+		checker_size_m: checker_size.size_m(),
 		color1: Color::srgb(0.9, 0.9, 0.9).into(), // Light gray
 		color2: Color::srgb(0.7, 0.7, 0.7).into(), // Dark gray
 	});
@@ -89,7 +89,7 @@ pub fn update_checker_size(
 		// Update the material with new checker size
 		if let Ok(mesh_material) = ground_query.single() {
 			if let Some(material) = materials.get_mut(&mesh_material.0) {
-				material.checker_size_km = checker_size.size_km();
+				material.checker_size_m = checker_size.size_m();
 			}
 		}
 	}

@@ -15,7 +15,7 @@
 // Material uniforms
 //---------------------------------------------------------
 @group(#{MATERIAL_BIND_GROUP}) @binding(0)
-var<uniform> checker_size_km: f32;
+var<uniform> checker_size_m: f32;
 
 @group(#{MATERIAL_BIND_GROUP}) @binding(1)
 var<uniform> color1: vec4<f32>;
@@ -40,8 +40,8 @@ fn fragment(
 
     // Calculate checkerboard pattern based on world position
     let world_pos = mesh.world_position;
-    let checker_x = floor(world_pos.x / checker_size_km);
-    let checker_z = floor(world_pos.z / checker_size_km);
+    let checker_x = floor(world_pos.x / checker_size_m);
+    let checker_z = floor(world_pos.z / checker_size_m);
     let checker_sum = checker_x + checker_z;
     let checker = checker_sum - 2.0 * floor(checker_sum / 2.0);
     

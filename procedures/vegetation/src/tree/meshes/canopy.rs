@@ -1,3 +1,4 @@
+pub mod ball;
 pub mod branch;
 
 use bevy::prelude::*;
