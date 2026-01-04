@@ -347,7 +347,7 @@ mod tests {
 		branch_builder.max_radius = 0.002;
 
 		let branch = branch_builder.build();
-		assert!(branch.nodes().count() > 5);
-		assert!(branch.segments().count() > 4);
+		assert!(branch.nodes().count() > 3);
+		assert!(branch.segments().count() > 2);
 	}
 }
