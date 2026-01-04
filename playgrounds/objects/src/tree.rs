@@ -2,9 +2,12 @@ use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;
 use engine::shaders::{leaf_material::LeafMaterial, outline::EdgeMaterial};
 use render_item::{mesh::cache::handle::map::HandleMap, DispatchRenderItem};
-use vegetation_sdf::tree::{
-	meshes::{canopy::ball::NoisyBall, trunk::segment::SimpleTrunkSegment},
-	TreeRenderItem,
+use vegetation_sdf::{
+	grove::{Grove, GroveBuilder},
+	tree::{
+		meshes::{canopy::ball::NoisyBall, trunk::segment::SimpleTrunkSegment},
+		TreeRenderItem,
+	},
 };
 
 #[derive(Resource, Clone)]
@@ -29,6 +32,27 @@ pub fn setup_tree_edge_material(
 }
 
 pub fn tree_playground<T: Material, L: Material>(
+	mut commands: Commands,
+	trunk_material: Res<TreeMaterial<T>>,
+	leaf_material: Res<TreeMaterial<L>>,
+) {
+	log::info!("Spawning tree playground");
+
+	let tree_cache = HandleMap::<SimpleTrunkSegment>::new();
+	let leaf_cache = HandleMap::<NoisyBall>::new();
+
+	let grove_builder = GroveBuilder::new(
+		MeshMaterial3d(trunk_material.0.clone()),
+		MeshMaterial3d(leaf_material.0.clone()),
+	)
+	.with_tree_cache(tree_cache)
+	.with_leaf_cache(leaf_cache);
+	let grove = grove_builder.build();
+
+	commands.spawn(grove);
+}
+
+pub fn square_tree_playground<T: Material, L: Material>(
 	mut commands: Commands,
 	trunk_material: Res<TreeMaterial<T>>,
 	leaf_material: Res<TreeMaterial<L>>,

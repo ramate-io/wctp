@@ -8,8 +8,11 @@ pub mod tree;
 mod ui;
 
 use engine::shaders::{leaf_material::LeafMaterial, outline::EdgeMaterial};
-use vegetation_sdf::tree::{
-	meshes::canopy::ball::NoisyBall, meshes::trunk::segment::SimpleTrunkSegment, TreeRenderItem,
+use vegetation_sdf::{
+	grove::Grove,
+	tree::{
+		meshes::canopy::ball::NoisyBall, meshes::trunk::segment::SimpleTrunkSegment, TreeRenderItem,
+	},
 };
 
 use render_item::{
@@ -54,6 +57,7 @@ impl Plugin for ObjectsPlugin {
 					ground::update_checker_size,
 					ui::update_coordinate_display,
 					render_items::<TreeRenderItem<EdgeMaterial, LeafMaterial>>,
+					render_items::<Grove<EdgeMaterial, LeafMaterial>>,
 					fetch_meshes::<MeshHandle<SimpleTrunkSegment>, EdgeMaterial>,
 					fetch_meshes::<MeshHandle<NoisyBall>, LeafMaterial>,
 					tree::tree_playground::<EdgeMaterial, LeafMaterial>
