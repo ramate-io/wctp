@@ -48,15 +48,15 @@ impl BranchBuilder {
 			anchor: Vec3::ZERO,
 			initial_ray: Vec3::ZERO,
 			bias_ray: Vec3::ZERO,
-			bias_amount: 0.0,
+			bias_amount: 0.2,
 			// 8 degrees of angle tolerance
-			angle_tolerance: 5.0,
+			angle_tolerance: 2.0,
 			initial_radius: 0.0,
 			min_radius: 0.0,
 			max_radius: 0.0,
-			depth: 6,
-			// 80% of the time the node will not split
-			splitting_coefficient: 0.8,
+			depth: 4,
+			// 60% of the time the node will not split
+			splitting_coefficient: 0.6,
 			min_segment_length: 0.0,
 			max_segment_length: 0.0,
 			noise_scale: 1000.0,
@@ -178,11 +178,10 @@ impl BranchBuilder {
 					let child_node = BranchNode::new(child_position, child_radius);
 
 					// add the child to the branch and queue it for processing
+					branch.add_node(child_node.clone());
 					branch.add_child(node.clone(), child_node.clone());
 					next_queue.push_back((child_node.clone(), child_ray));
 				}
-				// if we still haven't added the node, add it
-				branch.add_node(node);
 			}
 			// swap the queues
 			queue = next_queue;
@@ -348,7 +347,7 @@ mod tests {
 		branch_builder.max_radius = 0.002;
 
 		let branch = branch_builder.build();
-		assert!(branch.nodes().count() > 5);
-		assert!(branch.segments().count() > 4);
+		assert!(branch.nodes().count() > 3);
+		assert!(branch.segments().count() > 2);
 	}
 }

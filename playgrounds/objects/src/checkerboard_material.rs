@@ -5,7 +5,7 @@ use bevy::{
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct CheckerboardMaterial {
 	#[uniform(0)]
-	pub checker_size_km: f32,
+	pub checker_size_m: f32,
 	#[uniform(1)]
 	pub color1: LinearRgba,
 	#[uniform(2)]
