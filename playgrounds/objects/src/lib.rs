@@ -1,23 +1,25 @@
 use bevy::prelude::*;
 use std::f32::consts::PI;
 
+pub mod buildings_playground;
 mod camera;
 mod checkerboard_material;
 mod ground;
 pub mod tree;
 mod ui;
 
+use buildings::complex::render::ComplexRenderer;
+use buildings::meshes::walls::wall::{Wall, WallMesh};
 use engine::shaders::{leaf_material::LeafMaterial, outline::EdgeMaterial};
+use render_item::{
+	mesh::{fetch_meshes, handle::MeshHandle},
+	render_items,
+};
 use vegetation_sdf::{
 	grove::Grove,
 	tree::{
 		meshes::canopy::ball::NoisyBall, meshes::trunk::segment::SimpleTrunkSegment, TreeRenderItem,
 	},
-};
-
-use render_item::{
-	mesh::{fetch_meshes, handle::MeshHandle},
-	render_items,
 };
 
 pub use camera::CameraController;
@@ -48,6 +50,7 @@ impl Plugin for ObjectsPlugin {
 					ground::setup_ground,
 					ui::setup_debug_ui,
 					tree::setup_tree_edge_material,
+					buildings_playground::setup_buildings_material,
 				),
 			)
 			.add_systems(
@@ -62,6 +65,13 @@ impl Plugin for ObjectsPlugin {
 					fetch_meshes::<MeshHandle<NoisyBall>, LeafMaterial>,
 					tree::tree_playground::<EdgeMaterial, LeafMaterial>
 						.run_if(resource_exists::<tree::TreeMaterial<EdgeMaterial>>)
+						.run_if(run_once),
+					render_items::<ComplexRenderer<Wall<EdgeMaterial>, Wall<EdgeMaterial>>>,
+					fetch_meshes::<MeshHandle<WallMesh>, EdgeMaterial>,
+					buildings_playground::building_playground::<EdgeMaterial, EdgeMaterial>
+						.run_if(
+							resource_exists::<buildings_playground::BuildingMaterial<EdgeMaterial>>,
+						)
 						.run_if(run_once),
 				),
 			);
