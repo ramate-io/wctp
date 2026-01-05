@@ -2,16 +2,29 @@ use bevy::prelude::*;
 use render_item::RenderItem;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 
 /// A marker trait for render items that can be used as partitions in a complex.
 pub trait Partion: RenderItem + Hash + Debug + Clone {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PartitionCoordinates {
 	pub start: Vec3,
 	pub end: Vec3,
 }
+
+impl Hash for PartitionCoordinates {
+	fn hash<H: Hasher>(&self, state: &mut H) {
+		self.start.x.to_bits().hash(state);
+		self.start.y.to_bits().hash(state);
+		self.start.z.to_bits().hash(state);
+		self.end.x.to_bits().hash(state);
+		self.end.y.to_bits().hash(state);
+		self.end.z.to_bits().hash(state);
+	}
+}
+
+impl Eq for PartitionCoordinates {}
 
 #[derive(Debug, Clone)]
 pub struct PartitionComplex<P: Partion> {
@@ -21,10 +34,20 @@ pub struct PartitionComplex<P: Partion> {
 /// A marker trait for floors in a complex.
 pub trait Floor: RenderItem + Hash + Clone {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FloorCoordinates {
 	pub position: Vec3,
 }
+
+impl Hash for FloorCoordinates {
+	fn hash<H: Hasher>(&self, state: &mut H) {
+		self.position.x.to_bits().hash(state);
+		self.position.y.to_bits().hash(state);
+		self.position.z.to_bits().hash(state);
+	}
+}
+
+impl Eq for FloorCoordinates {}
 
 #[derive(Debug, Clone)]
 pub struct FloorComplex<F: Floor> {
@@ -54,12 +77,32 @@ pub enum ComplexCoordinates {
 }
 
 #[derive(Debug, Clone)]
-pub struct ComplexMember<P: Partion, F: Floor> {
-	pub coordinates: ComplexCoordinates,
-	pub element: ComplexElement<P, F>,
+pub enum ComplexMember<P: Partion, F: Floor> {
+	Partition(PartitionCoordinates, P),
+	Floor(FloorCoordinates, F),
+}
+
+pub trait Filler<P: Partion, F: Floor> {
+	fn fill(
+		&mut self,
+		complex: &mut Complex<P, F>,
+		coordinates: ComplexCoordinates,
+	) -> ComplexMember<P, F>;
 }
 
 impl<P: Partion, F: Floor> Complex<P, F> {
+	#[inline(always)]
+	pub fn insert_member(&mut self, member: ComplexMember<P, F>) {
+		match member {
+			ComplexMember::Partition(partition_coordinates, partition) => {
+				self.partitions.partitions.insert(partition_coordinates, partition);
+			}
+			ComplexMember::Floor(floor_coordinates, floor) => {
+				self.floors.floors.insert(floor_coordinates, floor);
+			}
+		}
+	}
+
 	pub fn coords_iter(&self) -> impl Iterator<Item = ComplexCoordinates> {
 		let mut members = Vec::new();
 
@@ -115,5 +158,12 @@ impl<P: Partion, F: Floor> Complex<P, F> {
 		}
 
 		members.into_iter()
+	}
+
+	pub fn fill_canonical_members(&mut self, filler: &mut impl Filler<P, F>) {
+		for coordinates in self.coords_iter() {
+			let member = filler.fill(self, coordinates);
+			self.insert_member(member);
+		}
 	}
 }
