@@ -31,10 +31,10 @@ pub fn building_playground<F: Material, P: Material>(
 
 	let partition_cache = HandleMap::<WallMesh>::new();
 	let mut scratchpad_filler = ScratchpadFiller::new(MeshMaterial3d(partition_material.0.clone()))
-		.with_wall_cache(partition_cache);
+		.with_wall_cache(partition_cache)
+		.with_partition_threshold(0.4);
 	let mut complex = Complex::new(Vec3::ZERO, Vec3::new(4.0, 2.0, 4.0), (32, 32, 32));
 	complex.fill_canonical_members(&mut scratchpad_filler);
-	log::info!("Complex: {:?}", complex);
 	let complex_renderer = ComplexRenderer::new(complex);
 
 	commands.spawn((

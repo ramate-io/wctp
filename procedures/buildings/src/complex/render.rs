@@ -49,7 +49,10 @@ impl<P: Partition, F: Floor> RenderItem for ComplexRenderer<P, F> {
 			};
 
 			let transform = transform
-				.with_translation(partition_coordinates.start)
+				.with_translation(
+					partition_coordinates.start
+						+ Vec3::new(0.0, self.complex.step_size.y / 2.0, 0.0),
+				)
 				.with_scale(Vec3::new(x_scale, y_scale, z_scale));
 
 			entities.extend(partition.spawn_render_items(commands, cascade_chunk, transform));

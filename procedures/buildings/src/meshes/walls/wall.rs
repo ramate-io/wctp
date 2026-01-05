@@ -36,26 +36,7 @@ impl IdentifiedMesh for WallMesh {
 
 impl MeshBuilder for WallMesh {
 	fn build_mesh_impl(&self, _cascade_chunk: &CascadeChunk) -> Option<Mesh> {
-		// simply creates a 1 x 1 x 1 cube
-		let mut mesh = Mesh::new(
-			bevy::mesh::PrimitiveTopology::TriangleList,
-			bevy::asset::RenderAssetUsages::RENDER_WORLD,
-		);
-		mesh.insert_attribute(
-			Mesh::ATTRIBUTE_POSITION,
-			vec![[-0.5, -0.5, -0.5], [0.5, -0.5, -0.5], [0.5, 0.5, -0.5], [-0.5, 0.5, -0.5]],
-		);
-		mesh.insert_attribute(
-			Mesh::ATTRIBUTE_NORMAL,
-			vec![[0.0, 0.0, 1.0], [0.0, 0.0, 1.0], [0.0, 0.0, 1.0], [0.0, 0.0, 1.0]],
-		);
-		mesh.insert_attribute(
-			Mesh::ATTRIBUTE_UV_0,
-			vec![[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]],
-		);
-		mesh.insert_indices(bevy::mesh::Indices::U32(vec![0, 1, 2, 0, 2, 3]));
-
-		Some(mesh)
+		Some(Mesh::from(Cuboid::new(1.0, 1.0, 1.0)))
 	}
 }
 

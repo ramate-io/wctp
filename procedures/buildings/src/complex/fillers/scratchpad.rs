@@ -58,6 +58,16 @@ impl<T: Material> ScratchpadFiller<T> {
 		self
 	}
 
+	pub fn with_floor_threshold(mut self, floor_threshold: f32) -> Self {
+		self.floor_threshold = floor_threshold;
+		self
+	}
+
+	pub fn with_partition_threshold(mut self, partition_threshold: f32) -> Self {
+		self.partition_threshold = partition_threshold;
+		self
+	}
+
 	pub fn should_fill_floor(&self, position: Vec3) -> bool {
 		self.noise_config.get_on_unit_interval(position) < self.floor_threshold
 	}
