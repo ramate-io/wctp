@@ -1,3 +1,5 @@
+pub mod fillers;
+
 use bevy::prelude::*;
 use render_item::RenderItem;
 use std::collections::HashMap;
@@ -5,7 +7,7 @@ use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 
 /// A marker trait for render items that can be used as partitions in a complex.
-pub trait Partion: RenderItem + Hash + Debug + Clone {}
+pub trait Partition: RenderItem + Hash + Debug + Clone {}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PartitionCoordinates {
@@ -27,7 +29,7 @@ impl Hash for PartitionCoordinates {
 impl Eq for PartitionCoordinates {}
 
 #[derive(Debug, Clone)]
-pub struct PartitionComplex<P: Partion> {
+pub struct PartitionComplex<P: Partition> {
 	pub partitions: HashMap<PartitionCoordinates, P>,
 }
 
@@ -55,7 +57,7 @@ pub struct FloorComplex<F: Floor> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Complex<P: Partion, F: Floor> {
+pub struct Complex<P: Partition, F: Floor> {
 	pub partitions: PartitionComplex<P>,
 	pub floors: FloorComplex<F>,
 	pub anchor: Vec3,
@@ -65,7 +67,7 @@ pub struct Complex<P: Partion, F: Floor> {
 }
 
 #[derive(Debug, Clone)]
-pub enum ComplexElement<P: Partion, F: Floor> {
+pub enum ComplexElement<P: Partition, F: Floor> {
 	Partition(P),
 	Floor(F),
 }
@@ -77,20 +79,20 @@ pub enum ComplexCoordinates {
 }
 
 #[derive(Debug, Clone)]
-pub enum ComplexMember<P: Partion, F: Floor> {
+pub enum ComplexMember<P: Partition, F: Floor> {
 	Partition(PartitionCoordinates, P),
 	Floor(FloorCoordinates, F),
 }
 
-pub trait Filler<P: Partion, F: Floor> {
+pub trait Filler<P: Partition, F: Floor> {
 	fn fill(
 		&mut self,
 		complex: &mut Complex<P, F>,
 		coordinates: ComplexCoordinates,
-	) -> ComplexMember<P, F>;
+	) -> Option<ComplexMember<P, F>>;
 }
 
-impl<P: Partion, F: Floor> Complex<P, F> {
+impl<P: Partition, F: Floor> Complex<P, F> {
 	#[inline(always)]
 	pub fn insert_member(&mut self, member: ComplexMember<P, F>) {
 		match member {
@@ -101,6 +103,72 @@ impl<P: Partion, F: Floor> Complex<P, F> {
 				self.floors.floors.insert(floor_coordinates, floor);
 			}
 		}
+	}
+
+	#[inline(always)]
+	pub fn get_partition(&self, coordinates: PartitionCoordinates) -> Option<&P> {
+		self.partitions.partitions.get(&coordinates).map(|p| p)
+	}
+
+	pub fn partition_to_floor_coordinates_below(
+		&self,
+		coordinates: &PartitionCoordinates,
+	) -> Vec<FloorCoordinates> {
+		if coordinates.start.y == self.anchor.y {
+			return Vec::new();
+		}
+
+		let mut floors = Vec::new();
+		let floor_y = coordinates.start.y - self.step_size.y;
+
+		if coordinates.start.z == coordinates.end.z {
+			// there are two possible floors, one on each side of the partition in the x direction
+			floors.push(FloorCoordinates {
+				position: self.anchor
+					+ Vec3::new(
+						coordinates.start.x - self.step_size.x,
+						floor_y,
+						coordinates.start.z,
+					),
+			});
+			floors.push(FloorCoordinates {
+				position: self.anchor
+					+ Vec3::new(coordinates.start.x, floor_y, coordinates.start.z),
+			});
+		} else if coordinates.start.x == coordinates.end.x {
+			// there are two possible floors, one on each side of the partition in the z direction
+			floors.push(FloorCoordinates {
+				position: self.anchor
+					+ Vec3::new(
+						coordinates.start.x,
+						floor_y,
+						coordinates.start.z - self.step_size.z,
+					),
+			});
+			floors.push(FloorCoordinates {
+				position: self.anchor
+					+ Vec3::new(coordinates.start.x, floor_y, coordinates.start.z),
+			});
+		}
+
+		floors
+	}
+
+	/// Gets the filled floors below a partition.
+	pub fn partition_to_floors_below(&self, coordinates: &PartitionCoordinates) -> Vec<&F> {
+		let mut floors = Vec::new();
+		for floor_coordinates in self.partition_to_floor_coordinates_below(coordinates) {
+			match self.get_floor(floor_coordinates) {
+				Some(floor) => floors.push(floor),
+				None => return Vec::new(),
+			}
+		}
+		floors
+	}
+
+	#[inline(always)]
+	pub fn get_floor(&self, coordinates: FloorCoordinates) -> Option<&F> {
+		self.floors.floors.get(&coordinates).map(|f| f)
 	}
 
 	pub fn coords_iter(&self) -> impl Iterator<Item = ComplexCoordinates> {
@@ -163,7 +231,9 @@ impl<P: Partion, F: Floor> Complex<P, F> {
 	pub fn fill_canonical_members(&mut self, filler: &mut impl Filler<P, F>) {
 		for coordinates in self.coords_iter() {
 			let member = filler.fill(self, coordinates);
-			self.insert_member(member);
+			if let Some(member) = member {
+				self.insert_member(member);
+			}
 		}
 	}
 }
