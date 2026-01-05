@@ -1,4 +1,5 @@
 pub mod fillers;
+pub mod render;
 
 use bevy::prelude::*;
 use render_item::RenderItem;
