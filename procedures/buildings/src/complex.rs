@@ -34,6 +34,12 @@ pub struct PartitionComplex<P: Partition> {
 	pub partitions: HashMap<PartitionCoordinates, P>,
 }
 
+impl<P: Partition> PartitionComplex<P> {
+	pub fn new() -> Self {
+		Self { partitions: HashMap::new() }
+	}
+}
+
 /// A marker trait for floors in a complex.
 pub trait Floor: RenderItem + Hash + Clone {}
 
@@ -55,6 +61,12 @@ impl Eq for FloorCoordinates {}
 #[derive(Debug, Clone)]
 pub struct FloorComplex<F: Floor> {
 	pub floors: HashMap<FloorCoordinates, F>,
+}
+
+impl<F: Floor> FloorComplex<F> {
+	pub fn new() -> Self {
+		Self { floors: HashMap::new() }
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -94,6 +106,16 @@ pub trait Filler<P: Partition, F: Floor> {
 }
 
 impl<P: Partition, F: Floor> Complex<P, F> {
+	pub fn new(anchor: Vec3, step_size: Vec3, step_count: (usize, usize, usize)) -> Self {
+		Self {
+			partitions: PartitionComplex::new(),
+			floors: FloorComplex::new(),
+			anchor,
+			step_size,
+			step_count,
+		}
+	}
+
 	#[inline(always)]
 	pub fn insert_member(&mut self, member: ComplexMember<P, F>) {
 		match member {

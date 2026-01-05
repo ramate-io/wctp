@@ -1,7 +1,10 @@
 use bevy::prelude::*;
-use buildings::complex::{fillers::scratchpad::ScratchpadFiller, render::ComplexRenderer, Complex};
+use buildings::{
+	complex::{fillers::scratchpad::ScratchpadFiller, render::ComplexRenderer, Complex},
+	meshes::walls::wall::WallMesh,
+};
 use chunk::cascade::CascadeChunk;
-use engine::shaders::{leaf_material::LeafMaterial, outline::EdgeMaterial};
+use engine::shaders::outline::EdgeMaterial;
 use render_item::{mesh::cache::handle::map::HandleMap, DispatchRenderItem};
 
 #[derive(Resource, Clone)]
@@ -21,16 +24,21 @@ pub fn setup_tree_edge_material(
 
 pub fn building_playground<F: Material, P: Material>(
 	mut commands: Commands,
-	floor_material: Res<BuildingMaterial<F>>,
+	_floor_material: Res<BuildingMaterial<F>>,
 	partition_material: Res<BuildingMaterial<P>>,
 ) {
 	log::info!("Spawning building playground");
 
-	let partition_cache = HandleMap::<Partition>::new();
+	let partition_cache = HandleMap::<WallMesh>::new();
+	let mut scratchpad_filler = ScratchpadFiller::new(MeshMaterial3d(partition_material.0.clone()))
+		.with_wall_cache(partition_cache);
+	let mut complex = Complex::new(Vec3::ZERO, Vec3::new(4.0, 2.0, 4.0), (32, 32, 32));
+	complex.fill_canonical_members(&mut scratchpad_filler);
+	let complex_renderer = ComplexRenderer::new(complex);
 
 	commands.spawn((
 		CascadeChunk::unit_center_chunk().with_res_2(3),
-		DispatchRenderItem::new(grove),
+		DispatchRenderItem::new(complex_renderer),
 		Transform::from_translation(Vec3::ZERO),
 	));
 }

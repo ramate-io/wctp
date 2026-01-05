@@ -1,9 +1,10 @@
 use crate::{
 	complex::{Complex, ComplexCoordinates, ComplexMember, Filler},
-	meshes::walls::wall::Wall,
+	meshes::walls::wall::{Wall, WallMesh},
 };
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
+use render_item::mesh::cache::handle::map::HandleMap;
 
 #[derive(Debug, Clone)]
 pub struct NoiseConfig {
@@ -38,6 +39,7 @@ pub struct ScratchpadFiller<T: Material> {
 	material: MeshMaterial3d<T>,
 	floor_threshold: f32,
 	partition_threshold: f32,
+	wall_cache: HandleMap<WallMesh>,
 }
 
 impl<T: Material> ScratchpadFiller<T> {
@@ -47,7 +49,13 @@ impl<T: Material> ScratchpadFiller<T> {
 			material,
 			floor_threshold: 0.6,
 			partition_threshold: 0.2,
+			wall_cache: HandleMap::<WallMesh>::new(),
 		}
+	}
+
+	pub fn with_wall_cache(mut self, wall_cache: HandleMap<WallMesh>) -> Self {
+		self.wall_cache = wall_cache;
+		self
 	}
 
 	pub fn should_fill_floor(&self, position: Vec3) -> bool {
@@ -68,7 +76,10 @@ impl<T: Material> Filler<Wall<T>, Wall<T>> for ScratchpadFiller<T> {
 		match coordinates {
 			ComplexCoordinates::Floor(floor_coordinates) => {
 				if self.should_fill_floor(floor_coordinates.position) {
-					Some(ComplexMember::Floor(floor_coordinates, Wall::new(self.material.clone())))
+					Some(ComplexMember::Floor(
+						floor_coordinates,
+						Wall::new(self.material.clone()).with_wall_cache(self.wall_cache.clone()),
+					))
 				} else {
 					None
 				}
@@ -79,7 +90,7 @@ impl<T: Material> Filler<Wall<T>, Wall<T>> for ScratchpadFiller<T> {
 				{
 					Some(ComplexMember::Partition(
 						partition_coordinates,
-						Wall::new(self.material.clone()),
+						Wall::new(self.material.clone()).with_wall_cache(self.wall_cache.clone()),
 					))
 				} else {
 					None
