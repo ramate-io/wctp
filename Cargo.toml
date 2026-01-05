@@ -15,6 +15,7 @@ members = [
   "procedures/terrain",
   "procedures/vegetation",
   "procedures/buildings",
+  "procedures/comproc",
 
   # util
   ## sdf
