@@ -108,6 +108,7 @@ chunk = { path = "util/chunk" }
 
 terrain-sdf = { path = "procedures/terrain" }
 vegetation-sdf = { path = "procedures/vegetation" }
+buildings = { path = "procedures/buildings" }
 engine = { path = "engine" }
 
 [workspace.lints.clippy]

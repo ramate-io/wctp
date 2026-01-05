@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use std::f32::consts::PI;
 
+pub mod buildings;
 mod camera;
 mod checkerboard_material;
 mod ground;

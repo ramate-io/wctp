@@ -31,6 +31,7 @@ engine = { workspace = true }
 terrain-sdf = { workspace = true }
 vegetation-sdf = { workspace = true }
 chunk = { workspace = true }
+buildings = { workspace = true }
 
 [lints]
 workspace = true
