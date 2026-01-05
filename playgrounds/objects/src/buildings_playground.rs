@@ -10,7 +10,7 @@ use render_item::{mesh::cache::handle::map::HandleMap, DispatchRenderItem};
 #[derive(Resource, Clone)]
 pub struct BuildingMaterial<M: Material>(pub Handle<M>);
 
-pub fn setup_tree_edge_material(
+pub fn setup_buildings_material(
 	mut commands: Commands,
 	mut materials: ResMut<Assets<EdgeMaterial>>,
 ) {
@@ -34,6 +34,7 @@ pub fn building_playground<F: Material, P: Material>(
 		.with_wall_cache(partition_cache);
 	let mut complex = Complex::new(Vec3::ZERO, Vec3::new(4.0, 2.0, 4.0), (32, 32, 32));
 	complex.fill_canonical_members(&mut scratchpad_filler);
+	log::info!("Complex: {:?}", complex);
 	let complex_renderer = ComplexRenderer::new(complex);
 
 	commands.spawn((
