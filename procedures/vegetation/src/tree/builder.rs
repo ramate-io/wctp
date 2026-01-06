@@ -9,7 +9,10 @@ use comproc::{
 };
 use noise::{NoiseFn, Seedable};
 use render_item::{
-	mesh::{cache::handle::map::HandleMap, handle::MeshHandle, IdentifiedMesh, MeshBuilder},
+	mesh::{
+		cache::handle::map::HandleMap, handle::MeshHandle, IdentifiedMesh, MeshBuilder,
+		MeshDispatch,
+	},
 	NormalizeChunk, RenderItem,
 };
 use std::fmt::Debug;
@@ -29,11 +32,107 @@ pub struct Tree<
 	anchor: Vec3,
 	height: f32,
 	stick_material: MeshMaterial3d<StickMaterial>,
-	leaf_material: MeshMaterial3d<LeafMaterial>,
+	// currentlly we don't need to use this at the spawning stage
+	pub leaf_material: MeshMaterial3d<LeafMaterial>,
 	trunk_meshes: Vec<MeshHandle<StickMesh>>,
 	branch_ball_sticks: Vec<BallStick>,
 	branch_spawner: MeshHandleStackSpawner<BallMesh, StickMesh, StickMaterial>,
 	leaf_spawner: MeshHandleStackSpawner<LeafMesh, LeafMesh, LeafMaterial>,
+}
+
+impl<
+		BallMesh: MeshFromTreeNum,
+		StickMesh: MeshFromTreeNum,
+		LeafMesh: MeshFromTreeNum,
+		StickMaterial: Material,
+		LeafMaterial: Material,
+	> Tree<BallMesh, StickMesh, LeafMesh, StickMaterial, LeafMaterial>
+where
+	(CascadeChunk, MeshDispatch<MeshHandle<StickMesh>>, Transform, MeshMaterial3d<StickMaterial>):
+		Bundle,
+{
+	pub fn spawn_trunk(&self, commands: &mut Commands, cascade_chunk: &CascadeChunk) {
+		// Build tree segment dispatch
+		if let Some(mesh_handle) = self.trunk_meshes.get(0) {
+			commands.spawn((
+				CascadeChunk::unit_center_chunk().with_res_2(3),
+				MeshDispatch::new(mesh_handle.clone()),
+				Transform::from_translation(self.anchor + Vec3::new(0.0, 0.0, 0.0))
+					.with_scale(Vec3::new(1.0, self.height / 2.0, 1.0)),
+				MeshMaterial3d(self.stick_material.0.clone()),
+			));
+
+			commands.spawn((
+				CascadeChunk::unit_chunk().with_res_2(3),
+				MeshDispatch::new(mesh_handle.clone()),
+				Transform::from_translation(self.anchor + Vec3::new(0.0003, 0.0005, 0.0004))
+					.with_scale(Vec3::new(0.5, self.height / 4.0, 0.5))
+					.with_rotation(Quat::from_rotation_arc(
+						Vec3::new(1.0, 1.0, 1.0).normalize(),
+						Vec3::Y,
+					)),
+				MeshMaterial3d(self.stick_material.0.clone()),
+			));
+
+			commands.spawn((
+				cascade_chunk.clone(),
+				MeshDispatch::new(mesh_handle.clone()),
+				Transform::from_translation(self.anchor).with_scale(Vec3::new(
+					0.9,
+					self.height,
+					0.9,
+				)),
+				MeshMaterial3d(self.stick_material.0.clone()),
+			));
+		};
+	}
+}
+
+impl<
+		BallMesh: MeshFromTreeNum,
+		StickMesh: MeshFromTreeNum,
+		LeafMesh: MeshFromTreeNum,
+		StickMaterial: Material,
+		LeafMaterial: Material,
+	> RenderItem for Tree<BallMesh, StickMesh, LeafMesh, StickMaterial, LeafMaterial>
+where
+	(CascadeChunk, MeshDispatch<MeshHandle<BallMesh>>, Transform, MeshMaterial3d<StickMaterial>):
+		Bundle,
+	(CascadeChunk, MeshDispatch<MeshHandle<StickMesh>>, Transform, MeshMaterial3d<StickMaterial>):
+		Bundle,
+	(CascadeChunk, MeshDispatch<MeshHandle<LeafMesh>>, Transform, MeshMaterial3d<LeafMaterial>):
+		Bundle,
+{
+	fn spawn_render_items(
+		&self,
+		commands: &mut Commands,
+		cascade_chunk: &CascadeChunk,
+		transform: Transform,
+	) -> Vec<Entity> {
+		let mut entities = Vec::new();
+		for branch in &self.branch_ball_sticks {
+			let branch_render_item =
+				BallStickRenderItem::new(branch.clone(), self.branch_spawner.clone());
+			entities.extend(branch_render_item.spawn_render_items(
+				commands,
+				cascade_chunk,
+				transform,
+			));
+
+			let (ballstick, _spawner) = branch_render_item.into_parts();
+			let leaf_render_item =
+				BallStickRenderItem::new(ballstick.clone(), self.leaf_spawner.clone());
+			entities.extend(leaf_render_item.spawn_render_items(
+				commands,
+				cascade_chunk,
+				transform,
+			));
+		}
+
+		self.spawn_trunk(commands, cascade_chunk);
+
+		entities
+	}
 }
 
 pub struct TreeBuilder<
