@@ -39,6 +39,8 @@ impl<T: Sdf + NormalizeChunk, N: NoiseFn<f64, 3> + Seedable + Send + Sync> Norma
 	for Noisy<T, N>
 {
 	fn normalize_chunk(&self, cascade_chunk: &CascadeChunk) -> CascadeChunk {
-		self.sdf.normalize_chunk(cascade_chunk)
+		self.sdf
+			.normalize_chunk(cascade_chunk)
+			.with_mu(self.noise_config.amplitude + 0.001)
 	}
 }
