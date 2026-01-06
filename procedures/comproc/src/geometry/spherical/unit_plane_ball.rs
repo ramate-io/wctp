@@ -1,8 +1,9 @@
 pub mod scratchpad;
 
+use crate::noise::config::NoiseConfig;
 use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;
-use noise::{NoiseFn, Perlin};
+use noise::{NoiseFn, Seedable};
 use render_item::{
 	mesh::{IdentifiedMesh, MeshBuilder, MeshId},
 	NormalizeChunk,
@@ -10,56 +11,46 @@ use render_item::{
 use scratchpad::{generate_unit_disk, generate_unit_triangle};
 use std::f32::consts::PI;
 
-/// Configuration for a noisy sphere/ball
-/// All balls work in unit space (0-1) and are transformed later
-#[derive(Debug, Clone)]
-pub struct PlaneBallConfig {
-	/// Seed for noise generation
-	pub seed: u32,
-	/// Base radius of the sphere (in unit space, typically 0.5)
-	pub radius: f32,
-	/// Noise amplitude for surface variation
-	/// Higher values create more pronounced surface bumps
-	pub noise_amplitude: f32,
-	/// Noise frequency for surface variation
-	/// Higher values create finer, more detailed noise patterns
-	pub noise_frequency: f32,
-	/// Number of noise octaves for fractal detail
-	/// More octaves = more detailed but potentially slower
-	pub noise_octaves: u32,
-}
-
-impl Default for PlaneBallConfig {
-	fn default() -> Self {
-		Self { seed: 0, radius: 0.5, noise_amplitude: 0.1, noise_frequency: 3.0, noise_octaves: 3 }
-	}
-}
-
 /// Noisy sphere: a sphere with Perlin noise perturbation for organic surface variation
 #[derive(Debug, Clone)]
-pub struct PlaneBall {
-	config: PlaneBallConfig,
-	noise: Perlin,
+pub struct UnitPlaneBall<N: NoiseFn<f64, 3> + Seedable + Clone> {
+	/// Base radius of the sphere (in unit space, typically 0.5)
+	pub radius: f32,
+	/// Noise configuration
+	pub noise_config: NoiseConfig<3, N>,
 }
 
-impl PlaneBall {
-	pub fn new(config: PlaneBallConfig) -> Self {
-		let noise = Perlin::new(config.seed);
-		Self { config, noise }
+impl<N: NoiseFn<f64, 3> + Seedable + Clone> UnitPlaneBall<N> {
+	pub fn new(noise: N) -> Self {
+		Self { radius: 0.5, noise_config: NoiseConfig::new(noise) }
+	}
+
+	pub fn with_radius(mut self, radius: f32) -> Self {
+		self.radius = radius;
+		self
+	}
+
+	pub fn with_noise_config(mut self, noise_config: NoiseConfig<3, N>) -> Self {
+		self.noise_config = noise_config;
+		self
+	}
+
+	pub fn noise_config_mut(&mut self) -> &mut NoiseConfig<3, N> {
+		&mut self.noise_config
 	}
 }
 
-impl NormalizeChunk for PlaneBall {
+impl<N: NoiseFn<f64, 3> + Seedable + Clone> NormalizeChunk for UnitPlaneBall<N> {
 	fn normalize_chunk(&self, cascade_chunk: &CascadeChunk) -> CascadeChunk {
 		CascadeChunk::unit_3d_center_chunk()
 			.with_res_2(cascade_chunk.res_2)
-			.with_mu(self.config.noise_amplitude + 0.001)
+			.with_mu(self.noise_config.amplitude + 0.001)
 	}
 }
 
-impl IdentifiedMesh for PlaneBall {
+impl<N: NoiseFn<f64, 3> + Seedable + Clone> IdentifiedMesh for UnitPlaneBall<N> {
 	fn id(&self) -> MeshId {
-		let debug_string = format!("{:?}", self);
+		let debug_string = format!("{:?}-{:?}", self.radius, self.noise_config);
 		MeshId::new(debug_string)
 	}
 }
@@ -71,7 +62,7 @@ enum ShapeType {
 	Triangle,
 }
 
-impl MeshBuilder for PlaneBall {
+impl<N: NoiseFn<f64, 3> + Seedable + Clone> MeshBuilder for UnitPlaneBall<N> {
 	fn build_mesh_impl(&self, _cascade_chunk: &CascadeChunk) -> Option<Mesh> {
 		// Generate a mix of 8 plane meshes (discs, triangles, rectangles) intersecting at the origin
 		let num_planes = 8;
@@ -136,16 +127,16 @@ impl MeshBuilder for PlaneBall {
 				}
 
 				// This is an edge vertex, apply noise
-				let noise_x = self.noise.get([
-					vertex[0] as f64 * edge_noise_frequency as f64,
-					vertex[1] as f64 * edge_noise_frequency as f64,
-					(i as f64) * 0.5, // Vary per plane
-				]) as f32;
-				let noise_y = self.noise.get([
-					vertex[0] as f64 * edge_noise_frequency as f64 + 100.0,
-					vertex[1] as f64 * edge_noise_frequency as f64 + 100.0,
-					(i as f64) * 0.5 + 50.0,
-				]) as f32;
+				let noise_x = self.noise_config.vec3_freqo(Vec3::new(
+					vertex[0] as f32 * edge_noise_frequency,
+					vertex[1] as f32 * edge_noise_frequency,
+					(i as f32) * 0.5, // Vary per plane
+				)) as f32;
+				let noise_y = self.noise_config.vec3_freqo(Vec3::new(
+					vertex[0] as f32 * edge_noise_frequency + 100.0,
+					vertex[1] as f32 * edge_noise_frequency + 100.0,
+					(i as f32) * 0.5 + 50.0,
+				)) as f32;
 
 				// Perturb in the plane (XY plane before rotation)
 				vertex[0] += noise_x * edge_noise_amplitude;
