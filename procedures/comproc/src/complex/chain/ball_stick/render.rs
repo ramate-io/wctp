@@ -1,3 +1,5 @@
+pub mod mesh_handle_stack;
+
 use crate::complex::chain::ball_stick::builder::{BallStick, BallStickNode, BallStickSegment};
 use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;
@@ -11,6 +13,7 @@ pub trait BallStickSpawner {
 		transform: Transform,
 		cascade_chunk: &CascadeChunk,
 		node: &BallStickNode,
+		index: usize,
 	) -> Vec<Entity>;
 
 	/// Computes the appropriate transform for the stick at the given segment.
@@ -20,6 +23,7 @@ pub trait BallStickSpawner {
 		transform: Transform,
 		cascade_chunk: &CascadeChunk,
 		segment: &BallStickSegment,
+		index: usize,
 	) -> Vec<Entity>;
 }
 
@@ -50,8 +54,9 @@ impl<P: BallStickSpawner> BallStickRenderItem<P> {
 		transform: Transform,
 		cascade_chunk: &CascadeChunk,
 		node: &BallStickNode,
+		index: usize,
 	) -> Vec<Entity> {
-		self.spawner.spawn_ball(commands, transform, cascade_chunk, node)
+		self.spawner.spawn_ball(commands, transform, cascade_chunk, node, index)
 	}
 
 	pub fn spawn_stick(
@@ -60,8 +65,9 @@ impl<P: BallStickSpawner> BallStickRenderItem<P> {
 		transform: Transform,
 		cascade_chunk: &CascadeChunk,
 		segment: &BallStickSegment,
+		index: usize,
 	) -> Vec<Entity> {
-		self.spawner.spawn_stick(commands, transform, cascade_chunk, segment)
+		self.spawner.spawn_stick(commands, transform, cascade_chunk, segment, index)
 	}
 
 	pub fn into_parts(self) -> (BallStick, P) {
@@ -76,11 +82,11 @@ impl<P: BallStickSpawner + Clone> RenderItem for BallStickRenderItem<P> {
 		cascade_chunk: &CascadeChunk,
 		transform: Transform,
 	) -> Vec<Entity> {
-		for ball in self.ballstick.nodes() {
-			let _entities = self.spawn_ball(commands, transform, cascade_chunk, ball);
+		for (index, ball) in self.ballstick.nodes().enumerate() {
+			let _entities = self.spawn_ball(commands, transform, cascade_chunk, ball, index);
 		}
-		for segment in self.ballstick.segments() {
-			let _entities = self.spawn_stick(commands, transform, cascade_chunk, &segment);
+		for (index, segment) in self.ballstick.segments().enumerate() {
+			let _entities = self.spawn_stick(commands, transform, cascade_chunk, &segment, index);
 		}
 		vec![]
 	}
