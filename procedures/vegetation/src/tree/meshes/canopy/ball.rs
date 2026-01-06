@@ -1,5 +1,6 @@
 pub mod scratchpad;
 
+use crate::tree::builder::MeshFromTreeNum;
 use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;
 use noise::{NoiseFn, Perlin};
@@ -216,5 +217,11 @@ impl MeshBuilder for NoisyBall {
 		mesh.insert_indices(bevy::mesh::Indices::U32(all_indices));
 
 		Some(mesh)
+	}
+}
+
+impl MeshFromTreeNum for NoisyBall {
+	fn from_tree_num(_tree_num: f32) -> Self {
+		Self::new(NoisyBallConfig::default())
 	}
 }

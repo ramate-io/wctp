@@ -1,3 +1,4 @@
+use crate::tree::builder::MeshFromTreeNum;
 use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;
 use noise::{NoiseFn, Perlin};
@@ -108,5 +109,11 @@ impl IdentifiedMesh for SimpleTrunkSegment {
 	fn id(&self) -> MeshId {
 		let debug_string = format!("{:?}", self);
 		MeshId::new(debug_string)
+	}
+}
+
+impl MeshFromTreeNum for SimpleTrunkSegment {
+	fn from_tree_num(_tree_num: f32) -> Self {
+		Self::new(SegmentConfig::default())
 	}
 }

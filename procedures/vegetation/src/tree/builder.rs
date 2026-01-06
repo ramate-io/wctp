@@ -146,13 +146,15 @@ pub struct TreeBuilder<
 > {
 	pub anchor: Vec3,
 	pub height: f32,
-	pub variety: u32,
 	pub branch_count: usize,
 	pub leaf_ball_scale: Vec3,
 	pub noise_config_3d: NoiseConfig<3, M>,
 	pub noise_config_4d: NoiseConfig<4, N>,
+	pub ball_variety: u32,
 	pub ball_cache: HandleMap<BallMesh>,
+	pub stick_variety: u32,
 	pub stick_cache: HandleMap<StickMesh>,
+	pub leaf_variety: u32,
 	pub leaf_cache: HandleMap<LeafMesh>,
 	pub stick_material: MeshMaterial3d<StickMaterial>,
 	pub leaf_material: MeshMaterial3d<LeafMaterial>,
@@ -219,21 +221,21 @@ impl<
 		let branch_ball_sticks = self.compute_radial_branches();
 		let tree_num = self.tree_num();
 
-		let stick_meshes: Vec<MeshHandle<StickMesh>> = (0..self.variety)
+		let stick_meshes: Vec<MeshHandle<StickMesh>> = (0..self.stick_variety)
 			.map(|i| {
 				MeshHandle::new(StickMesh::from_tree_num(tree_num + i as f32))
 					.with_handle_cache(self.stick_cache.clone())
 			})
 			.collect();
 
-		let ball_meshes: Vec<MeshHandle<BallMesh>> = (0..self.variety)
+		let ball_meshes: Vec<MeshHandle<BallMesh>> = (0..self.ball_variety)
 			.map(|i| {
 				MeshHandle::new(BallMesh::from_tree_num(tree_num + i as f32))
 					.with_handle_cache(self.ball_cache.clone())
 			})
 			.collect();
 
-		let leaf_meshes: Vec<MeshHandle<LeafMesh>> = (0..self.variety)
+		let leaf_meshes: Vec<MeshHandle<LeafMesh>> = (0..self.leaf_variety)
 			.map(|i| {
 				MeshHandle::new(LeafMesh::from_tree_num(tree_num + i as f32))
 					.with_handle_cache(self.leaf_cache.clone())
