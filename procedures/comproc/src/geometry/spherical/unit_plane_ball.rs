@@ -17,12 +17,12 @@ pub struct UnitPlaneBall<N: NoiseFn<f64, 3> + Seedable + Clone> {
 	/// Base radius of the sphere (in unit space, typically 0.5)
 	pub radius: f32,
 	/// Noise configuration
-	pub noise_config: NoiseConfig<3, N>,
+	pub noise_config: Option<NoiseConfig<3, N>>,
 }
 
 impl<N: NoiseFn<f64, 3> + Seedable + Clone> UnitPlaneBall<N> {
-	pub fn new(noise: N) -> Self {
-		Self { radius: 0.5, noise_config: NoiseConfig::new(noise) }
+	pub fn new() -> Self {
+		Self { radius: 0.5, noise_config: None }
 	}
 
 	pub fn with_radius(mut self, radius: f32) -> Self {
@@ -31,20 +31,20 @@ impl<N: NoiseFn<f64, 3> + Seedable + Clone> UnitPlaneBall<N> {
 	}
 
 	pub fn with_noise_config(mut self, noise_config: NoiseConfig<3, N>) -> Self {
-		self.noise_config = noise_config;
+		self.noise_config = Some(noise_config);
 		self
 	}
 
-	pub fn noise_config_mut(&mut self) -> &mut NoiseConfig<3, N> {
+	pub fn noise_config_mut(&mut self) -> &mut Option<NoiseConfig<3, N>> {
 		&mut self.noise_config
 	}
 }
 
 impl<N: NoiseFn<f64, 3> + Seedable + Clone> NormalizeChunk for UnitPlaneBall<N> {
 	fn normalize_chunk(&self, cascade_chunk: &CascadeChunk) -> CascadeChunk {
-		CascadeChunk::unit_3d_center_chunk()
-			.with_res_2(cascade_chunk.res_2)
-			.with_mu(self.noise_config.amplitude + 0.001)
+		let mu = self.noise_config.as_ref().map(|config| config.amplitude + 0.001).unwrap_or(0.0);
+
+		CascadeChunk::unit_3d_center_chunk().with_res_2(cascade_chunk.res_2).with_mu(mu)
 	}
 }
 
@@ -69,8 +69,6 @@ impl<N: NoiseFn<f64, 3> + Seedable + Clone> MeshBuilder for UnitPlaneBall<N> {
 		let size = 1.0; // Unit-sized shapes
 		let radius = 1.0; // For discs
 		let segments = 32; // For discs
-		let edge_noise_amplitude = 0.15; // How much to perturb edges
-		let edge_noise_frequency = 8.0; // Frequency of edge noise
 
 		// Use Fibonacci sphere algorithm for even distribution of directions
 		let golden_angle = PI * (3.0 - (5.0_f32).sqrt());
@@ -120,27 +118,29 @@ impl<N: NoiseFn<f64, 3> + Seedable + Clone> MeshBuilder for UnitPlaneBall<N> {
 				None
 			};
 
-			for (idx, vertex) in plane_vertices.iter_mut().enumerate() {
-				// Skip center vertices for discs (front at 0, back at segments+2)
-				if is_disk && (idx == 0 || Some(idx) == back_center_index) {
-					continue;
+			if let Some(noise_config) = self.noise_config.as_ref() {
+				for (idx, vertex) in plane_vertices.iter_mut().enumerate() {
+					// Skip center vertices for discs (front at 0, back at segments+2)
+					if is_disk && (idx == 0 || Some(idx) == back_center_index) {
+						continue;
+					}
+
+					// This is an edge vertex, apply noise
+					let noise_x = noise_config.vec3_amp(Vec3::new(
+						vertex[0] as f32,
+						vertex[1] as f32,
+						(i as f32) * 0.5, // Vary per plane
+					)) as f32;
+					let noise_y = noise_config.vec3_amp(Vec3::new(
+						vertex[0] + 100.0,
+						vertex[1] + 100.0,
+						(i as f32) * 0.5 + 50.0,
+					)) as f32;
+
+					// Perturb in the plane (XY plane before rotation)
+					vertex[0] += noise_x;
+					vertex[1] += noise_y;
 				}
-
-				// This is an edge vertex, apply noise
-				let noise_x = self.noise_config.vec3_freqo(Vec3::new(
-					vertex[0] as f32 * edge_noise_frequency,
-					vertex[1] as f32 * edge_noise_frequency,
-					(i as f32) * 0.5, // Vary per plane
-				)) as f32;
-				let noise_y = self.noise_config.vec3_freqo(Vec3::new(
-					vertex[0] as f32 * edge_noise_frequency + 100.0,
-					vertex[1] as f32 * edge_noise_frequency + 100.0,
-					(i as f32) * 0.5 + 50.0,
-				)) as f32;
-
-				// Perturb in the plane (XY plane before rotation)
-				vertex[0] += noise_x * edge_noise_amplitude;
-				vertex[1] += noise_y * edge_noise_amplitude;
 			}
 
 			// Transform plane to the appropriate orientation

@@ -123,3 +123,7 @@ impl<N: NoiseFn<f64, 4> + Seedable> NoiseConfig<4, N> {
 		noise * self.amplitude as f64
 	}
 }
+
+pub trait InternalNoise<const D: usize, N: NoiseFn<f64, D> + Seedable> {
+	fn set_internal_noise(&mut self, noise: NoiseConfig<D, N>);
+}
