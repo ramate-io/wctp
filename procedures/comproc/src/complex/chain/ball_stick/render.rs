@@ -62,6 +62,10 @@ impl<B: RenderItem, S: RenderItem, P: BallStickPrespawn<B, S>> BallStickRenderIt
 	) -> Option<(CascadeChunk, S, Transform)> {
 		self.prespawn.prespawn_stick(cascade_chunk, segment, transform)
 	}
+
+	pub fn into_parts(self) -> (BallStick, P) {
+		(self.ballstick, self.prespawn)
+	}
 }
 
 impl<B: RenderItem, S: RenderItem, P: BallStickPrespawn<B, S> + Clone> RenderItem
