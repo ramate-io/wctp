@@ -36,6 +36,28 @@ impl<const D: usize, N: NoiseFn<f64, D> + Seedable> Hash for NoiseConfig<D, N> {
 	}
 }
 
+impl<const D: usize, N: NoiseFn<f64, D> + Seedable> NoiseConfig<D, N> {
+	pub fn with_frequency(mut self, frequency: f32) -> Self {
+		self.frequency = frequency;
+		self
+	}
+
+	pub fn with_amplitude(mut self, amplitude: f32) -> Self {
+		self.amplitude = amplitude;
+		self
+	}
+
+	pub fn with_octaves(mut self, octaves: u32) -> Self {
+		self.octaves = octaves;
+		self
+	}
+
+	pub fn with_seed(mut self, seed: u32) -> Self {
+		self.noise = self.noise.set_seed(seed);
+		self
+	}
+}
+
 impl<N: NoiseFn<f64, 3> + Seedable> NoiseConfig<3, N> {
 	/// Gets on vec3 only applies frequency
 	pub fn vec3_freqo(&self, position: Vec3) -> f64 {
