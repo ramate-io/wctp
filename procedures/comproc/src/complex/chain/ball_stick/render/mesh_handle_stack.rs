@@ -57,6 +57,20 @@ impl<B: MeshBuilder + IdentifiedMesh, S: MeshBuilder + IdentifiedMesh, M: Materi
 		self.stick_scale = stick_scale;
 		self
 	}
+
+	pub fn get_ball_for_index(&self, index: usize) -> Option<MeshHandle<B>> {
+		if self.ball_mesh_handle_stack.is_empty() {
+			return None;
+		}
+		Some(self.ball_mesh_handle_stack[index % self.ball_mesh_handle_stack.len()].clone())
+	}
+
+	pub fn get_stick_for_index(&self, index: usize) -> Option<MeshHandle<S>> {
+		if self.stick_mesh_handle_stack.is_empty() {
+			return None;
+		}
+		Some(self.stick_mesh_handle_stack[index % self.stick_mesh_handle_stack.len()].clone())
+	}
 }
 
 impl<B: MeshBuilder + IdentifiedMesh, S: MeshBuilder + IdentifiedMesh, M: Material> BallStickSpawner
@@ -84,9 +98,7 @@ where
 		node: &BallStickNode,
 		index: usize,
 	) -> Vec<Entity> {
-		if let Some(mesh_handle) =
-			self.ball_mesh_handle_stack.get(index % self.ball_mesh_handle_stack.len())
-		{
+		if let Some(mesh_handle) = self.get_ball_for_index(index) {
 			let scale = self.ball_scale;
 
 			// spawn one on the point
@@ -112,9 +124,7 @@ where
 		segment: &BallStickSegment,
 		index: usize,
 	) -> Vec<Entity> {
-		if let Some(mesh_handle) =
-			self.stick_mesh_handle_stack.get(index % self.stick_mesh_handle_stack.len())
-		{
+		if let Some(mesh_handle) = self.get_stick_for_index(index) {
 			let ray = segment.ray();
 			let direction = ray.clone().normalize();
 			let length = ray.length();

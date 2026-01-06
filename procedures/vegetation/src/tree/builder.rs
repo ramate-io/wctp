@@ -51,33 +51,26 @@ where
 	(CascadeChunk, MeshDispatch<MeshHandle<StickMesh>>, Transform, MeshMaterial3d<StickMaterial>):
 		Bundle,
 {
+	pub fn centroid_anchor(&self) -> Vec3 {
+		let pivot_offset = Vec3::new(0.5, 0.0, 0.5);
+		self.anchor - pivot_offset * Vec3::new(1.0, 1.0, 1.0)
+	}
+
 	pub fn spawn_trunk(&self, commands: &mut Commands, cascade_chunk: &CascadeChunk) {
 		// Build tree segment dispatch
 		if let Some(mesh_handle) = self.trunk_meshes.get(0) {
 			commands.spawn((
 				CascadeChunk::unit_center_chunk().with_res_2(3),
 				MeshDispatch::new(mesh_handle.clone()),
-				Transform::from_translation(self.anchor + Vec3::new(0.0, 0.0, 0.0))
+				Transform::from_translation(self.centroid_anchor() + Vec3::new(0.0, 0.0, 0.0))
 					.with_scale(Vec3::new(1.0, self.height / 2.0, 1.0)),
-				MeshMaterial3d(self.stick_material.0.clone()),
-			));
-
-			commands.spawn((
-				CascadeChunk::unit_chunk().with_res_2(3),
-				MeshDispatch::new(mesh_handle.clone()),
-				Transform::from_translation(self.anchor + Vec3::new(0.0003, 0.0005, 0.0004))
-					.with_scale(Vec3::new(0.5, self.height / 4.0, 0.5))
-					.with_rotation(Quat::from_rotation_arc(
-						Vec3::new(1.0, 1.0, 1.0).normalize(),
-						Vec3::Y,
-					)),
 				MeshMaterial3d(self.stick_material.0.clone()),
 			));
 
 			commands.spawn((
 				cascade_chunk.clone(),
 				MeshDispatch::new(mesh_handle.clone()),
-				Transform::from_translation(self.anchor).with_scale(Vec3::new(
+				Transform::from_translation(self.centroid_anchor()).with_scale(Vec3::new(
 					0.9,
 					self.height,
 					0.9,
@@ -183,10 +176,10 @@ impl<
 			.with_bias_amount(0.2)
 			.with_angle_tolerance(2.0)
 			.with_splitting_coefficient(0.6)
-			.with_min_segment_length(0.002)
-			.with_max_segment_length(0.01)
-			.with_min_radius(0.001)
-			.with_max_radius(0.002)
+			.with_min_segment_length(0.6)
+			.with_max_segment_length(1.4)
+			.with_min_radius(0.1)
+			.with_max_radius(0.2)
 			.with_depth(4)
 			.with_noise_config_3d(self.noise_config_3d.clone())
 			.with_noise_config_4d(self.noise_config_4d.clone())
@@ -207,7 +200,8 @@ impl<
 			let branch = branch_builder.build();
 			branches.push(branch);
 
-			last_position = last_position + Vec3::new(0.0, height, 0.0);
+			let biased_height = (self.anchor.y + height).max(last_position.y - height);
+			last_position = self.anchor + Vec3::new(0.0, biased_height, 0.0);
 		}
 
 		branches

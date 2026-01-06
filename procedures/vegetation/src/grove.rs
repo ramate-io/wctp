@@ -21,6 +21,8 @@ pub struct GroveBuilder<T: Material, L: Material> {
 	leaf_material: MeshMaterial3d<L>,
 	tree_cache: HandleMap<SimpleTrunkSegment>,
 	leaf_cache: HandleMap<NoisyBall>,
+	min_height: f32,
+	max_height: f32,
 }
 
 impl<T: Material, L: Material> GroveBuilder<T, L> {
@@ -36,6 +38,8 @@ impl<T: Material, L: Material> GroveBuilder<T, L> {
 			leaf_material,
 			tree_cache: HandleMap::new(),
 			leaf_cache: HandleMap::new(),
+			min_height: 2.0,
+			max_height: 6.0,
 		}
 	}
 
@@ -58,6 +62,11 @@ impl<T: Material, L: Material> GroveBuilder<T, L> {
 		self.noise_config_3d.vec3_amp(position) as f32 * self.step_size / 2.0
 	}
 
+	pub fn get_height(&self, position: Vec3) -> f32 {
+		let noise = self.noise_config_3d.vec3_on_unit(position);
+		noise as f32 * (self.max_height - self.min_height) + self.min_height
+	}
+
 	pub fn build(&self) -> Grove<T, L> {
 		let mut trees = Vec::new();
 		for i in 0..self.count {
@@ -75,8 +84,8 @@ impl<T: Material, L: Material> GroveBuilder<T, L> {
 				if self.meets_threshold(position) {
 					let tree_builder = TreeBuilder {
 						anchor: position,
-						height: 10.0,
-						branch_count: 10,
+						height: self.get_height(position),
+						branch_count: 4,
 						leaf_ball_scale: Vec3::new(1.0, 1.0, 1.0),
 						noise_config_3d: self.noise_config_3d.clone(),
 						noise_config_4d: self.noise_config_4d.clone(),
