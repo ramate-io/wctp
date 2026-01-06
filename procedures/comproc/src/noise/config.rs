@@ -52,6 +52,10 @@ impl<const D: usize, N: NoiseFn<f64, D> + Seedable> Hash for NoiseConfig<D, N> {
 }
 
 impl<const D: usize, N: NoiseFn<f64, D> + Seedable> NoiseConfig<D, N> {
+	pub fn new(noise: N) -> Self {
+		Self { frequency: 0.1, amplitude: 1.0, octaves: 3, noise }
+	}
+
 	pub fn with_frequency(mut self, frequency: f32) -> Self {
 		self.frequency = frequency;
 		self
