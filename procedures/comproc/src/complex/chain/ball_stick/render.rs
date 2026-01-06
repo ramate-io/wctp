@@ -2,41 +2,40 @@ use crate::complex::chain::ball_stick::builder::{BallStick, BallStickNode, BallS
 use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;
 use render_item::RenderItem;
-use std::marker::PhantomData;
 
-pub trait BallStickPrespawn<B: RenderItem, S: RenderItem> {
+pub trait BallStickSpawner {
 	/// Computes the appropriate transform for the ball at the given node.
-	fn prespawn_ball(
+	fn spawn_ball(
 		&self,
+		commands: &mut Commands,
+		transform: Transform,
 		cascade_chunk: &CascadeChunk,
 		node: &BallStickNode,
-		transform: Transform,
-	) -> Option<(CascadeChunk, B, Transform)>;
+	) -> Vec<Entity>;
 
 	/// Computes the appropriate transform for the stick at the given segment.
-	fn prespawn_stick(
+	fn spawn_stick(
 		&self,
+		commands: &mut Commands,
+		transform: Transform,
 		cascade_chunk: &CascadeChunk,
 		segment: &BallStickSegment,
-		transform: Transform,
-	) -> Option<(CascadeChunk, S, Transform)>;
+	) -> Vec<Entity>;
 }
 
 #[derive(Component, Debug, Clone)]
-pub struct BallStickRenderItem<B: RenderItem, S: RenderItem, P: BallStickPrespawn<B, S>> {
+pub struct BallStickRenderItem<P: BallStickSpawner> {
 	ballstick: BallStick,
-	prespawn: P,
-	__ball_marker: PhantomData<B>,
-	__stick_marker: PhantomData<S>,
+	spawner: P,
 }
 
-impl<B: RenderItem, S: RenderItem, P: BallStickPrespawn<B, S>> BallStickRenderItem<B, S, P> {
-	pub fn new(ballstick: BallStick, prespawn: P) -> Self {
-		Self { ballstick, prespawn, __ball_marker: PhantomData, __stick_marker: PhantomData }
+impl<P: BallStickSpawner> BallStickRenderItem<P> {
+	pub fn new(ballstick: BallStick, spawner: P) -> Self {
+		Self { ballstick, spawner }
 	}
 
-	pub fn with_prespawn(mut self, prespawn: P) -> Self {
-		self.prespawn = prespawn;
+	pub fn with_spawner(mut self, spawner: P) -> Self {
+		self.spawner = spawner;
 		self
 	}
 
@@ -45,32 +44,32 @@ impl<B: RenderItem, S: RenderItem, P: BallStickPrespawn<B, S>> BallStickRenderIt
 		self
 	}
 
-	pub fn prespawn_ball(
+	pub fn spawn_ball(
 		&self,
+		commands: &mut Commands,
+		transform: Transform,
 		cascade_chunk: &CascadeChunk,
 		node: &BallStickNode,
-		transform: Transform,
-	) -> Option<(CascadeChunk, B, Transform)> {
-		self.prespawn.prespawn_ball(cascade_chunk, node, transform)
+	) -> Vec<Entity> {
+		self.spawner.spawn_ball(commands, transform, cascade_chunk, node)
 	}
 
-	pub fn prespawn_stick(
+	pub fn spawn_stick(
 		&self,
+		commands: &mut Commands,
+		transform: Transform,
 		cascade_chunk: &CascadeChunk,
 		segment: &BallStickSegment,
-		transform: Transform,
-	) -> Option<(CascadeChunk, S, Transform)> {
-		self.prespawn.prespawn_stick(cascade_chunk, segment, transform)
+	) -> Vec<Entity> {
+		self.spawner.spawn_stick(commands, transform, cascade_chunk, segment)
 	}
 
 	pub fn into_parts(self) -> (BallStick, P) {
-		(self.ballstick, self.prespawn)
+		(self.ballstick, self.spawner)
 	}
 }
 
-impl<B: RenderItem, S: RenderItem, P: BallStickPrespawn<B, S> + Clone> RenderItem
-	for BallStickRenderItem<B, S, P>
-{
+impl<P: BallStickSpawner + Clone> RenderItem for BallStickRenderItem<P> {
 	fn spawn_render_items(
 		&self,
 		commands: &mut Commands,
@@ -78,18 +77,10 @@ impl<B: RenderItem, S: RenderItem, P: BallStickPrespawn<B, S> + Clone> RenderIte
 		transform: Transform,
 	) -> Vec<Entity> {
 		for ball in self.ballstick.nodes() {
-			if let Some((cascade_chunk, ball, transform)) =
-				self.prespawn_ball(cascade_chunk, ball, transform)
-			{
-				ball.spawn_render_items(commands, &cascade_chunk, transform);
-			};
+			let _entities = self.spawn_ball(commands, transform, cascade_chunk, ball);
 		}
 		for segment in self.ballstick.segments() {
-			if let Some((cascade_chunk, stick, transform)) =
-				self.prespawn_stick(cascade_chunk, &segment, transform)
-			{
-				stick.spawn_render_items(commands, &cascade_chunk, transform);
-			};
+			let _entities = self.spawn_stick(commands, transform, cascade_chunk, &segment);
 		}
 		vec![]
 	}
