@@ -4809,6 +4809,7 @@ dependencies = [
  "bevy",
  "chrono",
  "chunk",
+ "comproc",
  "log",
  "noise",
  "rayon",
