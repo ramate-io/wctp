@@ -73,43 +73,68 @@ impl<
 		}
 	}
 
-	pub fn with_anchor(&mut self, anchor: Vec3) -> &mut Self {
+	pub fn with_anchor(mut self, anchor: Vec3) -> Self {
 		self.anchor = anchor;
 		self
 	}
 
-	pub fn with_initial_ray(&mut self, initial_ray: Vec3) -> &mut Self {
+	pub fn with_initial_ray(mut self, initial_ray: Vec3) -> Self {
 		self.initial_ray = initial_ray;
 		self
 	}
 
-	pub fn with_bias_ray(&mut self, bias_ray: Vec3) -> &mut Self {
+	pub fn with_bias_ray(mut self, bias_ray: Vec3) -> Self {
 		self.bias_ray = bias_ray;
 		self
 	}
 
-	pub fn with_bias_amount(&mut self, bias_amount: f32) -> &mut Self {
+	pub fn with_bias_amount(mut self, bias_amount: f32) -> Self {
 		self.bias_amount = bias_amount;
 		self
 	}
 
-	pub fn with_angle_tolerance(&mut self, angle_tolerance: f32) -> &mut Self {
+	pub fn with_angle_tolerance(mut self, angle_tolerance: f32) -> Self {
 		self.angle_tolerance = angle_tolerance;
 		self
 	}
 
-	pub fn with_splitting_coefficient(&mut self, splitting_coefficient: f32) -> &mut Self {
+	pub fn with_splitting_coefficient(mut self, splitting_coefficient: f32) -> Self {
 		self.splitting_coefficient = splitting_coefficient;
 		self
 	}
 
-	pub fn with_min_segment_length(&mut self, min_segment_length: f32) -> &mut Self {
+	pub fn with_min_segment_length(mut self, min_segment_length: f32) -> Self {
 		self.min_segment_length = min_segment_length;
 		self
 	}
 
-	pub fn with_max_segment_length(&mut self, max_segment_length: f32) -> &mut Self {
+	pub fn with_max_segment_length(mut self, max_segment_length: f32) -> Self {
 		self.max_segment_length = max_segment_length;
+		self
+	}
+
+	pub fn with_depth(mut self, depth: usize) -> Self {
+		self.depth = depth;
+		self
+	}
+
+	pub fn with_min_radius(mut self, min_radius: f32) -> Self {
+		self.min_radius = min_radius;
+		self
+	}
+
+	pub fn with_max_radius(mut self, max_radius: f32) -> Self {
+		self.max_radius = max_radius;
+		self
+	}
+
+	pub fn with_noise_config_3d(mut self, noise_config: NoiseConfig<3, M>) -> Self {
+		self.noise_3d = Some(noise_config);
+		self
+	}
+
+	pub fn with_noise_config_4d(mut self, noise_config: NoiseConfig<4, N>) -> Self {
+		self.noise_4d = Some(noise_config);
 		self
 	}
 

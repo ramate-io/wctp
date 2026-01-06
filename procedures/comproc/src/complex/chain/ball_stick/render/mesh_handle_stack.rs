@@ -10,12 +10,12 @@ pub struct MeshHandleStackSpawner<
 	S: MeshBuilder + IdentifiedMesh,
 	M: Material,
 > {
-	ball_mesh_handle_stack: Vec<MeshHandle<B>>,
-	ball_material: MeshMaterial3d<M>,
-	ball_scale: Vec3,
-	stick_mesh_handle_stack: Vec<MeshHandle<S>>,
-	stick_material: MeshMaterial3d<M>,
-	stick_scale: Vec3,
+	pub ball_mesh_handle_stack: Vec<MeshHandle<B>>,
+	pub ball_material: MeshMaterial3d<M>,
+	pub ball_scale: Vec3,
+	pub stick_mesh_handle_stack: Vec<MeshHandle<S>>,
+	pub stick_material: MeshMaterial3d<M>,
+	pub stick_scale: Vec3,
 }
 
 impl<B: MeshBuilder + IdentifiedMesh, S: MeshBuilder + IdentifiedMesh, M: Material>
@@ -45,6 +45,16 @@ impl<B: MeshBuilder + IdentifiedMesh, S: MeshBuilder + IdentifiedMesh, M: Materi
 		stick_mesh_handle_stack: Vec<MeshHandle<S>>,
 	) -> Self {
 		self.stick_mesh_handle_stack = stick_mesh_handle_stack;
+		self
+	}
+
+	pub fn with_ball_scale(mut self, ball_scale: Vec3) -> Self {
+		self.ball_scale = ball_scale;
+		self
+	}
+
+	pub fn with_stick_scale(mut self, stick_scale: Vec3) -> Self {
+		self.stick_scale = stick_scale;
 		self
 	}
 }
