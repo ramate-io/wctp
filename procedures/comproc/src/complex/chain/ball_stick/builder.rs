@@ -26,7 +26,6 @@ pub struct BallStickBuilder<
 	pub splitting_coefficient: f32,
 	pub min_segment_length: f32,
 	pub max_segment_length: f32,
-	pub noise_scale: f32,
 }
 
 impl<
@@ -50,7 +49,6 @@ impl<
 			splitting_coefficient: 0.0,
 			min_segment_length: 0.0,
 			max_segment_length: 0.0,
-			noise_scale: 1000.0,
 		}
 	}
 
@@ -72,8 +70,47 @@ impl<
 			splitting_coefficient: 0.6,
 			min_segment_length: 0.0,
 			max_segment_length: 0.0,
-			noise_scale: 1000.0,
 		}
+	}
+
+	pub fn with_anchor(&mut self, anchor: Vec3) -> &mut Self {
+		self.anchor = anchor;
+		self
+	}
+
+	pub fn with_initial_ray(&mut self, initial_ray: Vec3) -> &mut Self {
+		self.initial_ray = initial_ray;
+		self
+	}
+
+	pub fn with_bias_ray(&mut self, bias_ray: Vec3) -> &mut Self {
+		self.bias_ray = bias_ray;
+		self
+	}
+
+	pub fn with_bias_amount(&mut self, bias_amount: f32) -> &mut Self {
+		self.bias_amount = bias_amount;
+		self
+	}
+
+	pub fn with_angle_tolerance(&mut self, angle_tolerance: f32) -> &mut Self {
+		self.angle_tolerance = angle_tolerance;
+		self
+	}
+
+	pub fn with_splitting_coefficient(&mut self, splitting_coefficient: f32) -> &mut Self {
+		self.splitting_coefficient = splitting_coefficient;
+		self
+	}
+
+	pub fn with_min_segment_length(&mut self, min_segment_length: f32) -> &mut Self {
+		self.min_segment_length = min_segment_length;
+		self
+	}
+
+	pub fn with_max_segment_length(&mut self, max_segment_length: f32) -> &mut Self {
+		self.max_segment_length = max_segment_length;
+		self
 	}
 
 	pub fn unit_freqo3(&self, position: Vec3) -> f64 {
