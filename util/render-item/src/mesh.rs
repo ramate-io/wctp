@@ -14,6 +14,10 @@ impl MeshId {
 	pub fn new(id: String) -> Self {
 		Self(id)
 	}
+
+	pub fn with_suffix(&self, suffix: &str) -> Self {
+		Self(format!("{}{}", self.0, suffix))
+	}
 }
 
 pub trait IdentifiedMesh {

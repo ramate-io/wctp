@@ -1,13 +1,28 @@
 use bevy::prelude::*;
 use noise::{NoiseFn, Seedable};
+use std::fmt::Debug;
 use std::hash::{Hash, Hasher};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct NoiseConfig<const D: usize, N: NoiseFn<f64, D> + Seedable> {
 	pub noise: N,
 	pub frequency: f32,
 	pub amplitude: f32,
 	pub octaves: u32,
+}
+
+impl<const D: usize, N: NoiseFn<f64, D> + Seedable> Debug for NoiseConfig<D, N> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(
+			f,
+			"NoiseConfig<{}, {}> {{ frequency: {}, amplitude: {}, octaves: {} }}",
+			D,
+			std::any::type_name::<N>(),
+			self.frequency,
+			self.amplitude,
+			self.octaves
+		)
+	}
 }
 
 impl<const D: usize, N: NoiseFn<f64, D> + Seedable + Default> Default for NoiseConfig<D, N> {
