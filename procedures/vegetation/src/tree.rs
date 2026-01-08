@@ -15,6 +15,7 @@ use render_item::{
 };
 
 use noise::{NoiseFn, Perlin};
+pub mod builder;
 
 #[derive(Debug, Clone)]
 pub struct NoiseConfig {

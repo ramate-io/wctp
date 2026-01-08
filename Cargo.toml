@@ -15,6 +15,7 @@ members = [
   "procedures/terrain",
   "procedures/vegetation",
   "procedures/buildings",
+  "procedures/comproc",
 
   # util
   ## sdf
@@ -110,6 +111,7 @@ terrain-sdf = { path = "procedures/terrain" }
 vegetation-sdf = { path = "procedures/vegetation" }
 buildings = { path = "procedures/buildings" }
 engine = { path = "engine" }
+comproc = { "path" = "procedures/comproc" }
 
 [workspace.lints.clippy]
 debug_assert_with_mut_call = "deny"

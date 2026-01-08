@@ -1,5 +1,5 @@
 [package]
-name = "vegetation-sdf"
+name = "comproc"
 version = { workspace = true }
 edition  = { workspace = true }
 license  = { workspace = true }
@@ -25,7 +25,6 @@ sdf = { workspace = true }
 chunk = { workspace = true }
 render-item = { workspace = true }
 noise = "0.9"
-comproc = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,43 +1,18 @@
+use crate::tree::builder::{Tree, TreeBuilder};
 use crate::tree::meshes::canopy::ball::NoisyBall;
 use crate::tree::meshes::trunk::segment::SimpleTrunkSegment;
-use crate::tree::TreeRenderItem;
 use bevy::prelude::*;
 use chunk::cascade::CascadeChunk;
+use comproc::noise::config::NoiseConfig;
 use render_item::mesh::cache::handle::map::HandleMap;
 use render_item::RenderItem;
 
-use noise::{NoiseFn, Perlin};
-
-#[derive(Debug, Clone)]
-pub struct NoiseConfig {
-	scale: f32,
-	noise: Perlin,
-}
-
-impl Default for NoiseConfig {
-	fn default() -> Self {
-		Self { scale: 0.1, noise: Perlin::new(42) }
-	}
-}
-
-impl NoiseConfig {
-	pub fn get(&self, position: Vec3) -> f32 {
-		self.noise.get([
-			position.x as f64 * self.scale as f64,
-			position.y as f64 * self.scale as f64,
-			position.z as f64 * self.scale as f64,
-		]) as f32
-	}
-
-	pub fn get_on_unit_interval(&self, position: Vec3) -> f32 {
-		let noise = self.get(position);
-		noise * 0.5 + 0.5
-	}
-}
+use noise::Perlin;
 
 #[derive(Component, Clone)]
 pub struct GroveBuilder<T: Material, L: Material> {
-	noise_config: NoiseConfig,
+	noise_config_3d: NoiseConfig<3, Perlin>,
+	noise_config_4d: NoiseConfig<4, Perlin>,
 	threshold: f32,
 	anchor: Vec3,
 	step_size: f32,
@@ -46,12 +21,15 @@ pub struct GroveBuilder<T: Material, L: Material> {
 	leaf_material: MeshMaterial3d<L>,
 	tree_cache: HandleMap<SimpleTrunkSegment>,
 	leaf_cache: HandleMap<NoisyBall>,
+	min_height: f32,
+	max_height: f32,
 }
 
 impl<T: Material, L: Material> GroveBuilder<T, L> {
 	pub fn new(trunk_material: MeshMaterial3d<T>, leaf_material: MeshMaterial3d<L>) -> Self {
 		Self {
-			noise_config: NoiseConfig::default(),
+			noise_config_3d: NoiseConfig::default(),
+			noise_config_4d: NoiseConfig::default(),
 			threshold: 0.5,
 			anchor: Vec3::ZERO,
 			step_size: 4.0,
@@ -60,6 +38,8 @@ impl<T: Material, L: Material> GroveBuilder<T, L> {
 			leaf_material,
 			tree_cache: HandleMap::new(),
 			leaf_cache: HandleMap::new(),
+			min_height: 2.0,
+			max_height: 6.0,
 		}
 	}
 
@@ -74,12 +54,17 @@ impl<T: Material, L: Material> GroveBuilder<T, L> {
 	}
 
 	pub fn meets_threshold(&self, position: Vec3) -> bool {
-		let noise = self.noise_config.get_on_unit_interval(position);
-		noise > self.threshold
+		let noise = self.noise_config_3d.vec3_on_unit(position);
+		noise as f32 > self.threshold
 	}
 
 	pub fn inner_noise(&self, position: Vec3) -> f32 {
-		self.noise_config.get(position) * self.step_size / 2.0
+		self.noise_config_3d.vec3_amp(position) as f32 * self.step_size / 2.0
+	}
+
+	pub fn get_height(&self, position: Vec3) -> f32 {
+		let noise = self.noise_config_3d.vec3_on_unit(position);
+		noise as f32 * (self.max_height - self.min_height) + self.min_height
 	}
 
 	pub fn build(&self) -> Grove<T, L> {
@@ -97,12 +82,25 @@ impl<T: Material, L: Material> GroveBuilder<T, L> {
 					);
 
 				if self.meets_threshold(position) {
-					let tree = TreeRenderItem::new(
-						self.trunk_material.clone(),
-						self.leaf_material.clone(),
-					)
-					.with_tree_cache(self.tree_cache.clone())
-					.with_leaf_cache(self.leaf_cache.clone());
+					let tree_builder = TreeBuilder {
+						anchor: position,
+						height: self.get_height(position),
+						branch_count: 4,
+						leaf_ball_scale: Vec3::new(1.0, 1.0, 1.0),
+						noise_config_3d: self.noise_config_3d.clone(),
+						noise_config_4d: self.noise_config_4d.clone(),
+						ball_variety: 0,
+						ball_cache: self.leaf_cache.clone(),
+						stick_variety: 1,
+						stick_cache: self.tree_cache.clone(),
+						leaf_variety: 1,
+						leaf_cache: self.leaf_cache.clone(),
+						stick_material: self.trunk_material.clone(),
+						leaf_material: self.leaf_material.clone(),
+					};
+
+					let tree = tree_builder.build();
+
 					trees.push((position, tree));
 				}
 			}
@@ -113,7 +111,7 @@ impl<T: Material, L: Material> GroveBuilder<T, L> {
 
 #[derive(Component, Clone)]
 pub struct Grove<T: Material, L: Material> {
-	trees: Vec<(Vec3, TreeRenderItem<T, L>)>,
+	trees: Vec<(Vec3, Tree<NoisyBall, SimpleTrunkSegment, NoisyBall, T, L>)>,
 }
 
 impl<T: Material, L: Material> RenderItem for Grove<T, L> {
