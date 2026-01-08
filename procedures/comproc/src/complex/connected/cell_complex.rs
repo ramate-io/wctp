@@ -39,6 +39,10 @@ impl<O, V: Vertex, E: Edge<O, V>, F: Face<O, V, E>> CellComplex3d<O, V, E, F> {
 		}
 	}
 
+	pub fn unique_edges(&self) -> HashSet<&E> {
+		self.e_to_f.keys().collect()
+	}
+
 	pub fn unique_faces(&self) -> HashSet<&F> {
 		self.e_to_f.values().flat_map(|e| e.iter()).collect()
 	}
